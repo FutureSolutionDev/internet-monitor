@@ -114,6 +114,20 @@ const LANGS = {
     startup_on: "✅ مفعّل",
     startup_off: "تم الإيقاف",
     startup_err: "❌ فشل",
+    nav_speed: "قياس السرعة",
+    speed_title: "قياس سرعة الإنترنت",
+    speed_run: "قياس السرعة",
+    speed_cancel: "إيقاف",
+    speed_dl: "التنزيل",
+    speed_ul: "الرفع",
+    speed_running: "جاري القياس...",
+    speed_done: "✅ اكتمل",
+    speed_cancelled: "تم الإيقاف",
+    speed_upload_soon: "قريباً",
+    speed_history_title: "سجل الاختبارات",
+    speed_triggered: "المصدر",
+    speed_user: "يدوي",
+    speed_schedule: "تلقائي",
   },
   en: {
     appName: "Internet Monitor",
@@ -224,6 +238,20 @@ const LANGS = {
     startup_on: "✅ Enabled",
     startup_off: "Disabled",
     startup_err: "❌ Failed",
+    nav_speed: "Speed Test",
+    speed_title: "Internet Speed Test",
+    speed_run: "Run Speed Test",
+    speed_cancel: "Cancel",
+    speed_dl: "Download",
+    speed_ul: "Upload",
+    speed_running: "Testing...",
+    speed_done: "✅ Done",
+    speed_cancelled: "Cancelled",
+    speed_upload_soon: "Coming soon",
+    speed_history_title: "Test History",
+    speed_triggered: "Source",
+    speed_user: "Manual",
+    speed_schedule: "Scheduled",
   },
 };
 
@@ -291,6 +319,7 @@ function showTab(name) {
   document.querySelector('[data-tab="' + name + '"]').classList.add("active");
   if (name === "logs") loadLogDates();
   if (name === "settings") loadSettings();
+  if (name === "speed") loadSpeedHistory();
 }
 
 // ── Chart ──────────────────────────────────────────────────────
@@ -469,6 +498,10 @@ let avgSum = 0,
 function process(d) {
   if (d.update_info && d.update_info.has_update)
     showUpdateBanner(d.update_info);
+  if (d.type === 'speed_test_progress') {
+    handleSpeedProgress(d);
+    return;
+  }
   const prevStatus = lastData ? lastData.status : null;
   lastData = d;
   const st = d.status || "checking";
@@ -1379,3 +1412,100 @@ api.get("/api/update")
 
 // Check after a short delay so the Go binding has time to register
 setTimeout(checkNativeMode, 500);
+
+// ── Speed Test ─────────────────────────────────────────────────
+
+function handleSpeedProgress(d) {
+  const fill = document.getElementById('speed-progress-fill');
+  const status = document.getElementById('speed-status');
+  const dl = document.getElementById('speed-dl-result');
+  const wrap = document.getElementById('speed-progress-wrap');
+
+  if (d.cancelled) {
+    if (status) status.textContent = t('speed_cancelled');
+    _speedReset();
+    return;
+  }
+  if (d.done) {
+    if (dl) dl.textContent = (d.current_mbps || 0).toFixed(1);
+    if (status) status.textContent = t('speed_done');
+    if (fill) fill.style.width = '100%';
+    _speedReset();
+    loadSpeedHistory();
+    return;
+  }
+  if (wrap) wrap.style.display = '';
+  if (fill) fill.style.width = Math.min((d.elapsed_seconds / 10) * 100, 99) + '%';
+  if (dl) dl.textContent = (d.current_mbps || 0).toFixed(1);
+  if (status) status.textContent = t('speed_running') + ' ' + (d.elapsed_seconds || 0).toFixed(1) + 's';
+}
+
+function _speedReset() {
+  const run = document.getElementById('speed-run-btn');
+  const cancel = document.getElementById('speed-cancel-btn');
+  if (run) run.disabled = false;
+  if (cancel) cancel.style.display = 'none';
+}
+
+async function startSpeedTest() {
+  const run = document.getElementById('speed-run-btn');
+  const cancel = document.getElementById('speed-cancel-btn');
+  const status = document.getElementById('speed-status');
+  const fill = document.getElementById('speed-progress-fill');
+  const wrap = document.getElementById('speed-progress-wrap');
+
+  if (run) run.disabled = true;
+  if (cancel) cancel.style.display = '';
+  if (status) status.textContent = t('speed_running');
+  if (fill) fill.style.width = '0%';
+  if (wrap) wrap.style.display = '';
+
+  try {
+    const r = await api.post('/api/speed-test/start');
+    if (r.status === 409) {
+      if (status) status.textContent = t('speed_running');
+    }
+  } catch (_) {
+    _speedReset();
+  }
+}
+
+async function cancelSpeedTest() {
+  try { await api.post('/api/speed-test/cancel'); } catch (_) {}
+  _speedReset();
+  const status = document.getElementById('speed-status');
+  if (status) status.textContent = t('speed_cancelled');
+}
+
+async function loadSpeedHistory() {
+  try {
+    const rows = await (await api.get('/api/speed-test/history')).json();
+    const tbody = document.getElementById('speed-history-tbody');
+    if (!tbody) return;
+    if (!rows || rows.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="empty">${t('no_events')}</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `<tr>
+      <td class="mono">${(r.timestamp || '').slice(11, 19)}</td>
+      <td class="mono">${(r.download_mbps || 0).toFixed(1)}</td>
+      <td class="mono">${(r.duration_seconds || 0).toFixed(1)}</td>
+      <td>${r.triggered_by === 'user' ? t('speed_user') : t('speed_schedule')}</td>
+    </tr>`).join('');
+  } catch (_) {}
+}
+
+async function exportSpeedCSV() {
+  try {
+    const rows = await (await api.get('/api/speed-test/history?limit=1000')).json();
+    if (!rows || rows.length === 0) return;
+    const header = 'Timestamp,Download (Mbps),Duration (s),Triggered By\n';
+    const csv = header + rows.map(r =>
+      `${r.timestamp},${(r.download_mbps || 0).toFixed(1)},${(r.duration_seconds || 0).toFixed(1)},${r.triggered_by}`
+    ).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'speedtest-history.csv';
+    a.click();
+  } catch (_) {}
+}

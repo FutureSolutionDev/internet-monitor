@@ -144,3 +144,21 @@ select:focus, input:focus { border-color: var(--blue); }
 
 /* Warning banner */
 .warn-banner { background: rgba(234,179,8,.08); border: 1px solid rgba(234,179,8,.3); border-radius: 8px; padding: 10px 14px; display: flex; align-items: flex-start; gap: 8px; margin-bottom: 16px; font-size: 13px; color: var(--yellow); }
+
+/* Speed Test Tab */
+.speed-test-panel { display: flex; flex-direction: column; gap: 20px; }
+.speed-controls { display: flex; gap: 10px; align-items: center; }
+.speed-results { display: flex; gap: 16px; flex-wrap: wrap; }
+.speed-result-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 20px 28px; text-align: center; min-width: 130px; }
+.speed-result-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.speed-result-value { font-size: 40px; font-weight: 700; color: var(--blue); font-variant-numeric: tabular-nums; }
+.speed-result-unit { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.speed-progress-wrap { display: flex; flex-direction: column; gap: 6px; }
+.speed-progress-bar { height: 8px; background: var(--bg3); border-radius: 8px; overflow: hidden; }
+.speed-progress-bar #speed-progress-fill { height: 100%; background: var(--blue); border-radius: 8px; transition: width .5s ease; }
+.speed-status-text { font-size: 12px; color: var(--muted); }
+.btn-primary { background: var(--blue); color: #fff; border: none; border-radius: 8px; padding: 8px 20px; cursor: pointer; font-size: 14px; font-weight: 600; }
+.btn-primary:hover { background: #3b82f6; }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 16px; cursor: pointer; font-size: 13px; }
+.btn-secondary:hover { background: var(--bg3); }
