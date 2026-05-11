@@ -2,287 +2,6 @@
    Internet Monitor — Dashboard App
    ═══════════════════════════════════════════════════════════════ */
 
-// ── i18n ──────────────────────────────────────────────────────
-const LANGS = {
-  ar: {
-    appName: "مراقب الإنترنت",
-    nav_dashboard: "لوحة التحكم",
-    nav_logs: "السجلات",
-    nav_settings: "الإعدادات",
-    status_connected: "متصل",
-    status_disconnected: "منقطع",
-    status_degraded: "ضعيف الإشارة",
-    status_checking: "جاري الفحص...",
-    status_wait: "في انتظار أول فحص",
-    status_sub_ok: "جميع الفحوصات ناجحة",
-    latency: "زمن الاستجابة",
-    uptime: "وقت التشغيل",
-    uptime_pct: "نسبة الاتصال",
-    disconnections: "انقطاعات",
-    avg_latency: "متوسط الاستجابة",
-    total_checks: "إجمالي الفحوصات",
-    chart_title: "زمن الاستجابة — آخر 60 فحص",
-    events_title: "سجل الأحداث",
-    col_time: "الوقت",
-    col_event: "الحدث",
-    col_duration: "المدة",
-    col_reason: "السبب",
-    no_events: "لا توجد أحداث بعد",
-    ticks_title: "آخر الفحوصات",
-    loss_label: "فقدان الحزم",
-    ev_connected: "متصل",
-    ev_disconnected: "انقطاع",
-    ev_degraded: "ضعيف",
-    logs_title: "عرض السجلات المخزنة",
-    logs_select: "اختر تاريخاً...",
-    logs_select_hint: "اختر تاريخاً لعرض السجلات",
-    logs_empty: "لا توجد سجلات لهذا التاريخ",
-    export_csv: "تصدير CSV",
-    log_count: "سجل",
-    grp_notif_test: "اختبار الإشعارات والصوت",
-    notif_test_note: "يشغّل النغمة ويعرض إشعار تجريبي على سطح المكتب",
-    test_notif: "اختبار الإشعار والصوت",
-    test_notif_ok: "✅ تم الإرسال",
-    test_notif_err: "❌ فشل",
-    test_webhook: "اختبار الـ Webhook",
-    test_webhook_ok: "✅ وصل بنجاح",
-    test_webhook_err: "❌ فشل",
-    test_webhook_no_url: "⚠️ لم يتم تعيين webhook_url",
-    webhook_unsupported: "يُدعم Discord و Slack فقط",
-    settings_title: "الإعدادات",
-    settings_save: "حفظ الإعدادات",
-    settings_saved: "✅ تم الحفظ بنجاح",
-    settings_error: "❌ فشل الحفظ",
-    requires_restart: "يتطلب إعادة تشغيل",
-    grp_behaviour: "سلوك المراقبة",
-    grp_targets: "العناوين المستهدفة",
-    grp_storage: "التخزين والإشعارات",
-    tag_affects_perf: "تؤثر على الأداء",
-    check_interval: "فترة الفحص (ثانية)",
-    fail_threshold: "عدد الفشل المتتالي للانقطاع",
-    fail_threshold_note: "بعد كم فشل متتالي يُعتبر الاتصال منقطعاً",
-    loss_threshold: "حد فقدان الحزم (%)",
-    loss_threshold_note: "فوق هذه النسبة يُعتبر ضعيفاً",
-    latency_threshold: "حد زمن الاستجابة (مللي ثانية)",
-    latency_threshold_note: "فوق هذا الحد يُعتبر ضعيفاً",
-    ping_targets_label: "عناوين TCP Ping",
-    ping_targets_note: "صيغة: host:port — مثال: 8.8.8.8:53",
-    http_targets_label: "عناوين HTTP للاختبار",
-    http_targets_note:
-      "يُجرَّب الأول ثم الثاني عند الفشل — يجب أن يرجع 200 أو 204",
-    dns_targets_label: "نطاقات اختبار DNS",
-    dns_targets_note:
-      "يُجرَّب الأول ثم الثاني عند الفشل — مثال: www.google.com",
-    add_target: "+ إضافة عنوان",
-    remove: "حذف",
-    http_target_label: "عنوان HTTP للاختبار",
-    http_target_note: "يجب أن يرجع 200 أو 204",
-    dns_target_label: "اسم النطاق لاختبار DNS",
-    dns_target_note: "مثال: www.google.com",
-    test: "اختبار",
-    test_all: "⚡ اختبار جميع العناوين",
-    testing: "جاري الاختبار...",
-    test_all_ok: "✅ جميع العناوين تعمل",
-    test_all_warn: "⚠️ بعض العناوين لا تستجيب",
-    test_warn_banner:
-      'العناوين المؤثرة على الأداء لم تُختبر — انقر "اختبار الكل" للتحقق قبل الحفظ',
-    webhook_url: "عنوان الـ Webhook (اختياري)",
-    webhook_note: "يُرسل إشعار JSON عند كل حدث — Discord / Slack / أي خدمة",
-    log_dir: "مجلد السجلات",
-    dashboard_port: "منفذ لوحة التحكم",
-    q_excellent: "ممتاز",
-    q_good: "جيد",
-    q_fair: "متوسط",
-    q_poor: "ضعيف",
-    q_critical: "حرج",
-    live: "مباشر",
-    reconnecting: "جاري إعادة الاتصال...",
-    reason_tcp: "فشل TCP Ping",
-    reason_http: "فشل HTTP",
-    reason_dns: "فشل DNS",
-    reason_loss: "فقدان",
-    reason_latency: "زمن استجابة عالٍ",
-    reason_ok: "اتصال طبيعي",
-    update_available: "إصدار جديد متاح",
-    update_now: "تحديث الآن",
-    update_downloading: "⏳ جاري التحميل...",
-    update_applying: "⚙️ جاري التطبيق...",
-    update_done: "✅ تم — سيُعاد التشغيل",
-    update_err: "❌ فشل التحديث",
-    grp_startup: "بدء التشغيل التلقائي",
-    startup_label: "تشغيل مع بدء Windows",
-    startup_note: "يبدأ التطبيق تلقائياً عند تشغيل الجهاز",
-    startup_on: "✅ مفعّل",
-    startup_off: "تم الإيقاف",
-    startup_err: "❌ فشل",
-    nav_speed: "قياس السرعة",
-    stab_monitoring: "المراقبة",
-    stab_targets: "العناوين",
-    stab_notifs: "الإشعارات",
-    stab_speedtest: "قياس السرعة",
-    grp_webhook: "الـ Webhook",
-    grp_speed_settings: "إعدادات قياس السرعة",
-    speed_timeout: "مدة الاختبار (ثانية)",
-    speed_timeout_note: "الافتراضي 10 ثواني — زيادتها تُحسّن الدقة على الروابط السريعة",
-    speed_privacy_note: "يستخدم speed.cloudflare.com",
-    speed_dl_targets: "عناوين اختبار التنزيل",
-    speed_targets_note: "سطر لكل عنوان",
-    speed_parallel: "اتصالات متوازية (1–8)",
-    speed_alert_threshold: "حد التنبيه (Mbps، 0 = معطّل)",
-    speed_title: "قياس سرعة الإنترنت",
-    speed_run: "قياس السرعة",
-    speed_cancel: "إيقاف",
-    speed_dl: "التنزيل",
-    speed_ul: "الرفع",
-    speed_running: "جاري القياس...",
-    speed_done: "✅ اكتمل",
-    speed_cancelled: "تم الإيقاف",
-    speed_upload_soon: "قريباً",
-    speed_history_title: "سجل الاختبارات",
-    speed_triggered: "المصدر",
-    speed_user: "يدوي",
-    speed_schedule: "تلقائي",
-  },
-  en: {
-    appName: "Internet Monitor",
-    nav_dashboard: "Dashboard",
-    nav_logs: "Logs",
-    nav_settings: "Settings",
-    status_connected: "Connected",
-    status_disconnected: "Disconnected",
-    status_degraded: "Degraded",
-    status_checking: "Checking...",
-    status_wait: "Waiting for first check",
-    status_sub_ok: "All checks passing",
-    latency: "Latency",
-    uptime: "Uptime",
-    uptime_pct: "Connection %",
-    disconnections: "Drops",
-    avg_latency: "Avg Latency",
-    total_checks: "Total Checks",
-    chart_title: "Latency — Last 60 Checks",
-    events_title: "Event Log",
-    col_time: "Time",
-    col_event: "Event",
-    col_duration: "Duration",
-    col_reason: "Reason",
-    no_events: "No events yet",
-    ticks_title: "Recent Checks",
-    loss_label: "Packet Loss",
-    ev_connected: "Connected",
-    ev_disconnected: "Disconnected",
-    ev_degraded: "Degraded",
-    logs_title: "View Stored Logs",
-    logs_select: "Select a date...",
-    logs_select_hint: "Select a date to view logs",
-    logs_empty: "No logs for this date",
-    export_csv: "Export CSV",
-    log_count: "record",
-    grp_notif_test: "Notification & Sound Test",
-    notif_test_note: "Plays the ringtone and shows a desktop notification",
-    test_notif: "Test Notification & Sound",
-    test_notif_ok: "✅ Sent",
-    test_notif_err: "❌ Failed",
-    test_webhook: "Test Webhook",
-    test_webhook_ok: "✅ Delivered",
-    test_webhook_err: "❌ Failed",
-    test_webhook_no_url: "⚠️ webhook_url not set",
-    webhook_unsupported: "Only Discord and Slack are supported",
-    settings_title: "Settings",
-    settings_save: "Save Settings",
-    settings_saved: "✅ Saved successfully",
-    settings_error: "❌ Save failed",
-    requires_restart: "Requires restart",
-    grp_behaviour: "Monitoring Behaviour",
-    grp_targets: "Check Targets",
-    grp_storage: "Storage & Notifications",
-    tag_affects_perf: "Affects performance",
-    check_interval: "Check interval (seconds)",
-    fail_threshold: "Failures before disconnect",
-    fail_threshold_note:
-      "How many consecutive failures trigger disconnect status",
-    loss_threshold: "Packet loss threshold (%)",
-    loss_threshold_note: "Above this % = degraded",
-    latency_threshold: "Latency threshold (ms)",
-    latency_threshold_note: "Above this ms = degraded",
-    ping_targets_label: "TCP Ping Targets",
-    ping_targets_note: "Format: host:port — e.g. 8.8.8.8:53",
-    http_targets_label: "HTTP Test URLs",
-    http_targets_note: "First OK result is used — must return 200 or 204",
-    dns_targets_label: "DNS Test Domains",
-    dns_targets_note: "First OK result is used — e.g. www.google.com",
-    add_target: "+ Add Target",
-    remove: "Remove",
-    http_target_label: "HTTP Check URL",
-    http_target_note: "Should return 200 or 204",
-    dns_target_label: "DNS Resolution Domain",
-    dns_target_note: "e.g. www.google.com",
-    test: "Test",
-    test_all: "⚡ Test All Targets",
-    testing: "Testing...",
-    test_all_ok: "✅ All targets responding",
-    test_all_warn: "⚠️ Some targets not responding",
-    test_warn_banner:
-      'Performance-critical targets have not been tested — click "Test All" before saving',
-    webhook_url: "Webhook URL (optional)",
-    webhook_note: "Discord / Slack / any JSON-compatible service",
-    log_dir: "Logs directory",
-    dashboard_port: "Dashboard port",
-    q_excellent: "Excellent",
-    q_good: "Good",
-    q_fair: "Fair",
-    q_poor: "Poor",
-    q_critical: "Critical",
-    live: "Live",
-    reconnecting: "Reconnecting...",
-    reason_tcp: "TCP Ping failed",
-    reason_http: "HTTP failed",
-    reason_dns: "DNS failed",
-    reason_loss: "Loss",
-    reason_latency: "High latency",
-    reason_ok: "All checks passing",
-    update_available: "New version available",
-    update_now: "Update Now",
-    update_downloading: "⏳ Downloading...",
-    update_applying: "⚙️ Applying...",
-    update_done: "✅ Done — restarting",
-    update_err: "❌ Update failed",
-    grp_startup: "System Startup",
-    startup_label: "Run at Windows Startup",
-    startup_note: "Starts automatically when Windows boots",
-    startup_on: "✅ Enabled",
-    startup_off: "Disabled",
-    startup_err: "❌ Failed",
-    nav_speed: "Speed Test",
-    stab_monitoring: "Monitoring",
-    stab_targets: "Targets",
-    stab_notifs: "Notifications",
-    stab_speedtest: "Speed Test",
-    grp_webhook: "Webhook",
-    grp_speed_settings: "Speed Test Settings",
-    speed_timeout: "Test duration (seconds)",
-    speed_timeout_note: "Default 10s — increase for better accuracy on fast links",
-    speed_privacy_note: "Uses speed.cloudflare.com — click for privacy policy",
-    speed_dl_targets: "Download Test Targets",
-    speed_targets_note: "One URL per line — default: speed.cloudflare.com/__down",
-    speed_parallel: "Parallel connections (1–8)",
-    speed_alert_threshold: "Alert threshold (Mbps, 0 = disabled)",
-    speed_title: "Internet Speed Test",
-    speed_run: "Run Speed Test",
-    speed_cancel: "Cancel",
-    speed_dl: "Download",
-    speed_ul: "Upload",
-    speed_running: "Testing...",
-    speed_done: "✅ Done",
-    speed_cancelled: "Cancelled",
-    speed_upload_soon: "Coming soon",
-    speed_history_title: "Test History",
-    speed_triggered: "Source",
-    speed_user: "Manual",
-    speed_schedule: "Scheduled",
-  },
-};
-
 let lang = localStorage.getItem("lang") || "en";
 function t(k) {
   return LANGS[lang][k] || k;
@@ -346,13 +65,20 @@ function showTab(name) {
   document.getElementById("tab-" + name).classList.add("active");
   document.querySelector('[data-tab="' + name + '"]').classList.add("active");
   if (name === "logs") loadLogDates();
-  if (name === "settings") { loadSettings(); showSettingsTab('monitoring'); }
+  if (name === "settings") {
+    loadSettings();
+    showSettingsTab("monitoring");
+  }
   if (name === "speed") loadSpeedHistory();
 }
 
 function showSettingsTab(name) {
-  document.querySelectorAll(".stab-content").forEach(el => el.classList.remove("active"));
-  document.querySelectorAll(".settings-nav-btn").forEach(el => el.classList.remove("active"));
+  document
+    .querySelectorAll(".stab-content")
+    .forEach((el) => el.classList.remove("active"));
+  document
+    .querySelectorAll(".settings-nav-btn")
+    .forEach((el) => el.classList.remove("active"));
   document.getElementById("stab-" + name)?.classList.add("active");
   document.querySelector('[data-stab="' + name + '"]')?.classList.add("active");
 }
@@ -488,14 +214,14 @@ function qualityGrade(pct, loss, lat) {
 // ── API client — no-cache, unified settings ────────────────────
 const api = {
   get(url) {
-    return fetch(url, { cache: 'no-store' });
+    return fetch(url, { cache: "no-store" });
   },
   post(url, body) {
     return fetch(url, {
-      method: 'POST',
-      cache: 'no-store',
+      method: "POST",
+      cache: "no-store",
       ...(body !== undefined && {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }),
     });
@@ -533,7 +259,7 @@ let avgSum = 0,
 function process(d) {
   if (d.update_info && d.update_info.has_update)
     showUpdateBanner(d.update_info);
-  if (d.type === 'speed_test_progress') {
+  if (d.type === "speed_test_progress") {
     handleSpeedProgress(d);
     return;
   }
@@ -628,21 +354,24 @@ function process(d) {
 
   // Ticks table
   if (d.ticks && d.ticks.length) {
-    document.getElementById("ticks-tbody").innerHTML = d.ticks.map(t_ => {
-      const ok  = t_.tcp_ok && t_.http_ok && t_.dns_ok;
-      const row = ok ? '' : ' class="tick-row-warn"';
-      const chk = (v) => v
-        ? '<span class="tick-ok">✓</span>'
-        : '<span class="tick-fail">✗</span>';
-      return `<tr${row}>
+    document.getElementById("ticks-tbody").innerHTML = d.ticks
+      .map((t_) => {
+        const ok = t_.tcp_ok && t_.http_ok && t_.dns_ok;
+        const row = ok ? "" : ' class="tick-row-warn"';
+        const chk = (v) =>
+          v
+            ? '<span class="tick-ok">✓</span>'
+            : '<span class="tick-fail">✗</span>';
+        return `<tr${row}>
         <td class="mono">${t_.time}</td>
         <td>${chk(t_.tcp_ok)}</td>
         <td>${chk(t_.http_ok)}</td>
         <td>${chk(t_.dns_ok)}</td>
-        <td class="mono">${t_.latency_ms > 0 ? t_.latency_ms + 'ms' : '—'}</td>
-        <td class="mono">${t_.packet_loss_pct > 0 ? t_.packet_loss_pct.toFixed(1) + '%' : '—'}</td>
+        <td class="mono">${t_.latency_ms > 0 ? t_.latency_ms + "ms" : "—"}</td>
+        <td class="mono">${t_.packet_loss_pct > 0 ? t_.packet_loss_pct.toFixed(1) + "%" : "—"}</td>
       </tr>`;
-    }).join("");
+      })
+      .join("");
   }
 }
 
@@ -897,14 +626,18 @@ function removePingTarget(i) {
 function renderSpeedTargets() {
   const c = document.getElementById("speed-targets-container");
   if (!c) return;
-  c.innerHTML = speedTargets.map((target, i) => `
+  c.innerHTML = speedTargets
+    .map(
+      (target, i) => `
     <div class="target-row" id="speed-row-${i}">
       <input type="text" id="speed-target-${i}" value="${escHtml(target)}"
              placeholder="https://speed.cloudflare.com/__down"
              oninput="speedTargets[${i}]=this.value">
-      <button class="btn-remove" onclick="removeSpeedTarget(${i})" title="${t('remove')}">×</button>
+      <button class="btn-remove" onclick="removeSpeedTarget(${i})" title="${t("remove")}">×</button>
     </div>
-  `).join("");
+  `,
+    )
+    .join("");
 }
 
 function addSpeedTarget() {
@@ -1101,7 +834,9 @@ async function loadSettings() {
     document.getElementById("cfg-log-dir").value = cfg.log_dir || "logs";
     document.getElementById("cfg-port").value = cfg.dashboard_port || 8765;
     const st = cfg.speed_test || {};
-    speedTargets = [...(st.download_targets || ["https://speed.cloudflare.com/__down"])];
+    speedTargets = [
+      ...(st.download_targets || ["https://speed.cloudflare.com/__down"]),
+    ];
     renderSpeedTargets();
     const parallel = document.getElementById("cfg-speed-parallel");
     if (parallel) parallel.value = st.parallel_connections || 4;
@@ -1176,9 +911,15 @@ async function toggleStartup(enabled) {
 
 // ── Save settings ──────────────────────────────────────────────
 async function saveSettings() {
-  const allMsgs = ['save-msg','save-msg-targets','save-msg-notifs','save-msg-speed']
-    .map(id => document.getElementById(id)).filter(Boolean);
-  const msg = allMsgs.find(el => el.offsetParent !== null) || allMsgs[0];
+  const allMsgs = [
+    "save-msg",
+    "save-msg-targets",
+    "save-msg-notifs",
+    "save-msg-speed",
+  ]
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+  const msg = allMsgs.find((el) => el.offsetParent !== null) || allMsgs[0];
   if (msg) msg.textContent = "";
 
   // Sync all target arrays from inputs
@@ -1214,13 +955,18 @@ async function saveSettings() {
     cfg.http_targets = httpTargets.filter((v) => v.trim());
     cfg.dns_targets = dnsTargets.filter((v) => v.trim());
 
-    const stTargets = speedTargets.map(s => s.trim()).filter(Boolean);
+    const stTargets = speedTargets.map((s) => s.trim()).filter(Boolean);
     cfg.speed_test = {
-      download_targets: stTargets.length ? stTargets : ["https://speed.cloudflare.com/__down"],
-      parallel_connections: parseInt(document.getElementById("cfg-speed-parallel")?.value) || 4,
-      timeout_seconds: parseInt(document.getElementById("cfg-speed-timeout")?.value) || 10,
+      download_targets: stTargets.length
+        ? stTargets
+        : ["https://speed.cloudflare.com/__down"],
+      parallel_connections:
+        parseInt(document.getElementById("cfg-speed-parallel")?.value) || 4,
+      timeout_seconds:
+        parseInt(document.getElementById("cfg-speed-timeout")?.value) || 10,
       upload_target: cfg.speed_test?.upload_target || "",
-      alert_threshold_mbps: parseFloat(document.getElementById("cfg-speed-alert")?.value) || 0,
+      alert_threshold_mbps:
+        parseFloat(document.getElementById("cfg-speed-alert")?.value) || 0,
     };
 
     const res = await api.post("/api/config", cfg);
@@ -1445,7 +1191,8 @@ applyLang();
 connect();
 
 // Show version in header
-api.get("/api/version")
+api
+  .get("/api/version")
   .then((r) => r.json())
   .then((d) => {
     const el = document.getElementById("app-version");
@@ -1505,7 +1252,8 @@ async function applyUpdate() {
 }
 
 // Check for available update on page load
-api.get("/api/update")
+api
+  .get("/api/update")
   .then((r) => r.json())
   .then((d) => {
     if (d.has_update) showUpdateBanner(d);
@@ -1518,55 +1266,58 @@ setTimeout(checkNativeMode, 500);
 // ── Speed Test ─────────────────────────────────────────────────
 
 function handleSpeedProgress(d) {
-  const fill = document.getElementById('speed-progress-fill');
-  const status = document.getElementById('speed-status');
-  const dl = document.getElementById('speed-dl-result');
-  const wrap = document.getElementById('speed-progress-wrap');
+  const fill = document.getElementById("speed-progress-fill");
+  const status = document.getElementById("speed-status");
+  const dl = document.getElementById("speed-dl-result");
+  const wrap = document.getElementById("speed-progress-wrap");
 
   if (d.cancelled) {
-    if (status) status.textContent = t('speed_cancelled');
+    if (status) status.textContent = t("speed_cancelled");
     _speedReset();
     return;
   }
   if (d.done) {
     if (dl) dl.textContent = (d.current_mbps || 0).toFixed(1);
-    if (status) status.textContent = t('speed_done');
-    if (fill) fill.style.width = '100%';
+    if (status) status.textContent = t("speed_done");
+    if (fill) fill.style.width = "100%";
     _speedReset();
     loadSpeedHistory();
     return;
   }
-  if (wrap) wrap.style.display = '';
+  if (wrap) wrap.style.display = "";
   const total = d.total_seconds || 10;
-  if (fill) fill.style.width = Math.min((d.elapsed_seconds / total) * 100, 99) + '%';
+  if (fill)
+    fill.style.width = Math.min((d.elapsed_seconds / total) * 100, 99) + "%";
   if (dl) dl.textContent = (d.current_mbps || 0).toFixed(1);
-  if (status) status.textContent = t('speed_running') + ' ' + (d.elapsed_seconds || 0).toFixed(1) + 's';
+  if (status)
+    status.textContent =
+      t("speed_running") + " " + (d.elapsed_seconds || 0).toFixed(1) + "s";
 }
 
 function _speedReset() {
-  const run = document.getElementById('speed-run-btn');
-  const cancel = document.getElementById('speed-cancel-btn');
+  const run = document.getElementById("speed-run-btn");
+  const cancel = document.getElementById("speed-cancel-btn");
   if (run) run.disabled = false;
-  if (cancel) cancel.style.display = 'none';
+  if (cancel) cancel.style.display = "none";
 }
 
 async function startSpeedTest() {
-  const run = document.getElementById('speed-run-btn');
-  const cancel = document.getElementById('speed-cancel-btn');
-  const status = document.getElementById('speed-status');
-  const fill = document.getElementById('speed-progress-fill');
-  const wrap = document.getElementById('speed-progress-wrap');
+  const run = document.getElementById("speed-run-btn");
+  const cancel = document.getElementById("speed-cancel-btn");
+  const status = document.getElementById("speed-status");
+  const fill = document.getElementById("speed-progress-fill");
+  const wrap = document.getElementById("speed-progress-wrap");
 
   if (run) run.disabled = true;
-  if (cancel) cancel.style.display = '';
-  if (status) status.textContent = t('speed_running');
-  if (fill) fill.style.width = '0%';
-  if (wrap) wrap.style.display = '';
+  if (cancel) cancel.style.display = "";
+  if (status) status.textContent = t("speed_running");
+  if (fill) fill.style.width = "0%";
+  if (wrap) wrap.style.display = "";
 
   try {
-    const r = await api.post('/api/speed-test/start');
+    const r = await api.post("/api/speed-test/start");
     if (r.status === 409) {
-      if (status) status.textContent = t('speed_running');
+      if (status) status.textContent = t("speed_running");
     }
   } catch (_) {
     _speedReset();
@@ -1574,41 +1325,54 @@ async function startSpeedTest() {
 }
 
 async function cancelSpeedTest() {
-  try { await api.post('/api/speed-test/cancel'); } catch (_) {}
+  try {
+    await api.post("/api/speed-test/cancel");
+  } catch (_) {}
   _speedReset();
-  const status = document.getElementById('speed-status');
-  if (status) status.textContent = t('speed_cancelled');
+  const status = document.getElementById("speed-status");
+  if (status) status.textContent = t("speed_cancelled");
 }
 
 async function loadSpeedHistory() {
   try {
-    const rows = await (await api.get('/api/speed-test/history')).json();
-    const tbody = document.getElementById('speed-history-tbody');
+    const rows = await (await api.get("/api/speed-test/history")).json();
+    const tbody = document.getElementById("speed-history-tbody");
     if (!tbody) return;
     if (!rows || rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="4" class="empty">${t('no_events')}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="4" class="empty">${t("no_events")}</td></tr>`;
       return;
     }
-    tbody.innerHTML = rows.map(r => `<tr>
-      <td class="mono">${(r.timestamp || '').slice(11, 19)}</td>
+    tbody.innerHTML = rows
+      .map(
+        (r) => `<tr>
+      <td class="mono">${(r.timestamp || "").slice(11, 19)}</td>
       <td class="mono">${(r.download_mbps || 0).toFixed(1)}</td>
       <td class="mono">${(r.duration_seconds || 0).toFixed(1)}</td>
-      <td>${r.triggered_by === 'user' ? t('speed_user') : t('speed_schedule')}</td>
-    </tr>`).join('');
+      <td>${r.triggered_by === "user" ? t("speed_user") : t("speed_schedule")}</td>
+    </tr>`,
+      )
+      .join("");
   } catch (_) {}
 }
 
 async function exportSpeedCSV() {
   try {
-    const rows = await (await api.get('/api/speed-test/history?limit=1000')).json();
+    const rows = await (
+      await api.get("/api/speed-test/history?limit=1000")
+    ).json();
     if (!rows || rows.length === 0) return;
-    const header = 'Timestamp,Download (Mbps),Duration (s),Triggered By\n';
-    const csv = header + rows.map(r =>
-      `${r.timestamp},${(r.download_mbps || 0).toFixed(1)},${(r.duration_seconds || 0).toFixed(1)},${r.triggered_by}`
-    ).join('\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = 'speedtest-history.csv';
+    const header = "Timestamp,Download (Mbps),Duration (s),Triggered By\n";
+    const csv =
+      header +
+      rows
+        .map(
+          (r) =>
+            `${r.timestamp},${(r.download_mbps || 0).toFixed(1)},${(r.duration_seconds || 0).toFixed(1)},${r.triggered_by}`,
+        )
+        .join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "speedtest-history.csv";
     a.click();
   } catch (_) {}
 }
