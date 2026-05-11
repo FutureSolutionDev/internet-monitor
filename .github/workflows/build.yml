@@ -2,22 +2,21 @@ name: Build & Release
 
 on:
   push:
-    branches: [master, main]  # build at each push to master
-    tags:
-      - 'v*'                  # release at tag
+    branches: [master, main]   # كل push على master → build + release تلقائي
   pull_request:
-    branches: [master, main]
-  workflow_dispatch:          # manual trigger from GitHub UI
+    branches: [master, main]   # على PRs: build بس بدون release
+  workflow_dispatch:
 
 env:
   GO_VERSION: '1.21'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 # ══════════════════════════════════════════════════════════════
-# JOBS
+# BUILD JOBS
 # ══════════════════════════════════════════════════════════════
 jobs:
 
-  # ── Windows Tray — without CGO، built from Linux ───────────────
+  # ── Windows Tray — بدون CGO، يُبنى من Linux ───────────────
   windows-tray:
     name: "🪟 Windows Tray (cross-compile)"
     runs-on: ubuntu-latest
@@ -41,7 +40,7 @@ jobs:
           name: windows-tray
           path: internet-monitor-windows.exe
 
-  # ── Windows GUI — CGO + WebView2، need Windows runner ────
+  # ── Windows GUI — CGO + WebView2 ────────────────────────────
   windows-gui:
     name: "🪟 Windows GUI (native)"
     runs-on: windows-latest
@@ -63,8 +62,7 @@ jobs:
           name: windows-gui
           path: internet-monitor-gui-windows.exe
 
-  # ── macOS — arm64 native + amd64 cross-compile (single runner) ─
-  # macos-latest = Apple Silicon — Xcode supports cross-compiling to x86_64
+  # ── macOS — arm64 native + amd64 cross-compile ──────────────
   macos:
     name: "🍎 macOS (arm64 + intel)"
     runs-on: macos-latest
@@ -103,10 +101,10 @@ jobs:
             internet-monitor-gui-macos-arm64
             internet-monitor-gui-macos-intel
 
-  # ── Linux — AppIndicator + WebKitGTK ───────────────────────
+  # ── Linux — AppIndicator + WebKitGTK ────────────────────────
   linux:
     name: "🐧 Linux (ubuntu-22.04)"
-    runs-on: ubuntu-22.04          # installed on 22.04 to ensure webkit2gtk-4.0
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
@@ -140,18 +138,35 @@ jobs:
             internet-monitor-linux
             internet-monitor-gui-linux
 
-  # ══════════════════════════════════════════════════════════
-  # RELEASE — works only at push tag (v*)
-  # ══════════════════════════════════════════════════════════
+  # ══════════════════════════════════════════════════════════════
+  # AUTO RELEASE — يعمل فقط على push لـ master (مش PRs)
+  # 1. يولّد version tag تلقائي من الـ commits (feat/fix/BREAKING)
+  # 2. GitHub AI يكتب الـ changelog من الـ commits والـ PRs
+  # ══════════════════════════════════════════════════════════════
   release:
-    name: "🚀 Create GitHub Release"
+    name: "🚀 Auto Release"
     needs: [windows-tray, windows-gui, macos, linux]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'push'
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # محتاج كل الـ history عشان يحسب الـ version
+
+      # ── يولّد version tag تلقائي ──────────────────────────────
+      # feat: commit   → minor bump  (v1.1.0)
+      # fix: commit    → patch bump  (v1.0.1)
+      # BREAKING CHANGE → major bump (v2.0.0)
+      # أي commit تاني → patch bump  (v1.0.1)
+      - name: Generate version tag
+        id: tag
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: patch
+          release_branches: master,main
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -160,17 +175,22 @@ jobs:
           path: dist/
 
       - name: Make Linux/macOS binaries executable
-        run: chmod +x dist/internet-monitor-linux dist/internet-monitor-gui-linux dist/internet-monitor-macos-* dist/internet-monitor-gui-macos-* 2>/dev/null || true
+        run: |
+          chmod +x \
+            dist/internet-monitor-linux \
+            dist/internet-monitor-gui-linux \
+            dist/internet-monitor-macos-* \
+            dist/internet-monitor-gui-macos-* \
+            2>/dev/null || true
 
-      - name: Show artifacts
-        run: ls -lh dist/
-
+      # ── ينشر Release بـ AI-generated changelog ───────────────
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "Internet Monitor ${{ github.ref_name }}"
-          draft: false
-          prerelease: ${{ contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
+          tag_name: ${{ steps.tag.outputs.new_tag }}
+          name: "Internet Monitor ${{ steps.tag.outputs.new_tag }}"
+          generate_release_notes: true   # GitHub AI يكتب الـ changelog
+          prerelease: false
           files: |
             dist/internet-monitor-windows.exe
             dist/internet-monitor-gui-windows.exe
@@ -182,23 +202,23 @@ jobs:
             dist/internet-monitor-gui-linux
             config.json
           body: |
-            ## مراقب الإنترنت — Internet Monitor ${{ github.ref_name }}
+            ## مراقب الإنترنت — Internet Monitor ${{ steps.tag.outputs.new_tag }}
 
-            ### Download the appropriate file for your device
+            ### حمّل الملف المناسب لجهازك
 
-            | File | System | App Type |
-            |-------|--------|-------------|
-            | `internet-monitor-windows.exe` | Windows 10/11 | Runs in the background (Tray icon) |
-            | `internet-monitor-gui-windows.exe` | Windows 10/11 | Standalone window |
-            | `internet-monitor-macos-intel` | macOS Intel | Runs in the background |
-            | `internet-monitor-macos-arm64` | macOS M1/M2/M3 | Runs in the background |
-            | `internet-monitor-gui-macos-intel` | macOS Intel | Standalone window |
-            | `internet-monitor-gui-macos-arm64` | macOS M1/M2/M3 | Standalone window |
-            | `internet-monitor-linux` | Ubuntu/Debian | Runs in the background |
-            | `internet-monitor-gui-linux` | Ubuntu/Debian | Standalone window |
+            | الملف | النظام | النوع |
+            | ----- | ------ | ----- |
+            | `internet-monitor-windows.exe` | Windows 10/11 | Tray (خلفية) |
+            | `internet-monitor-gui-windows.exe` | Windows 10/11 | نافذة مستقلة |
+            | `internet-monitor-macos-arm64` | macOS M1/M2/M3 | Tray |
+            | `internet-monitor-macos-intel` | macOS Intel | Tray |
+            | `internet-monitor-gui-macos-arm64` | macOS M1/M2/M3 | نافذة مستقلة |
+            | `internet-monitor-gui-macos-intel` | macOS Intel | نافذة مستقلة |
+            | `internet-monitor-linux` | Linux | Tray |
+            | `internet-monitor-gui-linux` | Linux | نافذة مستقلة |
 
-            > **Instructions:** Download the binary and `config.json` in the same folder.
+            > حمّل الملف التنفيذي فقط — `config.json` بيتعمل تلقائياً أول تشغيل.
 
             ---
-            Built automatically with GitHub Actions ·
-            [Source code](https://github.com/${{ github.repository }})
+
+            <!-- تفاصيل الـ changelog بتتولّد تلقائياً من GitHub أعلاه -->
