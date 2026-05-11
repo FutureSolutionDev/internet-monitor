@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Internet Monitor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:    #0f172a;
+      --bg2:   #1e293b;
+      --bg3:   #334155;
+      --text:  #f1f5f9;
+      --muted: #94a3b8;
+      --green: #22c55e;
+      --yellow:#eab308;
+      --red:   #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+    /* ── Header ── */
+    header {
+      background: var(--bg2); border-bottom: 1px solid var(--bg3);
+      padding: 14px 24px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 10;
+    }
+    #dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); transition: background .4s; flex-shrink: 0; }
+    header h1 { font-size: 15px; font-weight: 600; }
+    #hdr-right { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--muted); }
+    #hdr-time { font-variant-numeric: tabular-nums; }
+
+    /* ── Layout ── */
+    .content { padding: 24px; max-width: 1000px; margin: 0 auto; }
+
+    /* ── Status card ── */
+    #status-card {
+      border-radius: 12px; padding: 24px 28px; margin-bottom: 16px;
+      background: var(--bg2); border: 2px solid var(--bg3);
+      display: flex; align-items: center; gap: 20px; transition: border-color .4s;
+    }
+    #status-circle {
+      width: 52px; height: 52px; border-radius: 50%; background: var(--muted);
+      flex-shrink: 0; transition: background .4s; display: flex; align-items: center;
+      justify-content: center; font-size: 22px;
+    }
+    #status-text  { font-size: 26px; font-weight: 700; letter-spacing: .5px; }
+    #status-sub   { font-size: 13px; color: var(--muted); margin-top: 3px; }
+    #latency-big  { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+    #latency-lbl  { font-size: 11px; color: var(--muted); text-align: right; text-transform: uppercase; letter-spacing: .5px; margin-top: 2px; }
+
+    /* ── Stat cards ── */
+    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+    .card  { background: var(--bg2); border: 1px solid var(--bg3); border-radius: 10px; padding: 16px 18px; }
+    .card-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .card-label { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
+
+    /* ── Section ── */
+    .section { background: var(--bg2); border: 1px solid var(--bg3); border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
+    .section-title { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 14px; }
+
+    /* ── Chart ── */
+    #chart-wrap { height: 150px; position: relative; }
+    .checks { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
+    .badge-check { font-size: 12px; padding: 3px 10px; border-radius: 999px; font-weight: 500; }
+    .ok   { background: rgba(34,197,94,.15);  color: var(--green); }
+    .fail { background: rgba(239,68,68,.15);  color: var(--red);   }
+    #loss-val { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+    /* ── Event table ── */
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); padding: 6px 10px; border-bottom: 1px solid var(--bg3); }
+    td { padding: 9px 10px; font-size: 13px; border-bottom: 1px solid rgba(51,65,85,.4); }
+    tr:last-child td { border-bottom: none; }
+    .badge { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+    .badge-connected    { background: rgba(34,197,94,.15);  color: var(--green);  }
+    .badge-degraded     { background: rgba(234,179,8,.15);  color: var(--yellow); }
+    .badge-disconnected { background: rgba(239,68,68,.15);  color: var(--red);    }
+    .empty { text-align: center; padding: 28px; color: var(--muted); font-size: 13px; }
+    .mono { font-family: monospace; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div id="dot"></div>
+  <h1>Internet Monitor</h1>
+  <div id="hdr-right">
+    <span id="hdr-status">Connecting...</span>
+    <span id="hdr-time">--:--:--</span>
+  </div>
+</header>
+
+<div class="content">
+
+  <!-- Status Card -->
+  <div id="status-card">
+    <div id="status-circle">🌐</div>
+    <div style="flex:1">
+      <div id="status-text">CHECKING...</div>
+      <div id="status-sub">Waiting for first check</div>
+    </div>
+    <div>
+      <div id="latency-big">—</div>
+      <div id="latency-lbl">Latency</div>
+    </div>
+  </div>
+
+  <!-- Stat Cards -->
+  <div class="cards">
+    <div class="card">
+      <div class="card-value" id="st-uptime">—</div>
+      <div class="card-label">Uptime</div>
+    </div>
+    <div class="card">
+      <div class="card-value" id="st-drops">0</div>
+      <div class="card-label">Disconnections</div>
+    </div>
+    <div class="card">
+      <div class="card-value" id="st-avg">—</div>
+      <div class="card-label">Avg Latency</div>
+    </div>
+    <div class="card">
+      <div class="card-value" id="st-checks">0</div>
+      <div class="card-label">Total Checks</div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="section">
+    <div class="section-title">Latency — Last 60 Checks</div>
+    <div id="chart-wrap"><canvas id="the-chart"></canvas></div>
+    <div class="checks">
+      <span class="badge-check ok"  id="chk-tcp">TCP ✓</span>
+      <span class="badge-check ok"  id="chk-http">HTTP ✓</span>
+      <span class="badge-check ok"  id="chk-dns">DNS ✓</span>
+      <span id="loss-val">Loss: 0.0%</span>
+    </div>
+  </div>
+
+  <!-- Event Log -->
+  <div class="section">
+    <div class="section-title">Event Log</div>
+    <table>
+      <thead>
+        <tr><th>Time</th><th>Event</th><th>Duration</th><th>Reason</th></tr>
+      </thead>
+      <tbody id="event-tbody">
+        <tr><td colspan="4" class="empty">No events yet</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+// ── Clock ──────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById('hdr-time').textContent =
+    new Date().toLocaleTimeString();
+}, 1000);
+
+// ── Chart ──────────────────────────────────────────────
+const chartData    = { labels: [], datasets: [{ label: 'ms', data: [], borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.07)', borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: .35, fill: true }] };
+const chart = new Chart(document.getElementById('the-chart').getContext('2d'), {
+  type: 'line', data: chartData,
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    animation: { duration: 250 },
+    scales: {
+      x: { display: false },
+      y: { beginAtZero: true, grid: { color: 'rgba(51,65,85,.5)' },
+           ticks: { color: '#94a3b8', callback: v => v + 'ms' }, border: { display: false } }
+    },
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y + 'ms' } } }
+  }
+});
+
+// ── Helpers ────────────────────────────────────────────
+const C = {
+  connected:    { dot: '#22c55e', border: 'rgba(34,197,94,.4)',  circle: '#22c55e', icon: '✅' },
+  degraded:     { dot: '#eab308', border: 'rgba(234,179,8,.4)',  circle: '#eab308', icon: '⚠️' },
+  disconnected: { dot: '#ef4444', border: 'rgba(239,68,68,.4)',  circle: '#ef4444', icon: '❌' },
+  checking:     { dot: '#94a3b8', border: 'rgba(148,163,184,.2)', circle: '#94a3b8', icon: '🌐' },
+};
+
+function fmtDur(s) {
+  if (!s || s < 1) return '—';
+  if (s < 60) return s.toFixed(0) + 's';
+  if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60|0) + 's';
+  return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
+}
+function fmtUptime(s) {
+  const h = s/3600|0, m = (s%3600/60)|0, sec = s%60|0;
+  return h > 0 ? h+'h '+m+'m' : m > 0 ? m+'m '+sec+'s' : sec+'s';
+}
+
+let avgSum = 0, avgCnt = 0;
+
+function applyStatus(st) {
+  const c = C[st] || C.checking;
+  document.getElementById('dot').style.background            = c.dot;
+  document.getElementById('status-card').style.borderColor  = c.border;
+  document.getElementById('status-circle').style.background = c.circle;
+  document.getElementById('status-circle').textContent      = c.icon;
+  document.getElementById('status-text').textContent        = st.toUpperCase();
+  document.getElementById('hdr-status').textContent         = st.charAt(0).toUpperCase() + st.slice(1);
+  chartData.datasets[0].borderColor      = c.dot;
+  chartData.datasets[0].backgroundColor = c.dot + '12';
+}
+
+function process(d) {
+  applyStatus(d.status || 'checking');
+
+  const lat = d.latency_ms || 0;
+  document.getElementById('latency-big').textContent = lat > 0 ? lat + 'ms' : '—';
+  document.getElementById('status-sub').textContent  =
+    d.tcp_ping_ok && d.http_ok && d.dns_ok
+      ? 'All checks passing'
+      : 'Packet loss: ' + (d.packet_loss||0).toFixed(1) + '%';
+
+  document.getElementById('st-uptime').textContent = fmtUptime(d.uptime_seconds || 0);
+  document.getElementById('st-drops').textContent  = d.disconnections || 0;
+  document.getElementById('st-checks').textContent = (d.total_checks || 0).toLocaleString();
+
+  if (lat > 0) { avgSum += lat; avgCnt++; }
+  document.getElementById('st-avg').textContent = avgCnt ? (avgSum/avgCnt|0) + 'ms' : '—';
+
+  // Check badges
+  function setChk(id, ok, label) {
+    const el = document.getElementById(id);
+    el.textContent = label + (ok ? ' ✓' : ' ✗');
+    el.className   = 'badge-check ' + (ok ? 'ok' : 'fail');
+  }
+  setChk('chk-tcp',  d.tcp_ping_ok, 'TCP');
+  setChk('chk-http', d.http_ok,     'HTTP');
+  setChk('chk-dns',  d.dns_ok,      'DNS');
+  document.getElementById('loss-val').textContent = 'Loss: ' + (d.packet_loss||0).toFixed(1) + '%';
+
+  // Chart — use full history from server
+  if (d.latency_history && d.latency_history.length) {
+    chartData.labels   = d.latency_history.map((_, i) => i);
+    chartData.datasets[0].data = d.latency_history;
+    chart.update('none');
+  }
+
+  // Events
+  if (d.events && d.events.length) {
+    const tbody = document.getElementById('event-tbody');
+    tbody.innerHTML = d.events.map(e => `
+      <tr>
+        <td class="mono">${e.time}</td>
+        <td><span class="badge badge-${e.event_type}">${e.event_type}</span></td>
+        <td class="mono">${fmtDur(e.duration_seconds)}</td>
+        <td style="color:var(--muted)">${e.reason}</td>
+      </tr>`).join('');
+  }
+}
+
+// ── SSE ────────────────────────────────────────────────
+function connect() {
+  const es = new EventSource('/events');
+  es.onopen    = () => document.getElementById('hdr-status').textContent = 'Live';
+  es.onmessage = e => { try { process(JSON.parse(e.data)); } catch(_) {} };
+  es.onerror   = () => {
+    document.getElementById('hdr-status').textContent = 'Reconnecting...';
+    es.close();
+    setTimeout(connect, 3000);
+  };
+}
+connect();
+</script>
+</body>
+</html>

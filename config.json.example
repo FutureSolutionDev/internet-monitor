@@ -1,0 +1,11 @@
+{
+  "check_interval_sec": 5,
+  "ping_targets": ["8.8.8.8:53", "1.1.1.1:53"],
+  "http_target": "https://connectivitycheck.gstatic.com/generate_204",
+  "dns_target": "www.google.com",
+  "fail_threshold": 3,
+  "packet_loss_threshold": 20.0,
+  "latency_threshold_ms": 500,
+  "log_dir": "logs",
+  "webhook_url": "https://discord.com/api/webhooks/{{ID}}/{{TOKEN}}"
+}
