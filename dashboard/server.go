@@ -1,3 +1,4 @@
+// Package dashboard serves the web-based monitoring UI and REST API over HTTP.
 package dashboard
 
 import (

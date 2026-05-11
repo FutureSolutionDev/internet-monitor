@@ -1,3 +1,4 @@
+// Package monitor performs TCP ping, HTTP, and DNS connectivity checks.
 package monitor
 
 import (
