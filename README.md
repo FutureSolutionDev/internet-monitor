@@ -17,7 +17,11 @@ Runs silently in the background, logs every disconnection with its cause and dur
 
 ![Dashboard Arabic RTL](docs/screenshot-dashboard-ar.png)
 
+![Speed Test Running](docs/screenshot-speed-running.png)
+
 ![Speed Test Result](docs/screenshot-speed-result.png)
+
+![Logs](docs/screenshot-logs.png)
 
 ![Settings Targets](docs/screenshot-settings-targets.png)
 

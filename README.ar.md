@@ -17,7 +17,11 @@
 
 ![لوحة التحكم — إنجليزي](docs/screenshot-dashboard.png)
 
+![قياس السرعة — جاري التشغيل](docs/screenshot-speed-running.png)
+
 ![نتيجة قياس السرعة](docs/screenshot-speed-result.png)
+
+![السجلات](docs/screenshot-logs.png)
 
 ![الإعدادات — العناوين](docs/screenshot-settings-targets.png)
 
