@@ -13,10 +13,13 @@
 
 ---
 
-<!-- مكان الصور
-![لوحة تحكم مراقب الإنترنت](docs/screenshot-dashboard.png)
-استبدل هذا التعليق بالصور الفعلية عند توفّرها.
--->
+![لوحة التحكم — عربي](docs/screenshot-dashboard-ar.png)
+
+![لوحة التحكم — إنجليزي](docs/screenshot-dashboard.png)
+
+![نتيجة قياس السرعة](docs/screenshot-speed-result.png)
+
+![الإعدادات — العناوين](docs/screenshot-settings-targets.png)
 
 ## 💡 لماذا مراقب الإنترنت؟
 

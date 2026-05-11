@@ -13,10 +13,13 @@ Runs silently in the background, logs every disconnection with its cause and dur
 
 ---
 
-<!-- SCREENSHOT PLACEHOLDER
-![Internet Monitor Dashboard](docs/screenshot-dashboard.png)
-Replace this comment with actual screenshots once available.
--->
+![Dashboard](docs/screenshot-dashboard.png)
+
+![Dashboard Arabic RTL](docs/screenshot-dashboard-ar.png)
+
+![Speed Test Result](docs/screenshot-speed-result.png)
+
+![Settings Targets](docs/screenshot-settings-targets.png)
 
 ## 💡 Why Internet Monitor?
 
