@@ -2,24 +2,53 @@ name: Build & Release
 
 on:
   push:
-    branches: [master, main]   # triggers build + auto-release on every push to master
+    branches: [master, main]
   pull_request:
-    branches: [master, main]   # triggers build only (no release) on PRs
-  workflow_dispatch:            # manual trigger from GitHub UI
+    branches: [master, main]
+  workflow_dispatch:
 
 env:
   GO_VERSION: '1.21'
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-# ══════════════════════════════════════════════════════════════
-# BUILD JOBS
-# ══════════════════════════════════════════════════════════════
 jobs:
+
+  # ══════════════════════════════════════════════════════════════
+  # VERSION — generates the semver tag first (push only)
+  # Build jobs depend on this so they embed the correct version.
+  # ══════════════════════════════════════════════════════════════
+  version:
+    name: "🏷️ Generate Version Tag"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+    outputs:
+      new_tag: ${{ steps.tag.outputs.new_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate version tag
+        id: tag
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: patch
+          release_branches: master,main
+
+  # ══════════════════════════════════════════════════════════════
+  # BUILD JOBS — all depend on version (if: always() keeps them
+  # running on PRs where version job is skipped)
+  # ══════════════════════════════════════════════════════════════
 
   # ── Windows Tray — no CGO, cross-compiled from Linux ─────────
   windows-tray:
     name: "🪟 Windows Tray (cross-compile)"
     runs-on: ubuntu-latest
+    needs: [version]
+    if: always()
     steps:
       - uses: actions/checkout@v4
 
@@ -33,7 +62,8 @@ jobs:
           CGO_ENABLED: 0
           GOOS: windows
           GOARCH: amd64
-        run: go build -ldflags="-H=windowsgui -s -w -X main.Version=${{ github.ref_name }}" -o internet-monitor-windows.exe .
+          VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
+        run: go build -ldflags="-H=windowsgui -s -w -X main.Version=$VERSION" -o internet-monitor-windows.exe .
 
       - uses: actions/upload-artifact@v4
         with:
@@ -44,6 +74,8 @@ jobs:
   windows-gui:
     name: "🪟 Windows GUI (native)"
     runs-on: windows-latest
+    needs: [version]
+    if: always()
     steps:
       - uses: actions/checkout@v4
 
@@ -61,7 +93,8 @@ jobs:
       - name: Build
         env:
           CGO_ENABLED: 1
-        run: go build -ldflags="-H=windowsgui -s -w" -o internet-monitor-gui-windows.exe ./cmd/gui/
+          VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
+        run: go build -ldflags="-H=windowsgui -s -w -X main.Version=$env:VERSION" -o internet-monitor-gui-windows.exe ./cmd/gui/
 
       - uses: actions/upload-artifact@v4
         with:
@@ -72,6 +105,8 @@ jobs:
   macos:
     name: "🍎 macOS (arm64 + intel)"
     runs-on: macos-latest
+    needs: [version]
+    if: always()
     steps:
       - uses: actions/checkout@v4
 
@@ -84,9 +119,10 @@ jobs:
         env:
           CGO_ENABLED: 1
           GOARCH: arm64
+          VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
         run: |
-          go build -ldflags="-s -w" -o internet-monitor-macos-arm64 .
-          go build -ldflags="-s -w" -o internet-monitor-gui-macos-arm64 ./cmd/gui/
+          go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-macos-arm64 .
+          go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-gui-macos-arm64 ./cmd/gui/
 
       - name: Build Intel/amd64 (cross-compile via Xcode)
         env:
@@ -94,9 +130,10 @@ jobs:
           GOARCH: amd64
           CGO_CFLAGS: "-arch x86_64"
           CGO_LDFLAGS: "-arch x86_64"
+          VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
         run: |
-          go build -ldflags="-s -w" -o internet-monitor-macos-intel .
-          go build -ldflags="-s -w" -o internet-monitor-gui-macos-intel ./cmd/gui/
+          go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-macos-intel .
+          go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-gui-macos-intel ./cmd/gui/
 
       - uses: actions/upload-artifact@v4
         with:
@@ -110,7 +147,9 @@ jobs:
   # ── Linux — AppIndicator (systray) + WebKitGTK (native GUI) ──
   linux:
     name: "🐧 Linux (ubuntu-22.04)"
-    runs-on: ubuntu-22.04          # pinned to 22.04 to ensure webkit2gtk-4.0 availability
+    runs-on: ubuntu-22.04
+    needs: [version]
+    if: always()
     steps:
       - uses: actions/checkout@v4
 
@@ -130,12 +169,14 @@ jobs:
       - name: Build Tray
         env:
           CGO_ENABLED: 1
-        run: go build -ldflags="-s -w" -o internet-monitor-linux .
+          VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
+        run: go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-linux .
 
       - name: Build GUI
         env:
           CGO_ENABLED: 1
-        run: go build -ldflags="-s -w" -o internet-monitor-gui-linux ./cmd/gui/
+          VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
+        run: go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-gui-linux ./cmd/gui/
 
       - uses: actions/upload-artifact@v4
         with:
@@ -145,34 +186,18 @@ jobs:
             internet-monitor-gui-linux
 
   # ══════════════════════════════════════════════════════════════
-  # AUTO RELEASE — runs only on push to master (not on PRs)
-  # 1. Auto-generates a version tag from commits (feat/fix/BREAKING)
-  # 2. GitHub AI writes the changelog from commits and PRs
+  # RELEASE — runs only on push to master, after all builds pass
+  # Tag was already created by the version job above.
   # ══════════════════════════════════════════════════════════════
   release:
     name: "🚀 Auto Release"
-    needs: [windows-tray, windows-gui, macos, linux]
+    needs: [version, windows-tray, windows-gui, macos, linux]
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && needs.version.outputs.new_tag != ''
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # full history required to calculate the next version tag
-
-      # Auto-generates a semantic version tag from commit messages:
-      # feat: commit        → minor bump  (v1.1.0)
-      # fix: commit         → patch bump  (v1.0.1)
-      # BREAKING CHANGE     → major bump  (v2.0.0)
-      # any other commit    → patch bump  (v1.0.1)
-      - name: Generate version tag
-        id: tag
-        uses: mathieudutour/github-tag-action@v6.2
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          default_bump: patch
-          release_branches: master,main
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -189,13 +214,12 @@ jobs:
             dist/internet-monitor-gui-macos-* \
             2>/dev/null || true
 
-      # Creates the GitHub Release with AI-generated changelog
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.new_tag }}
-          name: "Internet Monitor ${{ steps.tag.outputs.new_tag }}"
-          generate_release_notes: true   # GitHub AI writes the changelog
+          tag_name: ${{ needs.version.outputs.new_tag }}
+          name: "Internet Monitor ${{ needs.version.outputs.new_tag }}"
+          generate_release_notes: true
           prerelease: false
           files: |
             dist/internet-monitor-windows.exe
@@ -208,7 +232,7 @@ jobs:
             dist/internet-monitor-gui-linux
             config.json
           body: |
-            ## Internet Monitor ${{ steps.tag.outputs.new_tag }}
+            ## Internet Monitor ${{ needs.version.outputs.new_tag }}
 
             ### Download the right file for your OS
 
