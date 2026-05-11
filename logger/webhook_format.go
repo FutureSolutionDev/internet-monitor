@@ -182,34 +182,55 @@ func BuildTestPayload(results TestResults, url string) interface{} {
 	return slackTestPayload(results)
 }
 
-// ── Speed Alert Payload ──────────────────────────────────────
+// ── Speed Test Result Payload ─────────────────────────────────
 
-func BuildSpeedAlertPayload(event SpeedTestEvent, thresholdMbps float64, url string) interface{} {
+// BuildSpeedResultPayload creates a webhook payload for a completed speed test.
+// Uses warning color if belowThreshold is true.
+func BuildSpeedResultPayload(event SpeedTestEvent, thresholdMbps float64, belowThreshold bool, url string) interface{} {
+	title := "🚀 Speed Test Completed"
+	color := 0x22C55E // green
+	if belowThreshold {
+		title = "⚠️ Speed Drop Detected"
+		color = 0xEAB308 // yellow
+	}
+
+	fields := []map[string]interface{}{
+		{"name": "📥 Download", "value": fmt.Sprintf("%.1f Mbps", event.DownloadMbps), "inline": true},
+		{"name": "⏱️ Duration", "value": fmt.Sprintf("%.1fs", event.DurationSeconds), "inline": true},
+		{"name": "📡 Latency", "value": fmt.Sprintf("%dms", event.LatencyMs), "inline": true},
+	}
+	if belowThreshold && thresholdMbps > 0 {
+		fields = append(fields, map[string]interface{}{
+			"name": "⚠️ Threshold", "value": fmt.Sprintf("%.1f Mbps", thresholdMbps), "inline": true,
+		})
+	}
+
 	if IsDiscord(url) {
 		return map[string]interface{}{
 			"username": "Internet Monitor",
 			"embeds": []map[string]interface{}{{
-				"title": "⚠️ Speed Drop Detected",
-				"color": 0xEAB308,
-				"fields": []map[string]interface{}{
-					{"name": "📉 Download Speed", "value": fmt.Sprintf("%.1f Mbps", event.DownloadMbps), "inline": true},
-					{"name": "⚠️ Threshold", "value": fmt.Sprintf("%.1f Mbps", thresholdMbps), "inline": true},
-					{"name": "🕒 Time", "value": event.Timestamp.Format(time.RFC3339), "inline": false},
-				},
+				"title":     title,
+				"color":     color,
+				"fields":    fields,
 				"timestamp": event.Timestamp.Format(time.RFC3339),
 			}},
 		}
 	}
+
+	statusIcon := "✅"
+	if belowThreshold {
+		statusIcon = "⚠️"
+	}
+	text := fmt.Sprintf("*%s %s*\n📥 Download: *%.1f Mbps* | ⏱️ %.1fs | 📡 %dms",
+		statusIcon, title, event.DownloadMbps, event.DurationSeconds, event.LatencyMs)
+	if belowThreshold && thresholdMbps > 0 {
+		text += fmt.Sprintf("\n⚠️ Below threshold: %.1f Mbps", thresholdMbps)
+	}
 	return map[string]interface{}{
-		"blocks": []map[string]interface{}{
-			{
-				"type": "section",
-				"text": map[string]interface{}{
-					"type": "mrkdwn",
-					"text": fmt.Sprintf("*⚠️ Speed Drop Detected*\n📉 Download: *%.1f Mbps* (threshold: %.1f Mbps)", event.DownloadMbps, thresholdMbps),
-				},
-			},
-		},
+		"blocks": []map[string]interface{}{{
+			"type": "section",
+			"text": map[string]interface{}{"type": "mrkdwn", "text": text},
+		}},
 	}
 }
 

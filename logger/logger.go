@@ -118,12 +118,13 @@ func (l *Logger) LogSpeedTest(event SpeedTestEvent) {
 	}
 }
 
-// SendSpeedTestAlert sends a webhook notification when speed drops below threshold.
-func (l *Logger) SendSpeedTestAlert(webhookURL string, event SpeedTestEvent, thresholdMbps float64) {
+// SendSpeedTestResult sends the speed test result to the webhook.
+// If belowThreshold is true, the payload is styled as a warning alert.
+func (l *Logger) SendSpeedTestResult(webhookURL string, event SpeedTestEvent, thresholdMbps float64, belowThreshold bool) {
 	if webhookURL == "" || !IsSupportedWebhook(webhookURL) {
 		return
 	}
-	go l.sendWebhook(webhookURL, BuildSpeedAlertPayload(event, thresholdMbps, webhookURL))
+	go l.sendWebhook(webhookURL, BuildSpeedResultPayload(event, thresholdMbps, belowThreshold, webhookURL))
 }
 
 // buildEventPayload creates a Discord+generic compatible payload for a connectivity event.

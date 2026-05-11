@@ -851,11 +851,11 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 
 		if s.lgr != nil {
 			s.lgr.LogSpeedTest(event)
-		}
-
-		if cfg.SpeedTest.AlertThresholdMbps > 0 && result.DownloadMbps < cfg.SpeedTest.AlertThresholdMbps {
-			if s.lgr != nil {
-				s.lgr.SendSpeedTestAlert(cfg.WebhookURL, event, cfg.SpeedTest.AlertThresholdMbps)
+			// Always send webhook with speed test result if webhook is configured
+			if cfg.WebhookURL != "" {
+				belowThreshold := cfg.SpeedTest.AlertThresholdMbps > 0 &&
+					result.DownloadMbps < cfg.SpeedTest.AlertThresholdMbps
+				s.lgr.SendSpeedTestResult(cfg.WebhookURL, event, cfg.SpeedTest.AlertThresholdMbps, belowThreshold)
 			}
 		}
 

@@ -15,7 +15,8 @@
 body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Tahoma, sans-serif; min-height: 100vh; }
 
 /* Header */
-header { background: var(--bg2); border-bottom: 1px solid var(--bg3); padding: 12px 20px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 100; }
+.sticky-top { position: sticky; top: 0; z-index: 100; }
+header { background: var(--bg2); border-bottom: 1px solid var(--bg3); padding: 12px 20px; display: flex; align-items: center; gap: 10px; }
 #dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); transition: background .4s; flex-shrink: 0; }
 header h1 { font-size: 15px; font-weight: 600; }
 .hdr-right { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; }
