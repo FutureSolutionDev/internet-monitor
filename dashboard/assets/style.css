@@ -147,14 +147,12 @@ select:focus, input:focus { border-color: var(--blue); }
 .warn-banner { background: rgba(234,179,8,.08); border: 1px solid rgba(234,179,8,.3); border-radius: 8px; padding: 10px 14px; display: flex; align-items: flex-start; gap: 8px; margin-bottom: 16px; font-size: 13px; color: var(--yellow); }
 
 /* Recent Checks table — sticky header + scrollable body */
-.ticks-wrap { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.ticks-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.ticks-wrap { border: 1px solid var(--border); border-radius: 8px; max-height: 40rem; overflow-y: auto; }
+.ticks-table { width: 100%; border-collapse: collapse; }
 .ticks-table th,
 .ticks-table td { padding: 7px 12px; font-size: 13px; border-bottom: 1px solid var(--border); }
-.ticks-table thead th { background: var(--bg2); color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.ticks-table thead th { position: sticky; top: 0; z-index: 1; background: var(--bg2); color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 .ticks-table tbody tr:last-child td { border-bottom: none; }
-.ticks-scroll { max-height: 40rem; overflow-y: auto; }
-.ticks-scroll .ticks-table thead { display: none; }
 .tick-ok   { color: var(--green); font-weight: 700; }
 .tick-fail { color: var(--red);   font-weight: 700; }
 .tick-row-warn td { background: rgba(239,68,68,.04); }
