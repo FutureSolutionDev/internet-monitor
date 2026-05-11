@@ -32,6 +32,11 @@ func main() {
 	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir)
 	dash.Start()
 
+	// Use favicon.png as the tray icon (embedded in the dashboard assets)
+	if png := dashboard.FaviconPNG(); len(png) > 0 {
+		tray.SetCustomIcon(png)
+	}
+
 	checker := monitor.NewChecker(cfg)
 	t := tray.New(cfg, checker, lgr, dash.URL())
 	t.OnTick  = dash.UpdateTick

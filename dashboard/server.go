@@ -22,6 +22,12 @@ import (
 //go:embed assets
 var staticFiles embed.FS
 
+// FaviconPNG returns the raw bytes of assets/favicon.png for use as the tray icon.
+func FaviconPNG() []byte {
+	data, _ := staticFiles.ReadFile("assets/favicon.png")
+	return data
+}
+
 const maxHistory = 60
 const maxEvents = 100
 
