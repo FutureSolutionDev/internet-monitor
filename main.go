@@ -39,7 +39,7 @@ func main() {
 		log.Fatalf("failed to init logger: %v", err)
 	}
 
-	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir, Version)
+	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir, Version, lgr)
 	dash.OnApplyUpdate = updater.Apply
 	dash.OnRestartApp = updater.Restart
 	dash.OnTestWebhook = lgr.SendTestWebhook

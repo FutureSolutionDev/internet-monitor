@@ -182,6 +182,37 @@ func BuildTestPayload(results TestResults, url string) interface{} {
 	return slackTestPayload(results)
 }
 
+// ── Speed Alert Payload ──────────────────────────────────────
+
+func BuildSpeedAlertPayload(event SpeedTestEvent, thresholdMbps float64, url string) interface{} {
+	if IsDiscord(url) {
+		return map[string]interface{}{
+			"username": "Internet Monitor",
+			"embeds": []map[string]interface{}{{
+				"title": "⚠️ Speed Drop Detected",
+				"color": 0xEAB308,
+				"fields": []map[string]interface{}{
+					{"name": "📉 Download Speed", "value": fmt.Sprintf("%.1f Mbps", event.DownloadMbps), "inline": true},
+					{"name": "⚠️ Threshold", "value": fmt.Sprintf("%.1f Mbps", thresholdMbps), "inline": true},
+					{"name": "🕒 Time", "value": event.Timestamp.Format(time.RFC3339), "inline": false},
+				},
+				"timestamp": event.Timestamp.Format(time.RFC3339),
+			}},
+		}
+	}
+	return map[string]interface{}{
+		"blocks": []map[string]interface{}{
+			{
+				"type": "section",
+				"text": map[string]interface{}{
+					"type": "mrkdwn",
+					"text": fmt.Sprintf("*⚠️ Speed Drop Detected*\n📉 Download: *%.1f Mbps* (threshold: %.1f Mbps)", event.DownloadMbps, thresholdMbps),
+				},
+			},
+		},
+	}
+}
+
 func discordTestPayload(results TestResults) map[string]interface{} {
 	allOK := results.AllOK()
 	color := 0x22C55E

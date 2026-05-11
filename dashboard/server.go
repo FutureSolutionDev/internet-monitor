@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"internet-monitor/config"
 	"internet-monitor/logger"
+	"internet-monitor/speedtest"
 	"internet-monitor/startup"
 	"internet-monitor/types"
+	"sync/atomic"
 	"io"
 	"net"
 	"net/http"
@@ -166,6 +168,7 @@ type Server struct {
 	port       int
 	configPath string
 	logDir     string
+	lgr        *logger.Logger
 	clients    map[chan string]struct{}
 	mu         sync.Mutex
 
@@ -193,13 +196,19 @@ type Server struct {
 	startTime      time.Time
 	latencyHistory []int64
 	events         []EventEntry
+
+	// Speed test state
+	stRunning atomic.Bool
+	stCancel  context.CancelFunc
+	stLast    *logger.SpeedTestEvent
 }
 
-func NewServer(port int, configPath, logDir, version string) *Server {
+func NewServer(port int, configPath, logDir, version string, lgr *logger.Logger) *Server {
 	return &Server{
 		port:       port,
 		configPath: configPath,
 		logDir:     logDir,
+		lgr:        lgr,
 		version:    version,
 		clients:    make(map[chan string]struct{}),
 		startTime:  time.Now(),
@@ -233,6 +242,9 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/test-webhook", s.serveTestWebhook)
 	mux.HandleFunc("/api/update", s.serveUpdate)
 	mux.HandleFunc("/api/startup", s.serveStartup)
+	mux.HandleFunc("/api/speed-test/start", s.serveSpeedTestStart)
+	mux.HandleFunc("/api/speed-test/cancel", s.serveSpeedTestCancel)
+	mux.HandleFunc("/api/speed-test/history", s.serveSpeedTestHistory)
 
 	go http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", s.port), mux)
 }
@@ -754,4 +766,196 @@ func simplifyError(e string) string {
 	default:
 		return "error"
 	}
+}
+
+// ── Speed Test ────────────────────────────────────────────────
+
+func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.stRunning.Load() {
+		w.WriteHeader(http.StatusConflict)
+		w.Write([]byte(`{"error":"test_already_running"}`))
+		return
+	}
+	s.stRunning.Store(true)
+
+	data, _ := os.ReadFile(s.configPath)
+	var cfg config.Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		cfg = config.Default
+	}
+	if len(cfg.SpeedTest.DownloadTargets) == 0 {
+		cfg.SpeedTest = config.Default.SpeedTest
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.stateMu.Lock()
+	s.stCancel = cancel
+	s.stateMu.Unlock()
+
+	stCfg := speedtest.Config{
+		Endpoints: cfg.SpeedTest.DownloadTargets,
+		Parallel:  cfg.SpeedTest.ParallelConnections,
+		Timeout:   10 * time.Second,
+	}
+
+	go func() {
+		defer func() {
+			s.stRunning.Store(false)
+			cancel()
+		}()
+
+		result, err := speedtest.Run(ctx, stCfg, func(mbps float64, elapsed time.Duration) {
+			progress, _ := json.Marshal(map[string]interface{}{
+				"type":            "speed_test_progress",
+				"phase":           "download",
+				"current_mbps":    mbps,
+				"elapsed_seconds": elapsed.Seconds(),
+				"done":            false,
+			})
+			s.broadcastRaw(string(progress))
+		})
+
+		if ctx.Err() != nil && (result == nil || result.DownloadMbps == 0) {
+			cancelled, _ := json.Marshal(map[string]interface{}{
+				"type":      "speed_test_progress",
+				"done":      true,
+				"cancelled": true,
+			})
+			s.broadcastRaw(string(cancelled))
+			return
+		}
+
+		if err != nil || result == nil {
+			return
+		}
+
+		s.stateMu.RLock()
+		latency := s.latencyMs
+		s.stateMu.RUnlock()
+
+		event := logger.SpeedTestEvent{
+			Timestamp:       time.Now().UTC(),
+			Event:           "speed_test",
+			DownloadMbps:    result.DownloadMbps,
+			LatencyMs:       latency,
+			DurationSeconds: result.DurationSeconds,
+			Endpoints:       result.Endpoints,
+			ParallelConns:   result.ParallelConns,
+			TriggeredBy:     "user",
+		}
+
+		if s.lgr != nil {
+			s.lgr.LogSpeedTest(event)
+		}
+
+		if cfg.SpeedTest.AlertThresholdMbps > 0 && result.DownloadMbps < cfg.SpeedTest.AlertThresholdMbps {
+			if s.lgr != nil {
+				s.lgr.SendSpeedTestAlert(cfg.WebhookURL, event, cfg.SpeedTest.AlertThresholdMbps)
+			}
+		}
+
+		s.stateMu.Lock()
+		s.stLast = &event
+		s.stateMu.Unlock()
+
+		done, _ := json.Marshal(map[string]interface{}{
+			"type":  "speed_test_progress",
+			"phase": "download",
+			"current_mbps": result.DownloadMbps,
+			"elapsed_seconds": result.DurationSeconds,
+			"done":   true,
+			"result": event,
+		})
+		s.broadcastRaw(string(done))
+	}()
+
+	w.Write([]byte(`{"ok":true}`))
+}
+
+func (s *Server) serveSpeedTestCancel(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.stateMu.Lock()
+	if s.stCancel != nil {
+		s.stCancel()
+		s.stCancel = nil
+	}
+	s.stateMu.Unlock()
+	s.stRunning.Store(false)
+	w.Write([]byte(`{"ok":true}`))
+}
+
+func (s *Server) serveSpeedTestHistory(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	limit := 20
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := parseInt(v); err == nil && n > 0 {
+			if n > 100 {
+				n = 100
+			}
+			limit = n
+		}
+	}
+	date := r.URL.Query().Get("date")
+	if date == "" {
+		date = time.Now().Format("2006-01-02")
+	}
+
+	filename := filepath.Join(s.logDir, fmt.Sprintf("speedtest_%s.jsonl", date))
+	data, err := os.ReadFile(filename)
+	if os.IsNotExist(err) {
+		w.Write([]byte("[]"))
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	lines := bytes.Split(bytes.TrimSpace(data), []byte{'\n'})
+	entries := make([]json.RawMessage, 0, len(lines))
+	for _, line := range lines {
+		line = bytes.TrimSpace(line)
+		if len(line) > 0 && json.Valid(line) {
+			entries = append(entries, json.RawMessage(line))
+		}
+	}
+	// Reverse to newest-first
+	for i, j := 0, len(entries)-1; i < j; i, j = i+1, j-1 {
+		entries[i], entries[j] = entries[j], entries[i]
+	}
+	if len(entries) > limit {
+		entries = entries[:limit]
+	}
+	json.NewEncoder(w).Encode(entries)
+}
+
+func (s *Server) broadcastRaw(msg string) {
+	s.mu.Lock()
+	for ch := range s.clients {
+		select {
+		case ch <- msg:
+		default:
+		}
+	}
+	s.mu.Unlock()
+}
+
+func parseInt(s string) (int, error) {
+	n := 0
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return 0, fmt.Errorf("invalid")
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n, nil
 }
