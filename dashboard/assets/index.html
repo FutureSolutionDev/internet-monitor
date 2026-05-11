@@ -343,6 +343,28 @@
       <button class="btn btn-primary" onclick="saveSettings()" data-i18n="settings_save">حفظ الإعدادات</button>
       <span id="save-msg"></span>
     </div>
+
+    <!-- ── Speed Test Settings ── -->
+    <div class="settings-group">
+      <div class="settings-group-title" data-i18n="grp_speed_settings">إعدادات قياس السرعة</div>
+      <div class="field-note" style="margin-bottom:12px;color:var(--muted);font-size:12px" data-i18n="speed_privacy_note">يستخدم speed.cloudflare.com — اضغط هنا للاطلاع على سياسة الخصوصية</div>
+      <div class="settings-grid">
+        <div class="field full-width">
+          <label data-i18n="speed_dl_targets">عناوين اختبار التنزيل</label>
+          <textarea id="cfg-speed-targets" rows="2" style="width:100%;font-family:monospace;font-size:12px"></textarea>
+          <div class="field-note" data-i18n="speed_targets_note">سطر لكل عنوان — الافتراضي: speed.cloudflare.com/__down</div>
+        </div>
+        <div class="field">
+          <label data-i18n="speed_parallel">اتصالات متوازية (1–8)</label>
+          <input type="number" id="cfg-speed-parallel" min="1" max="8" value="4">
+        </div>
+        <div class="field">
+          <label data-i18n="speed_alert_threshold">حد التنبيه (Mbps، 0 = معطّل)</label>
+          <input type="number" id="cfg-speed-alert" min="0" step="1" value="0">
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 </div>

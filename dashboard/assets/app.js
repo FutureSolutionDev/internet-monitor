@@ -115,6 +115,12 @@ const LANGS = {
     startup_off: "تم الإيقاف",
     startup_err: "❌ فشل",
     nav_speed: "قياس السرعة",
+    grp_speed_settings: "إعدادات قياس السرعة",
+    speed_privacy_note: "يستخدم speed.cloudflare.com",
+    speed_dl_targets: "عناوين اختبار التنزيل",
+    speed_targets_note: "سطر لكل عنوان",
+    speed_parallel: "اتصالات متوازية (1–8)",
+    speed_alert_threshold: "حد التنبيه (Mbps، 0 = معطّل)",
     speed_title: "قياس سرعة الإنترنت",
     speed_run: "قياس السرعة",
     speed_cancel: "إيقاف",
@@ -239,6 +245,12 @@ const LANGS = {
     startup_off: "Disabled",
     startup_err: "❌ Failed",
     nav_speed: "Speed Test",
+    grp_speed_settings: "Speed Test Settings",
+    speed_privacy_note: "Uses speed.cloudflare.com — click for privacy policy",
+    speed_dl_targets: "Download Test Targets",
+    speed_targets_note: "One URL per line — default: speed.cloudflare.com/__down",
+    speed_parallel: "Parallel connections (1–8)",
+    speed_alert_threshold: "Alert threshold (Mbps, 0 = disabled)",
     speed_title: "Internet Speed Test",
     speed_run: "Run Speed Test",
     speed_cancel: "Cancel",
@@ -1018,6 +1030,13 @@ async function loadSettings() {
     validateWebhookURL(cfg.webhook_url || "");
     document.getElementById("cfg-log-dir").value = cfg.log_dir || "logs";
     document.getElementById("cfg-port").value = cfg.dashboard_port || 8765;
+    const st = cfg.speed_test || {};
+    const targets = document.getElementById("cfg-speed-targets");
+    if (targets) targets.value = (st.download_targets || ["https://speed.cloudflare.com/__down"]).join("\n");
+    const parallel = document.getElementById("cfg-speed-parallel");
+    if (parallel) parallel.value = st.parallel_connections || 4;
+    const alert = document.getElementById("cfg-speed-alert");
+    if (alert) alert.value = st.alert_threshold_mbps || 0;
 
     pingTargets = Array.isArray(cfg.ping_targets)
       ? [...cfg.ping_targets]
@@ -1120,6 +1139,15 @@ async function saveSettings() {
     cfg.ping_targets = pingTargets.filter((v) => v.trim());
     cfg.http_targets = httpTargets.filter((v) => v.trim());
     cfg.dns_targets = dnsTargets.filter((v) => v.trim());
+
+    const stTargetsEl = document.getElementById("cfg-speed-targets");
+    const stTargets = stTargetsEl ? stTargetsEl.value.split("\n").map(s => s.trim()).filter(Boolean) : [];
+    cfg.speed_test = {
+      download_targets: stTargets.length ? stTargets : ["https://speed.cloudflare.com/__down"],
+      parallel_connections: parseInt(document.getElementById("cfg-speed-parallel")?.value) || 4,
+      upload_target: cfg.speed_test?.upload_target || "",
+      alert_threshold_mbps: parseFloat(document.getElementById("cfg-speed-alert")?.value) || 0,
+    };
 
     const res = await api.post("/api/config", cfg);
 
