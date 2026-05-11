@@ -7,6 +7,7 @@ import (
 	"internet-monitor/tray"
 	"runtime"
 	"syscall"
+	"time"
 
 	webview "github.com/webview/webview_go"
 
@@ -67,7 +68,13 @@ func initTray(w webview.WebView, hwnd uintptr) func() {
 		default:
 			close(quit)
 		}
-		<-done // wait for systray to actually exit before returning
+		// Wait up to 2s for systray to exit cleanly.
+		// On Windows, systray.Run() occasionally doesn't return after Quit()
+		// which would block os.Exit forever — the timeout breaks that deadlock.
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+		}
 	}
 }
 
