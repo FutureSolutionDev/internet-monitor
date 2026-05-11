@@ -249,6 +249,7 @@ function escHtml(str) {
 let avgSum = 0, avgCnt = 0, lastData = null;
 
 function process(d) {
+  if (d.update_info && d.update_info.has_update) showUpdateBanner(d.update_info);
   const prevStatus = lastData ? lastData.status : null;
   lastData = d;
   const st = d.status || 'checking';
@@ -986,15 +987,5 @@ fetch('/api/update').then(r=>r.json()).then(d=>{
   if (d.has_update) showUpdateBanner(d);
 }).catch(()=>{});
 
-// Also check via SSE snapshot (server pushes update info)
-const _origConnect = connect;
-// Patch process() to also handle update info from snapshot
-const _procOrig = process;
-// Note: update info is separate from SSE; we poll /api/update every 30min
-setInterval(() => {
-  fetch('/api/update').then(r=>r.json()).then(d=>{
-    if (d.has_update) showUpdateBanner(d);
-  }).catch(()=>{});
-}, 30 * 60 * 1000);
 // Check after a short delay so the Go binding has time to register
 setTimeout(checkNativeMode, 500);

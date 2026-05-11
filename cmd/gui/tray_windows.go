@@ -51,7 +51,7 @@ func initTray(w webview.WebView, hwnd uintptr) func() {
 						restoreWindow(hwnd)
 					case <-mExit.ClickedCh:
 						systray.Quit()
-						w.Dispatch(func() { w.Destroy() })
+						w.Terminate()
 					case <-quit:
 						systray.Quit()
 						return

@@ -7,12 +7,12 @@ echo  Internet Monitor GUI - Build
 echo ============================================
 echo.
 
-rem ── TDM-GCC مطلوب لـ Go CGO — POSIX threads لا تعمل ────────
-rem    TDM-GCC يستخدم win32 threads وهو الوحيد المضمون مع Go
+rem ── TDM-GCC required for Go CGO — POSIX threads do not work ─────
+rem    TDM-GCC uses win32 threads, the only option guaranteed to work with Go
 
 :find_toolchain
 
-rem أولوية 1: TDM-GCC (الأفضل لـ Go CGO)
+rem Priority 1: TDM-GCC (best for Go CGO)
 if exist "C:\TDM-GCC-64\bin\g++.exe" (
     set "PATH=C:\TDM-GCC-64\bin;%PATH%"
     set "CC=C:\TDM-GCC-64\bin\gcc.exe"
@@ -20,7 +20,7 @@ if exist "C:\TDM-GCC-64\bin\g++.exe" (
     goto :verify
 )
 
-rem أولوية 2: MSYS2 ucrt64
+rem Priority 2: MSYS2 ucrt64
 if exist "C:\msys64\ucrt64\bin\g++.exe" (
     set "PATH=C:\msys64\ucrt64\bin;%PATH%"
     set "CC=C:\msys64\ucrt64\bin\gcc.exe"
@@ -28,7 +28,7 @@ if exist "C:\msys64\ucrt64\bin\g++.exe" (
     goto :verify
 )
 
-rem أولوية 3: MSYS2 mingw64
+rem Priority 3: MSYS2 mingw64
 if exist "C:\msys64\mingw64\bin\g++.exe" (
     set "PATH=C:\msys64\mingw64\bin;%PATH%"
     set "CC=C:\msys64\mingw64\bin\gcc.exe"
@@ -36,23 +36,23 @@ if exist "C:\msys64\mingw64\bin\g++.exe" (
     goto :verify
 )
 
-rem فحص الـ PATH الحالي — لكن تجاهل POSIX threads
+rem Check current PATH — but skip POSIX threads builds
 where g++ >nul 2>&1
 if %errorlevel% equ 0 (
     for /f "tokens=*" %%G in ('g++ -v 2^>^&1') do (
         echo %%G | findstr /i "posix" >nul
         if !errorlevel! equ 0 (
-            echo [WARN] الـ GCC الموجود يستخدم POSIX threads وهو غير متوافق مع Go CGO.
-            echo        سيتم تحميل TDM-GCC...
+            echo [WARN] Found GCC uses POSIX threads — incompatible with Go CGO.
+            echo        Downloading TDM-GCC...
             goto :install
         )
     )
-    rem POSIX مش موجود — جرّب البناء بالـ GCC الحالي
+    rem Not POSIX — try building with current GCC
     goto :verify
 )
 
 :install
-echo [!] تثبيت TDM-GCC تلقائياً...
+echo [!] Installing TDM-GCC automatically...
 echo.
 
 rem --- MSYS2 via winget ---
@@ -71,7 +71,7 @@ if exist "C:\msys64\usr\bin\bash.exe" (
     )
 )
 
-rem --- TDM-GCC مباشر ---
+rem --- TDM-GCC direct download ---
 echo [2/3] Downloading TDM-GCC...
 set TDM_URL=https://github.com/jmeubank/tdm-gcc/releases/download/v10.3.0-tdm64-2/tdm64-gcc-10.3.0-2.exe
 set TDM_EXE=%TEMP%\tdm-gcc-setup.exe
@@ -101,22 +101,22 @@ echo [ERROR] Installation failed.
 echo         Download manually: https://jmeubank.github.io/tdm-gcc/download/
 pause & exit /b 1
 
-rem ── التحقق ───────────────────────────────────────────────────
+rem ── Verify toolchain ─────────────────────────────────────────
 :verify
 echo.
 gcc --version 2>nul | findstr /v "^$"
 g++ --version 2>nul | findstr /v "^$"
 
-rem تحذير إذا كان POSIX threads
+rem Warn if POSIX threads slipped through
 g++ -v 2>&1 | findstr /i "posix" >nul
 if %errorlevel% equ 0 (
     echo.
-    echo [WARN] هذا GCC يستخدم POSIX threads ← قد يفشل مع Go CGO.
-    echo        الحل المضمون: https://jmeubank.github.io/tdm-gcc/download/
+    echo [WARN] This GCC uses POSIX threads — may fail with Go CGO.
+    echo        Guaranteed fix: https://jmeubank.github.io/tdm-gcc/download/
     echo.
 )
 
-rem ── البناء ───────────────────────────────────────────────────
+rem ── Build ────────────────────────────────────────────────────
 :build
 echo.
 echo [Building] internet-monitor-gui.exe ...
@@ -127,7 +127,7 @@ powershell -NoProfile -Command ^
   "$env:CGO_ENABLED='1'; $env:CC='%CC%'; $env:CXX='%CXX%'; go build -ldflags='-H=windowsgui -s -w' -o internet-monitor-gui.exe ./cmd/gui/ 2>&1" ^
   > build_output.txt 2>&1
 
-rem تحقق إذا الملف اتعمل
+rem Check if binary was produced
 if exist internet-monitor-gui.exe (
     for %%A in (internet-monitor-gui.exe) do echo [OK] Done: %%~zA bytes — %%~fA
     del /f build_output.txt >nul 2>&1
@@ -137,9 +137,9 @@ if exist internet-monitor-gui.exe (
     type build_output.txt
     echo --------------------------------------------------------
     echo.
-    echo إذا كان الخطأ "posix threads" أو "runtime/cgo":
-    echo   ثبّت TDM-GCC: https://jmeubank.github.io/tdm-gcc/download/
-    echo   ثم شغّل السكريبت مرة ثانية.
+    echo If the error mentions "posix threads" or "runtime/cgo":
+    echo   Install TDM-GCC: https://jmeubank.github.io/tdm-gcc/download/
+    echo   Then re-run this script.
     del /f build_output.txt >nul 2>&1
     pause & exit /b 1
 )

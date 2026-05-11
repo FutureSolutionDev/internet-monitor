@@ -140,6 +140,7 @@ type Snapshot struct {
 	UptimePct      float64      `json:"uptime_pct"`
 	LatencyHistory []int64      `json:"latency_history"`
 	Events         []EventEntry `json:"events"`
+	UpdateInfo     *UpdateInfo  `json:"update_info,omitempty"`
 }
 
 type testTargetResult struct {
@@ -660,6 +661,10 @@ func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {
 // ── Internal ──────────────────────────────────────────────────
 
 func (s *Server) snapshot(msgType string) Snapshot {
+	s.updateMu.RLock()
+	updateInfo := s.updateInfo
+	s.updateMu.RUnlock()
+
 	s.stateMu.RLock()
 	defer s.stateMu.RUnlock()
 
@@ -687,6 +692,7 @@ func (s *Server) snapshot(msgType string) Snapshot {
 		UptimePct:      uptimePct,
 		LatencyHistory: hist,
 		Events:         evts,
+		UpdateInfo:     updateInfo,
 	}
 }
 
