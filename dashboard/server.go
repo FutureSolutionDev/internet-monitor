@@ -1,13 +1,15 @@
 package dashboard
 
 import (
-	_ "embed"
 	"bytes"
+	"context"
 	"encoding/json"
+	"embed"
 	"fmt"
 	"internet-monitor/config"
 	"internet-monitor/monitor"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,11 +19,13 @@ import (
 	"time"
 )
 
-//go:embed index.html
-var indexHTML string
+//go:embed assets
+var staticFiles embed.FS
 
 const maxHistory = 60
 const maxEvents = 100
+
+// ── Types ─────────────────────────────────────────────────────
 
 type EventEntry struct {
 	Time      string  `json:"time"`
@@ -46,6 +50,21 @@ type Snapshot struct {
 	Events         []EventEntry `json:"events"`
 }
 
+type testTargetResult struct {
+	Target    string `json:"target"`
+	OK        bool   `json:"ok"`
+	LatencyMs int64  `json:"latency_ms,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+type testTargetsResponse struct {
+	PingTargets []testTargetResult `json:"ping_targets"`
+	HTTPTarget  testTargetResult   `json:"http_target"`
+	DNSTarget   testTargetResult   `json:"dns_target"`
+}
+
+// ── Server ────────────────────────────────────────────────────
+
 type Server struct {
 	port       int
 	configPath string
@@ -53,7 +72,6 @@ type Server struct {
 	clients    map[chan string]struct{}
 	mu         sync.Mutex
 
-	// Called when config is saved via dashboard
 	OnConfigChange func(*config.Config)
 
 	stateMu        sync.RWMutex
@@ -84,12 +102,23 @@ func NewServer(port int, configPath, logDir string) *Server {
 
 func (s *Server) Start() {
 	mux := http.NewServeMux()
+
+	// Static assets (CSS, JS, chart lib, favicon…)
+	mux.Handle("/assets/", http.FileServer(http.FS(staticFiles)))
+
+	// Dashboard index
 	mux.HandleFunc("/", s.serveIndex)
+
+	// Real-time stream
 	mux.HandleFunc("/events", s.serveSSE)
+
+	// JSON APIs
 	mux.HandleFunc("/api/state", s.serveState)
 	mux.HandleFunc("/api/config", s.serveConfig)
 	mux.HandleFunc("/api/logs", s.serveLogs)
 	mux.HandleFunc("/api/log-dates", s.serveLogDates)
+	mux.HandleFunc("/api/test-targets", s.serveTestTargets)
+
 	go http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", s.port), mux)
 }
 
@@ -97,7 +126,7 @@ func (s *Server) URL() string {
 	return fmt.Sprintf("http://localhost:%d", s.port)
 }
 
-// ── Public update methods (called from tray monitoring loop) ──────────────
+// ── Public update methods ─────────────────────────────────────
 
 func (s *Server) UpdateTick(result monitor.CheckResult, status monitor.Status) {
 	s.stateMu.Lock()
@@ -157,11 +186,20 @@ func (s *Server) AddEvent(event monitor.Event) {
 	s.broadcast("event")
 }
 
-// ── HTTP handlers ─────────────────────────────────────────────────────────
+// ── HTTP handlers ─────────────────────────────────────────────
 
 func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	data, err := staticFiles.ReadFile("assets/index.html")
+	if err != nil {
+		http.Error(w, "index.html not found", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprint(w, indexHTML)
+	w.Write(data)
 }
 
 func (s *Server) serveState(w http.ResponseWriter, r *http.Request) {
@@ -199,7 +237,6 @@ func (s *Server) serveConfig(w http.ResponseWriter, r *http.Request) {
 		if s.OnConfigChange != nil {
 			s.OnConfigChange(&cfg)
 		}
-		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"ok":true}`))
 
 	default:
@@ -213,7 +250,6 @@ func (s *Server) serveLogs(w http.ResponseWriter, r *http.Request) {
 	if date == "" {
 		date = time.Now().Format("2006-01-02")
 	}
-
 	filename := filepath.Join(s.logDir, fmt.Sprintf("connectivity_%s.jsonl", date))
 	data, err := os.ReadFile(filename)
 	if os.IsNotExist(err) {
@@ -224,8 +260,6 @@ func (s *Server) serveLogs(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	// Parse JSONL: one JSON object per line
 	lines := bytes.Split(bytes.TrimSpace(data), []byte{'\n'})
 	entries := make([]json.RawMessage, 0, len(lines))
 	for _, line := range lines {
@@ -234,7 +268,6 @@ func (s *Server) serveLogs(w http.ResponseWriter, r *http.Request) {
 			entries = append(entries, json.RawMessage(line))
 		}
 	}
-	// Return newest first
 	for i, j := 0, len(entries)-1; i < j; i, j = i+1, j-1 {
 		entries[i], entries[j] = entries[j], entries[i]
 	}
@@ -252,12 +285,90 @@ func (s *Server) serveLogDates(w http.ResponseWriter, r *http.Request) {
 	for _, e := range entries {
 		name := e.Name()
 		if !e.IsDir() && strings.HasPrefix(name, "connectivity_") && strings.HasSuffix(name, ".jsonl") {
-			date := name[len("connectivity_") : len(name)-len(".jsonl")]
-			dates = append(dates, date)
+			dates = append(dates, name[len("connectivity_"):len(name)-len(".jsonl")])
 		}
 	}
 	sort.Sort(sort.Reverse(sort.StringSlice(dates)))
 	json.NewEncoder(w).Encode(dates)
+}
+
+// serveTestTargets tests ping/http/dns targets and returns per-target results.
+// Used by the settings UI to validate before saving.
+func (s *Server) serveTestTargets(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+
+	var req struct {
+		PingTargets []string `json:"ping_targets"`
+		HTTPTarget  string   `json:"http_target"`
+		DNSTarget   string   `json:"dns_target"`
+	}
+	body, _ := io.ReadAll(r.Body)
+	json.Unmarshal(body, &req)
+
+	resp := testTargetsResponse{
+		PingTargets: make([]testTargetResult, 0),
+	}
+
+	// Test TCP ping targets
+	for _, target := range req.PingTargets {
+		target = strings.TrimSpace(target)
+		if target == "" {
+			continue
+		}
+		start := time.Now()
+		conn, err := net.DialTimeout("tcp", target, 3*time.Second)
+		lat := time.Since(start).Milliseconds()
+		r := testTargetResult{Target: target}
+		if err == nil {
+			conn.Close()
+			r.OK = true
+			r.LatencyMs = lat
+		} else {
+			r.Error = simplifyError(err.Error())
+		}
+		resp.PingTargets = append(resp.PingTargets, r)
+	}
+
+	// Test HTTP target
+	if req.HTTPTarget != "" {
+		start := time.Now()
+		client := &http.Client{
+			Timeout: 5 * time.Second,
+			Transport: &http.Transport{DisableKeepAlives: true},
+		}
+		httpResp, err := client.Get(req.HTTPTarget)
+		lat := time.Since(start).Milliseconds()
+		resp.HTTPTarget = testTargetResult{Target: req.HTTPTarget}
+		if err == nil {
+			httpResp.Body.Close()
+			resp.HTTPTarget.OK = true
+			resp.HTTPTarget.LatencyMs = lat
+		} else {
+			resp.HTTPTarget.Error = simplifyError(err.Error())
+		}
+	}
+
+	// Test DNS target
+	if req.DNSTarget != "" {
+		start := time.Now()
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		_, err := net.DefaultResolver.LookupHost(ctx, req.DNSTarget)
+		lat := time.Since(start).Milliseconds()
+		resp.DNSTarget = testTargetResult{Target: req.DNSTarget}
+		if err == nil {
+			resp.DNSTarget.OK = true
+			resp.DNSTarget.LatencyMs = lat
+		} else {
+			resp.DNSTarget.Error = simplifyError(err.Error())
+		}
+	}
+
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {
@@ -298,7 +409,7 @@ func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ── Internal ──────────────────────────────────────────────────────────────
+// ── Internal ──────────────────────────────────────────────────
 
 func (s *Server) snapshot(msgType string) Snapshot {
 	s.stateMu.RLock()
@@ -345,4 +456,25 @@ func (s *Server) broadcast(msgType string) {
 		}
 	}
 	s.mu.Unlock()
+}
+
+// simplifyError extracts a short, human-readable error from a net error string.
+func simplifyError(e string) string {
+	e = strings.ToLower(e)
+	switch {
+	case strings.Contains(e, "timeout") || strings.Contains(e, "i/o timeout"):
+		return "timeout"
+	case strings.Contains(e, "connection refused"):
+		return "refused"
+	case strings.Contains(e, "no such host") || strings.Contains(e, "no route"):
+		return "not found"
+	case strings.Contains(e, "network unreachable"):
+		return "unreachable"
+	default:
+		// Return first 40 chars to avoid flooding the UI
+		if len(e) > 40 {
+			return e[:40] + "…"
+		}
+		return e
+	}
 }

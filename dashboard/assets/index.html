@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مراقب الإنترنت</title>
+<link rel="icon" href="/assets/favicon.png">
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+
+<!-- ══ Header ══ -->
+<header>
+  <div id="dot"></div>
+  <h1 data-i18n="appName">مراقب الإنترنت</h1>
+  <div class="hdr-right">
+    <span id="hdr-status" data-i18n="status_checking">جاري الفحص...</span>
+    <span id="hdr-time">--:--:--</span>
+    <button class="lang-btn" onclick="toggleLang()">EN / عر</button>
+  </div>
+</header>
+
+<!-- ══ Tabs ══ -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="dashboard" onclick="showTab('dashboard')" data-i18n="nav_dashboard">لوحة التحكم</button>
+  <button class="tab-btn" data-tab="logs" onclick="showTab('logs')" data-i18n="nav_logs">السجلات</button>
+  <button class="tab-btn" data-tab="settings" onclick="showTab('settings')" data-i18n="nav_settings">الإعدادات</button>
+</div>
+
+<!-- ══════════════════════════════════════════
+     TAB: Dashboard
+══════════════════════════════════════════ -->
+<div class="tab-content active" id="tab-dashboard">
+<div class="content">
+
+  <div id="status-card">
+    <div id="status-circle">🌐</div>
+    <div style="flex:1">
+      <div id="status-text" data-i18n="status_checking">جاري الفحص...</div>
+      <div id="status-sub" data-i18n="status_wait">في انتظار أول فحص</div>
+    </div>
+    <div class="status-right">
+      <div id="latency-big">—</div>
+      <div id="latency-lbl" data-i18n="latency">زمن الاستجابة</div>
+      <div id="quality-badge" class="quality-badge" style="display:none"></div>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="card-value" id="st-uptime">—</div><div class="card-label" data-i18n="uptime">وقت التشغيل</div></div>
+    <div class="card"><div class="card-value" id="st-uptime-pct">—</div><div class="card-label" data-i18n="uptime_pct">نسبة الاتصال</div></div>
+    <div class="card"><div class="card-value" id="st-drops">0</div><div class="card-label" data-i18n="disconnections">انقطاعات</div></div>
+    <div class="card"><div class="card-value" id="st-avg">—</div><div class="card-label" data-i18n="avg_latency">متوسط الاستجابة</div></div>
+    <div class="card"><div class="card-value" id="st-checks">0</div><div class="card-label" data-i18n="total_checks">إجمالي الفحوصات</div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title" data-i18n="chart_title">زمن الاستجابة — آخر 60 فحص</div>
+    <div id="chart-wrap"><canvas id="the-chart"></canvas></div>
+    <div class="checks">
+      <span class="chk-badge ok" id="chk-tcp">TCP ✓</span>
+      <span class="chk-badge ok" id="chk-http">HTTP ✓</span>
+      <span class="chk-badge ok" id="chk-dns">DNS ✓</span>
+      <span id="loss-val">0.0%</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title" data-i18n="events_title">سجل الأحداث</div>
+    <table>
+      <thead><tr>
+        <th data-i18n="col_time">الوقت</th>
+        <th data-i18n="col_event">الحدث</th>
+        <th data-i18n="col_duration">المدة</th>
+        <th data-i18n="col_reason">السبب</th>
+      </tr></thead>
+      <tbody id="event-tbody">
+        <tr><td colspan="4" class="empty" data-i18n="no_events">لا توجد أحداث بعد</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     TAB: Logs
+══════════════════════════════════════════ -->
+<div class="tab-content" id="tab-logs">
+<div class="content">
+  <div class="section">
+    <div class="section-title" data-i18n="logs_title">عرض السجلات المخزنة</div>
+    <div class="logs-toolbar">
+      <select id="log-date-select" onchange="loadLogs()">
+        <option value="" data-i18n="logs_select">اختر تاريخاً...</option>
+      </select>
+      <button class="btn btn-secondary" onclick="exportCSV()" data-i18n="export_csv">تصدير CSV</button>
+      <span id="log-count"></span>
+    </div>
+    <table>
+      <thead><tr>
+        <th data-i18n="col_time">الوقت</th>
+        <th data-i18n="col_event">الحدث</th>
+        <th data-i18n="col_duration">المدة</th>
+        <th data-i18n="col_reason">السبب</th>
+        <th>Packet Loss</th>
+        <th>Latency</th>
+      </tr></thead>
+      <tbody id="log-tbody">
+        <tr><td colspan="6" class="empty" data-i18n="logs_select_hint">اختر تاريخاً لعرض السجلات</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     TAB: Settings
+══════════════════════════════════════════ -->
+<div class="tab-content" id="tab-settings">
+<div class="content">
+  <div class="section">
+    <div class="section-title" data-i18n="settings_title">الإعدادات</div>
+
+    <!-- Test warning banner (shown when untested) -->
+    <div id="test-warn-banner" class="warn-banner" style="display:none">
+      <span>⚠️</span>
+      <span data-i18n="test_warn_banner">العناوين المؤثرة على الأداء لم تُختبر بعد — انقر "اختبار الكل" للتحقق قبل الحفظ</span>
+    </div>
+
+    <!-- ── Monitoring behaviour ── -->
+    <div class="settings-group">
+      <div class="settings-group-title" data-i18n="grp_behaviour">سلوك المراقبة</div>
+      <div class="settings-grid">
+        <div class="field">
+          <label data-i18n="check_interval">فترة الفحص (ثانية)</label>
+          <input type="number" id="cfg-interval" min="1" max="60">
+        </div>
+        <div class="field">
+          <label data-i18n="fail_threshold">عدد الفشل المتتالي للانقطاع</label>
+          <input type="number" id="cfg-fail-threshold" min="1" max="20">
+          <div class="field-note" data-i18n="fail_threshold_note">بعد كم فشل متتالي يُعتبر الاتصال منقطعاً</div>
+        </div>
+        <div class="field">
+          <label data-i18n="loss_threshold">حد فقدان الحزم (%)</label>
+          <input type="number" id="cfg-loss-threshold" min="0" max="100">
+          <div class="field-note" data-i18n="loss_threshold_note">فوق هذه النسبة يُعتبر الاتصال ضعيفاً</div>
+        </div>
+        <div class="field">
+          <label data-i18n="latency_threshold">حد زمن الاستجابة (مللي ثانية)</label>
+          <input type="number" id="cfg-latency-threshold" min="0">
+          <div class="field-note" data-i18n="latency_threshold_note">فوق هذا الحد يُعتبر الاتصال ضعيفاً</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Targets (affect performance — must test) ── -->
+    <div class="settings-group">
+      <div class="settings-group-title">
+        <span data-i18n="grp_targets">العناوين المستهدفة</span>
+        <span class="tag-perf" data-i18n="tag_affects_perf">تؤثر على الأداء</span>
+      </div>
+
+      <!-- Ping targets list -->
+      <div class="field full-width">
+        <label data-i18n="ping_targets_label">عناوين TCP Ping</label>
+        <div id="ping-targets-container" class="targets-container"></div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addPingTarget()" data-i18n="add_target">+ إضافة عنوان</button>
+        <div class="field-note" data-i18n="ping_targets_note">صيغة: host:port — مثال: 8.8.8.8:53</div>
+      </div>
+
+      <!-- HTTP target -->
+      <div class="field full-width">
+        <label data-i18n="http_target_label">عنوان HTTP للاختبار</label>
+        <div class="target-input-row">
+          <input type="text" id="cfg-http" placeholder="https://..." oninput="markUntested()">
+          <button class="btn btn-secondary btn-sm" onclick="testSingle('http')" data-i18n="test">اختبار</button>
+          <span class="test-result" id="http-result"></span>
+        </div>
+        <div class="field-note" data-i18n="http_target_note">يجب أن يرجع 200 أو 204 — مثال: https://connectivitycheck.gstatic.com/generate_204</div>
+      </div>
+
+      <!-- DNS target -->
+      <div class="field full-width">
+        <label data-i18n="dns_target_label">اسم النطاق لاختبار DNS</label>
+        <div class="target-input-row">
+          <input type="text" id="cfg-dns" placeholder="www.google.com" oninput="markUntested()">
+          <button class="btn btn-secondary btn-sm" onclick="testSingle('dns')" data-i18n="test">اختبار</button>
+          <span class="test-result" id="dns-result"></span>
+        </div>
+        <div class="field-note" data-i18n="dns_target_note">مثال: www.google.com</div>
+      </div>
+
+      <!-- Test All button -->
+      <div class="field full-width">
+        <button class="btn btn-secondary" id="test-all-btn" onclick="testAllTargets()">
+          <span data-i18n="test_all">⚡ اختبار جميع العناوين</span>
+        </button>
+        <span class="test-result" id="test-all-result"></span>
+      </div>
+    </div>
+
+    <!-- ── Storage & Notifications ── -->
+    <div class="settings-group">
+      <div class="settings-group-title" data-i18n="grp_storage">التخزين والإشعارات</div>
+      <div class="settings-grid">
+        <div class="field">
+          <label data-i18n="log_dir">مجلد السجلات</label>
+          <input type="text" id="cfg-log-dir">
+        </div>
+        <div class="field">
+          <label>
+            <span data-i18n="dashboard_port">منفذ لوحة التحكم</span>
+            <span class="tag-restart" data-i18n="requires_restart">يتطلب إعادة تشغيل</span>
+          </label>
+          <input type="number" id="cfg-port" min="1024" max="65535">
+        </div>
+        <div class="field full-width">
+          <label data-i18n="webhook_url">عنوان الـ Webhook (اختياري)</label>
+          <input type="text" id="cfg-webhook" placeholder="https://...">
+          <div class="field-note" data-i18n="webhook_note">يُرسل إشعار JSON عند كل حدث — Discord / Slack / أي خدمة</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-footer">
+      <button class="btn btn-primary" onclick="saveSettings()" data-i18n="settings_save">حفظ الإعدادات</button>
+      <span id="save-msg"></span>
+    </div>
+  </div>
+</div>
+</div>
+
+<script src="/assets/chart.umd.min.js"></script>
+<script src="/assets/app.js"></script>
+</body>
+</html>
