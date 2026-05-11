@@ -1,0 +1,205 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:          # يسمح بتشغيل يدوي من GitHub UI
+
+env:
+  GO_VERSION: '1.21'
+
+# ══════════════════════════════════════════════════════════════
+# JOBS
+# ══════════════════════════════════════════════════════════════
+jobs:
+
+  # ── Windows Tray — بدون CGO، يُبنى من Linux ───────────────
+  windows-tray:
+    name: "🪟 Windows Tray (cross-compile)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build
+        env:
+          CGO_ENABLED: 0
+          GOOS: windows
+          GOARCH: amd64
+        run: go build -ldflags="-H=windowsgui -s -w" -o internet-monitor-windows.exe .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-tray
+          path: internet-monitor-windows.exe
+
+  # ── Windows GUI — CGO + WebView2، يحتاج Windows runner ────
+  windows-gui:
+    name: "🪟 Windows GUI (native)"
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build
+        env:
+          CGO_ENABLED: 1
+        run: go build -ldflags="-H=windowsgui -s -w" -o internet-monitor-gui-windows.exe ./cmd/gui/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-gui
+          path: internet-monitor-gui-windows.exe
+
+  # ── macOS — Intel (macos-13) + ARM64 (macos-latest) ────────
+  macos:
+    name: "🍎 macOS ${{ matrix.arch }}"
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13       # Intel x86_64
+            arch: intel
+            goarch: amd64
+          - runner: macos-latest   # Apple Silicon ARM64
+            arch: arm64
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build Tray
+        env:
+          CGO_ENABLED: 1
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -ldflags="-s -w" -o internet-monitor-macos-${{ matrix.arch }} .
+
+      - name: Build GUI
+        env:
+          CGO_ENABLED: 1
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -ldflags="-s -w" -o internet-monitor-gui-macos-${{ matrix.arch }} ./cmd/gui/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: |
+            internet-monitor-macos-${{ matrix.arch }}
+            internet-monitor-gui-macos-${{ matrix.arch }}
+
+  # ── Linux — AppIndicator + WebKitGTK ───────────────────────
+  linux:
+    name: "🐧 Linux (ubuntu-22.04)"
+    runs-on: ubuntu-22.04          # مثبّت على 22.04 لضمان webkit2gtk-4.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            libappindicator3-dev \
+            libwebkit2gtk-4.0-dev
+
+      - name: Build Tray
+        env:
+          CGO_ENABLED: 1
+        run: go build -ldflags="-s -w" -o internet-monitor-linux .
+
+      - name: Build GUI
+        env:
+          CGO_ENABLED: 1
+        run: go build -ldflags="-s -w" -o internet-monitor-gui-linux ./cmd/gui/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            internet-monitor-linux
+            internet-monitor-gui-linux
+
+  # ══════════════════════════════════════════════════════════
+  # RELEASE — يعمل فقط عند push tag (v*)
+  # ══════════════════════════════════════════════════════════
+  release:
+    name: "🚀 Create GitHub Release"
+    needs: [windows-tray, windows-gui, macos, linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist/
+
+      - name: Make Linux/macOS binaries executable
+        run: chmod +x dist/internet-monitor-linux dist/internet-monitor-gui-linux dist/internet-monitor-macos-* dist/internet-monitor-gui-macos-* 2>/dev/null || true
+
+      - name: Show artifacts
+        run: ls -lh dist/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Internet Monitor ${{ github.ref_name }}"
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
+          files: |
+            dist/internet-monitor-windows.exe
+            dist/internet-monitor-gui-windows.exe
+            dist/internet-monitor-macos-intel
+            dist/internet-monitor-macos-arm64
+            dist/internet-monitor-gui-macos-intel
+            dist/internet-monitor-gui-macos-arm64
+            dist/internet-monitor-linux
+            dist/internet-monitor-gui-linux
+            config.json
+          body: |
+            ## مراقب الإنترنت — Internet Monitor ${{ github.ref_name }}
+
+            ### حمّل الملف المناسب لجهازك
+
+            | الملف | النظام | نوع التطبيق |
+            |-------|--------|-------------|
+            | `internet-monitor-windows.exe` | Windows 10/11 | يعمل في الخلفية (Tray icon) |
+            | `internet-monitor-gui-windows.exe` | Windows 10/11 | نافذة مستقلة |
+            | `internet-monitor-macos-intel` | macOS Intel | يعمل في الخلفية |
+            | `internet-monitor-macos-arm64` | macOS M1/M2/M3 | يعمل في الخلفية |
+            | `internet-monitor-gui-macos-intel` | macOS Intel | نافذة مستقلة |
+            | `internet-monitor-gui-macos-arm64` | macOS M1/M2/M3 | نافذة مستقلة |
+            | `internet-monitor-linux` | Ubuntu/Debian | يعمل في الخلفية |
+            | `internet-monitor-gui-linux` | Ubuntu/Debian | نافذة مستقلة |
+
+            > **تعليمات:** حمّل الملف التنفيذي + `config.json` وضعهم في نفس المجلد.
+            >
+            > **Instructions:** Download the binary + `config.json` in the same folder.
+
+            ---
+            Built automatically with GitHub Actions ·
+            [Source code](https://github.com/${{ github.repository }})
