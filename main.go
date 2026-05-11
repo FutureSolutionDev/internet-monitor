@@ -37,6 +37,11 @@ func main() {
 		tray.SetCustomIcon(png)
 	}
 
+	// Wire test notification button → OS toast
+	dash.OnTestNotification = func() {
+		tray.Notify("اختبار الإشعار / Test Notification", "🔔 الإشعار يعمل بشكل صحيح")
+	}
+
 	checker := monitor.NewChecker(cfg)
 	t := tray.New(cfg, checker, lgr, dash.URL())
 	t.OnTick  = dash.UpdateTick

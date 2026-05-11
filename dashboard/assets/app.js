@@ -18,6 +18,8 @@ const LANGS = {
     logs_title:'عرض السجلات المخزنة', logs_select:'اختر تاريخاً...',
     logs_select_hint:'اختر تاريخاً لعرض السجلات', logs_empty:'لا توجد سجلات لهذا التاريخ',
     export_csv:'تصدير CSV', log_count:'سجل',
+    grp_notif_test:'اختبار الإشعارات والصوت', notif_test_note:'يشغّل النغمة ويعرض إشعار تجريبي على سطح المكتب',
+    test_notif:'اختبار الإشعار والصوت', test_notif_ok:'✅ تم الإرسال', test_notif_err:'❌ فشل',
     settings_title:'الإعدادات', settings_save:'حفظ الإعدادات',
     settings_saved:'✅ تم الحفظ بنجاح', settings_error:'❌ فشل الحفظ',
     requires_restart:'يتطلب إعادة تشغيل',
@@ -53,6 +55,8 @@ const LANGS = {
     logs_title:'View Stored Logs', logs_select:'Select a date...',
     logs_select_hint:'Select a date to view logs', logs_empty:'No logs for this date',
     export_csv:'Export CSV', log_count:'record',
+    grp_notif_test:'Notification & Sound Test', notif_test_note:'Plays the ringtone and shows a desktop notification',
+    test_notif:'Test Notification & Sound', test_notif_ok:'✅ Sent', test_notif_err:'❌ Failed',
     settings_title:'Settings', settings_save:'Save Settings',
     settings_saved:'✅ Saved successfully', settings_error:'❌ Save failed',
     requires_restart:'Requires restart',
@@ -193,8 +197,14 @@ function escHtml(str) {
 let avgSum = 0, avgCnt = 0, lastData = null;
 
 function process(d) {
+  const prevStatus = lastData ? lastData.status : null;
   lastData = d;
   const st = d.status || 'checking';
+
+  // Browser notification on status change
+  if (prevStatus && prevStatus !== st && prevStatus !== 'checking') {
+    _browserAlert(st, d);
+  }
   const c  = STATUS_C[st] || STATUS_C.checking;
 
   document.getElementById('dot').style.background            = c.dot;
@@ -581,7 +591,119 @@ async function saveSettings() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// BROWSER NOTIFICATIONS + AUDIO
+// ══════════════════════════════════════════════════════════════
+
+// Request browser notification permission on load
+(function askPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+})();
+
+function playAlert() {
+  try {
+    const audio = new Audio('/assets/Ringtone.mp3');
+    audio.volume = 0.85;
+    audio.play().catch(() => {}); // ignore autoplay block
+  } catch(_) {}
+}
+
+function showBrowserNotification(title, body) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    new Notification(title, { body, icon: '/assets/favicon.png', silent: true });
+  } catch(_) {}
+}
+
+function _browserAlert(status, d) {
+  const loss = (d.packet_loss || 0).toFixed(1);
+  const lat  = d.latency_ms || 0;
+  switch (status) {
+    case 'disconnected':
+      playAlert();
+      showBrowserNotification(
+        lang === 'ar' ? '🔴 النت انقطع!' : '🔴 Disconnected',
+        lang === 'ar' ? `فقدان: ${loss}%` : `Loss: ${loss}%`
+      );
+      break;
+    case 'degraded':
+      playAlert();
+      showBrowserNotification(
+        lang === 'ar' ? '⚠️ الاتصال ضعيف' : '⚠️ Connection Degraded',
+        lang === 'ar' ? `فقدان ${loss}% — زمن ${lat}ms` : `Loss ${loss}% — ${lat}ms`
+      );
+      break;
+    case 'connected':
+      showBrowserNotification(
+        lang === 'ar' ? '✅ الإنترنت عاد' : '✅ Internet Restored',
+        lang === 'ar' ? `زمن الاستجابة: ${lat}ms` : `Latency: ${lat}ms`
+      );
+      break;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// NOTIFICATION TEST
+// ══════════════════════════════════════════════════════════════
+async function testNotification() {
+  const btn = document.getElementById('test-notif-btn');
+  const res = document.getElementById('test-notif-result');
+  if (btn) btn.disabled = true;
+  if (res) { res.className = 'test-result'; res.textContent = '...'; }
+
+  // 1. Request permission if needed
+  if ('Notification' in window && Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+
+  // 2. Play audio in the browser immediately
+  playAlert();
+
+  // 3. Show browser notification
+  showBrowserNotification(
+    lang === 'ar' ? '🔔 اختبار الإشعار' : '🔔 Test Notification',
+    lang === 'ar' ? 'الصوت والإشعار يعملان بشكل صحيح ✅' : 'Sound and notification are working ✅'
+  );
+
+  // 4. Call server API (triggers OS toast in native window / tray mode)
+  try {
+    const r = await fetch('/api/test-notification', { method: 'POST' });
+    if (res) {
+      res.className = r.ok ? 'test-result test-ok' : 'test-result test-warn';
+      res.textContent = r.ok ? t('test_notif_ok') : '⚠️ server';
+    }
+  } catch (_) {
+    if (res) { res.className = 'test-result test-warn'; res.textContent = '⚠️ offline'; }
+  } finally {
+    if (btn) btn.disabled = false;
+    setTimeout(() => { if (res) res.textContent = ''; }, 4000);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// NATIVE GUI INTEGRATION
+// ══════════════════════════════════════════════════════════════
+
+// Show "Minimize to Tray" button only when running inside the native GUI window
+// (the Go code binds window.nativeMinimizeToTray on the webview)
+function checkNativeMode() {
+  if (typeof window['nativeMinimizeToTray'] === 'function') {
+    const btn = document.getElementById('tray-minimize-btn');
+    if (btn) btn.style.display = 'inline-flex';
+  }
+}
+
+function minimizeToTray() {
+  if (typeof window['nativeMinimizeToTray'] === 'function') {
+    window['nativeMinimizeToTray']();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════════════
 applyLang();
 connect();
+// Check after a short delay so the Go binding has time to register
+setTimeout(checkNativeMode, 500);

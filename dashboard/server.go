@@ -28,6 +28,12 @@ func FaviconPNG() []byte {
 	return data
 }
 
+// RingtoneMp3 returns the raw bytes of the embedded Ringtone.mp3.
+func RingtoneMp3() []byte {
+	data, _ := staticFiles.ReadFile("assets/Ringtone.mp3")
+	return data
+}
+
 const maxHistory = 60
 const maxEvents = 100
 
@@ -78,7 +84,8 @@ type Server struct {
 	clients    map[chan string]struct{}
 	mu         sync.Mutex
 
-	OnConfigChange func(*config.Config)
+	OnConfigChange      func(*config.Config)
+	OnTestNotification  func() // called when user clicks "Test Notification"
 
 	stateMu        sync.RWMutex
 	status         string
@@ -124,6 +131,7 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/logs", s.serveLogs)
 	mux.HandleFunc("/api/log-dates", s.serveLogDates)
 	mux.HandleFunc("/api/test-targets", s.serveTestTargets)
+	mux.HandleFunc("/api/test-notification", s.serveTestNotification)
 
 	go http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", s.port), mux)
 }
@@ -416,6 +424,18 @@ func (s *Server) sendTestWebhook(results testTargetsResponse) {
 	if err == nil {
 		resp.Body.Close()
 	}
+}
+
+func (s *Server) serveTestNotification(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if s.OnTestNotification != nil {
+		go s.OnTestNotification()
+	}
+	w.Write([]byte(`{"ok":true}`))
 }
 
 func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {

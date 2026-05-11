@@ -1,3 +1,5 @@
+//go:generate go-winres simply --arch amd64 --icon ../../dashboard/assets/favicon.png
+
 package main
 
 import (
@@ -30,17 +32,33 @@ func main() {
 	}
 
 	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir)
+	dash.OnTestNotification = TestNotification
 	dash.Start()
 
 	checker := monitor.NewChecker(cfg)
-	go monitoringLoop(cfg, checker, lgr, dash)
 
-	time.Sleep(150 * time.Millisecond)
-
+	// Create webview window
 	w := webview.New(false)
 	defer w.Destroy()
 	w.SetTitle("مراقب الإنترنت — Internet Monitor")
 	w.SetSize(1100, 750, webview.HintNone)
+
+	// Get native window handle (HWND on Windows)
+	hwnd := uintptr(w.Window())
+
+	// Expose minimize-to-tray to JavaScript
+	w.Bind("nativeMinimizeToTray", func() {
+		hideWindow(hwnd)
+	})
+
+	// Start system tray (Windows: real tray; other OS: no-op)
+	stopTray := initTray(w, hwnd)
+	defer stopTray()
+
+	// Start monitoring loop
+	go monitoringLoop(cfg, checker, lgr, dash)
+
+	time.Sleep(150 * time.Millisecond)
 	w.Navigate(dash.URL())
 	w.Run()
 }
@@ -55,6 +73,9 @@ func monitoringLoop(cfg *config.Config, checker *monitor.Checker, lgr *logger.Lo
 		newStatus := determineStatus(result, &consecutiveFails, cfg)
 
 		dash.UpdateTick(result, newStatus)
+
+		// Always keep tray icon in sync with current status
+		updateTrayStatus(newStatus)
 
 		if currentStatus == nil || *currentStatus != newStatus {
 			duration := 0.0

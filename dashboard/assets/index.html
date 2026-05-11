@@ -17,6 +17,10 @@
     <span id="hdr-status" data-i18n="status_checking">جاري الفحص...</span>
     <span id="hdr-time">--:--:--</span>
     <button class="lang-btn" onclick="toggleLang()">EN / عر</button>
+    <button class="tray-btn" id="tray-minimize-btn" onclick="minimizeToTray()"
+            title="تصغير للـ Tray / Minimize to tray" style="display:none">
+      &#x2212;
+    </button>
   </div>
 </header>
 
@@ -219,6 +223,22 @@
           <label data-i18n="webhook_url">عنوان الـ Webhook (اختياري)</label>
           <input type="text" id="cfg-webhook" placeholder="https://...">
           <div class="field-note" data-i18n="webhook_note">يُرسل إشعار JSON عند كل حدث — Discord / Slack / أي خدمة</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Notification Test ── -->
+    <div class="settings-group">
+      <div class="settings-group-title" data-i18n="grp_notif_test">اختبار الإشعارات والصوت</div>
+      <div class="settings-grid">
+        <div class="field full-width">
+          <div class="field-note" data-i18n="notif_test_note">يشغّل النغمة ويعرض إشعار تجريبي على سطح المكتب</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+            <button class="btn btn-secondary" id="test-notif-btn" onclick="testNotification()">
+              🔔 <span data-i18n="test_notif">اختبار الإشعار والصوت</span>
+            </button>
+            <span class="test-result" id="test-notif-result"></span>
+          </div>
         </div>
       </div>
     </div>

@@ -23,6 +23,8 @@ header h1 { font-size: 15px; font-weight: 600; }
 #hdr-time { font-variant-numeric: tabular-nums; }
 .lang-btn { background: var(--bg3); border: none; color: var(--text); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; }
 .lang-btn:hover { background: #475569; }
+.tray-btn { background: var(--bg3); border: none; color: var(--muted); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 18px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.tray-btn:hover { background: #475569; color: var(--text); }
 
 /* Tabs */
 .tabs { background: var(--bg2); border-bottom: 1px solid var(--bg3); display: flex; }
