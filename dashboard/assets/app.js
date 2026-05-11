@@ -28,6 +28,7 @@ const LANGS = {
     col_duration: "المدة",
     col_reason: "السبب",
     no_events: "لا توجد أحداث بعد",
+    ticks_title: "آخر الفحوصات",
     loss_label: "فقدان الحزم",
     ev_connected: "متصل",
     ev_disconnected: "انقطاع",
@@ -166,6 +167,7 @@ const LANGS = {
     col_duration: "Duration",
     col_reason: "Reason",
     no_events: "No events yet",
+    ticks_title: "Recent Checks",
     loss_label: "Packet Loss",
     ev_connected: "Connected",
     ev_disconnected: "Disconnected",
@@ -622,6 +624,25 @@ function process(d) {
       </tr>`,
       )
       .join("");
+  }
+
+  // Ticks table
+  if (d.ticks && d.ticks.length) {
+    document.getElementById("ticks-tbody").innerHTML = d.ticks.map(t_ => {
+      const ok  = t_.tcp_ok && t_.http_ok && t_.dns_ok;
+      const row = ok ? '' : ' class="tick-row-warn"';
+      const chk = (v) => v
+        ? '<span class="tick-ok">✓</span>'
+        : '<span class="tick-fail">✗</span>';
+      return `<tr${row}>
+        <td class="mono">${t_.time}</td>
+        <td>${chk(t_.tcp_ok)}</td>
+        <td>${chk(t_.http_ok)}</td>
+        <td>${chk(t_.dns_ok)}</td>
+        <td class="mono">${t_.latency_ms > 0 ? t_.latency_ms + 'ms' : '—'}</td>
+        <td class="mono">${t_.packet_loss_pct > 0 ? t_.packet_loss_pct.toFixed(1) + '%' : '—'}</td>
+      </tr>`;
+    }).join("");
   }
 }
 

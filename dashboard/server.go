@@ -112,9 +112,21 @@ func RingtoneMp3() []byte {
 }
 
 const maxHistory = 60
-const maxEvents = 100
+const maxEvents  = 100
+const maxTicks   = 20
 
 // ── Types ─────────────────────────────────────────────────────
+
+// TickEntry is a single check-cycle result stored for the recent-checks table.
+type TickEntry struct {
+	Time       string  `json:"time"`
+	Status     string  `json:"status"`
+	LatencyMs  int64   `json:"latency_ms"`
+	PacketLoss float64 `json:"packet_loss_pct"`
+	TCPOk      bool    `json:"tcp_ok"`
+	HTTPOk     bool    `json:"http_ok"`
+	DNSOk      bool    `json:"dns_ok"`
+}
 
 // EventEntry is the in-memory / SSE representation of a connectivity event.
 // Reason is sent as structured booleans so the client can translate it.
@@ -143,6 +155,7 @@ type Snapshot struct {
 	UptimePct      float64      `json:"uptime_pct"`
 	LatencyHistory []int64      `json:"latency_history"`
 	Events         []EventEntry `json:"events"`
+	Ticks          []TickEntry  `json:"ticks"`
 	UpdateInfo     *UpdateInfo  `json:"update_info,omitempty"`
 }
 
@@ -196,6 +209,7 @@ type Server struct {
 	startTime      time.Time
 	latencyHistory []int64
 	events         []EventEntry
+	ticks          []TickEntry
 
 	// Speed test state
 	stRunning atomic.Bool
@@ -270,6 +284,19 @@ func (s *Server) UpdateTick(result types.CheckResult, status types.Status) {
 	s.latencyHistory = append(s.latencyHistory, result.LatencyMs)
 	if len(s.latencyHistory) > maxHistory {
 		s.latencyHistory = s.latencyHistory[1:]
+	}
+	tick := TickEntry{
+		Time:       result.Timestamp.Format("15:04:05"),
+		Status:     status.String(),
+		LatencyMs:  result.LatencyMs,
+		PacketLoss: result.PacketLoss,
+		TCPOk:      result.TCPPingOK,
+		HTTPOk:     result.HTTPOK,
+		DNSOk:      result.DNSOK,
+	}
+	s.ticks = append([]TickEntry{tick}, s.ticks...)
+	if len(s.ticks) > maxTicks {
+		s.ticks = s.ticks[:maxTicks]
 	}
 	s.stateMu.Unlock()
 	s.broadcast("tick")
@@ -685,6 +712,8 @@ func (s *Server) snapshot(msgType string) Snapshot {
 	copy(hist, s.latencyHistory)
 	evts := make([]EventEntry, len(s.events))
 	copy(evts, s.events)
+	ticks := make([]TickEntry, len(s.ticks))
+	copy(ticks, s.ticks)
 
 	uptimePct := 0.0
 	if s.totalChecks > 0 {
@@ -705,6 +734,7 @@ func (s *Server) snapshot(msgType string) Snapshot {
 		UptimePct:      uptimePct,
 		LatencyHistory: hist,
 		Events:         evts,
+		Ticks:          ticks,
 		UpdateInfo:     updateInfo,
 	}
 }
