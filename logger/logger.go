@@ -70,32 +70,15 @@ func (l *Logger) Log(event monitor.Event) {
 	}
 
 	if l.cfg.WebhookURL != "" {
-		go l.sendWebhook(l.cfg.WebhookURL, l.buildEventPayload(event))
+		if !IsSupportedWebhook(l.cfg.WebhookURL) {
+			l.AppLog("WEBHOOK skipped: URL is not Discord or Slack")
+		} else {
+			go l.sendWebhook(l.cfg.WebhookURL, BuildEventPayload(event, l.cfg.WebhookURL))
+		}
 	}
 }
 
 // buildEventPayload creates a Discord+generic compatible payload for a connectivity event.
-func (l *Logger) buildEventPayload(event monitor.Event) map[string]interface{} {
-	emoji := map[string]string{
-		"connected":    "✅",
-		"disconnected": "❌",
-		"degraded":     "⚠️",
-	}
-	em := emoji[event.EventType]
-	summary := fmt.Sprintf("%s Internet %s", em, event.EventType)
-	if event.DurationSeconds > 0 {
-		summary += fmt.Sprintf(" (%.0fs)", event.DurationSeconds)
-	}
-
-	return map[string]interface{}{
-		"content":   summary, // Discord shows this
-		"event":     event.EventType,
-		"timestamp": event.Timestamp.UTC().Format(time.RFC3339),
-		"duration_seconds": event.DurationSeconds,
-		"reason":    event.Reason,
-	}
-}
-
 // sendWebhook sends a payload to the configured webhook URL.
 // It logs success/failure to app.log (issue 9).
 func (l *Logger) sendWebhook(url string, payload interface{}) {
@@ -124,11 +107,26 @@ func (l *Logger) sendWebhook(url string, payload interface{}) {
 // SendTestWebhook sends a test payload to the given URL.
 // Returns an error string if it fails, or "" on success.
 func (l *Logger) SendTestWebhook(url string) string {
-	payload := map[string]interface{}{
-		"content":   "🔔 Internet Monitor — Webhook Test",
-		"type":      "webhook_test",
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
-		"status":    "ok",
+	if !IsSupportedWebhook(url) {
+		return "Only Discord and Slack webhooks are supported"
+	}
+
+	// Build a proper test payload matching the platform format
+	var payload interface{}
+	if IsDiscord(url) {
+		payload = map[string]interface{}{
+			"username": "Internet Monitor",
+			"embeds": []map[string]interface{}{{
+				"title":       "🔔 Webhook Test",
+				"description": "الاتصال بين Internet Monitor والـ Webhook يعمل بشكل صحيح ✅",
+				"color":       0x22C55E,
+				"footer":      map[string]string{"text": "Internet Monitor"},
+			}},
+		}
+	} else {
+		payload = map[string]interface{}{
+			"text": ":bell: *Webhook Test* — Internet Monitor webhook is working correctly :white_check_mark:",
+		}
 	}
 
 	body, _ := json.Marshal(payload)

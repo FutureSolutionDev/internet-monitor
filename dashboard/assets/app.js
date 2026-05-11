@@ -22,6 +22,7 @@ const LANGS = {
     test_notif:'اختبار الإشعار والصوت', test_notif_ok:'✅ تم الإرسال', test_notif_err:'❌ فشل',
     test_webhook:'اختبار الـ Webhook', test_webhook_ok:'✅ وصل بنجاح', test_webhook_err:'❌ فشل',
     test_webhook_no_url:'⚠️ لم يتم تعيين webhook_url',
+    webhook_unsupported:'يُدعم Discord و Slack فقط',
     settings_title:'الإعدادات', settings_save:'حفظ الإعدادات',
     settings_saved:'✅ تم الحفظ بنجاح', settings_error:'❌ فشل الحفظ',
     requires_restart:'يتطلب إعادة تشغيل',
@@ -66,6 +67,7 @@ const LANGS = {
     test_notif:'Test Notification & Sound', test_notif_ok:'✅ Sent', test_notif_err:'❌ Failed',
     test_webhook:'Test Webhook', test_webhook_ok:'✅ Delivered', test_webhook_err:'❌ Failed',
     test_webhook_no_url:'⚠️ webhook_url not set',
+    webhook_unsupported:'Only Discord and Slack are supported',
     settings_title:'Settings', settings_save:'Save Settings',
     settings_saved:'✅ Saved successfully', settings_error:'❌ Save failed',
     requires_restart:'Requires restart',
@@ -571,6 +573,7 @@ async function loadSettings() {
     document.getElementById('cfg-loss-threshold').value   = cfg.packet_loss_threshold || 20;
     document.getElementById('cfg-latency-threshold').value = cfg.latency_threshold_ms || 500;
     document.getElementById('cfg-webhook').value          = cfg.webhook_url           || '';
+    validateWebhookURL(cfg.webhook_url || '');
     document.getElementById('cfg-log-dir').value          = cfg.log_dir               || 'logs';
     document.getElementById('cfg-port').value             = cfg.dashboard_port        || 8765;
     document.getElementById('cfg-http').value             = cfg.http_target           || '';
@@ -727,6 +730,16 @@ async function testNotification() {
     if (btn) btn.disabled = false;
     setTimeout(() => { if (res) res.textContent = ''; }, 4000);
   }
+}
+
+function isDiscordURL(url) { return url.includes('discord.com/api/webhooks') || url.includes('discordapp.com/api/webhooks'); }
+function isSlackURL(url)   { return url.includes('hooks.slack.com') || url.includes('slack.com/services/'); }
+function isSupportedWebhook(url) { return isDiscordURL(url) || isSlackURL(url); }
+
+function validateWebhookURL(url) {
+  const warn = document.getElementById('webhook-url-warn');
+  if (!warn) return;
+  warn.style.display = (url && !isSupportedWebhook(url)) ? 'block' : 'none';
 }
 
 async function testWebhook() {

@@ -234,7 +234,11 @@
         </div>
         <div class="field full-width">
           <label data-i18n="webhook_url">عنوان الـ Webhook (اختياري)</label>
-          <input type="text" id="cfg-webhook" placeholder="https://...">
+          <input type="text" id="cfg-webhook" placeholder="https://discord.com/api/webhooks/... أو https://hooks.slack.com/..."
+                 oninput="validateWebhookURL(this.value)">
+          <div id="webhook-url-warn" style="display:none;font-size:11px;color:var(--yellow);margin-top:3px">
+            ⚠️ <span data-i18n="webhook_unsupported">يُدعم Discord و Slack فقط</span>
+          </div>
           <div class="field-note" data-i18n="webhook_note">يُرسل إشعار JSON عند كل حدث — Discord / Slack / أي خدمة</div>
           <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
             <button class="btn btn-secondary btn-sm" id="test-webhook-btn" onclick="testWebhook()">

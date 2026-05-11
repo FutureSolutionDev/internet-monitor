@@ -7,6 +7,7 @@ import (
 	"embed"
 	"fmt"
 	"internet-monitor/config"
+	"internet-monitor/logger"
 	"internet-monitor/monitor"
 	"io"
 	"net"
@@ -476,27 +477,38 @@ func (s *Server) sendTestWebhook(results testTargetsResponse) {
 	if err := json.Unmarshal(data, &cfg); err != nil || cfg.WebhookURL == "" {
 		return
 	}
+	if !logger.IsSupportedWebhook(cfg.WebhookURL) {
+		return // Only Discord and Slack
+	}
 
-	allOK := true
+	// Convert to logger.TestResults for unified formatting
+	tr := logger.TestResults{}
 	for _, r := range results.PingTargets {
-		if !r.OK {
-			allOK = false
+		tr.PingTargets = append(tr.PingTargets, logger.TestResult{
+			Target:    r.Target,
+			OK:        r.OK,
+			LatencyMs: r.LatencyMs,
+			Error:     r.Error,
+		})
+	}
+	if results.HTTPTarget.Target != "" {
+		tr.HTTPTarget = &logger.TestResult{
+			Target:    results.HTTPTarget.Target,
+			OK:        results.HTTPTarget.OK,
+			LatencyMs: results.HTTPTarget.LatencyMs,
+			Error:     results.HTTPTarget.Error,
 		}
 	}
-	if results.HTTPTarget.Target != "" && !results.HTTPTarget.OK {
-		allOK = false
-	}
-	if results.DNSTarget.Target != "" && !results.DNSTarget.OK {
-		allOK = false
-	}
-
-	payload := map[string]interface{}{
-		"type":      "manual_test",
-		"status":    map[bool]string{true: "all_ok", false: "some_failed"}[allOK],
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
-		"results":   results,
+	if results.DNSTarget.Target != "" {
+		tr.DNSTarget = &logger.TestResult{
+			Target:    results.DNSTarget.Target,
+			OK:        results.DNSTarget.OK,
+			LatencyMs: results.DNSTarget.LatencyMs,
+			Error:     results.DNSTarget.Error,
+		}
 	}
 
+	payload := logger.BuildTestPayload(tr, cfg.WebhookURL)
 	body, _ := json.Marshal(payload)
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Post(cfg.WebhookURL, "application/json", bytes.NewReader(body))
