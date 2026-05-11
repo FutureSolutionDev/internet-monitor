@@ -1,272 +1,555 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Internet Monitor</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <style>
-    :root {
-      --bg:    #0f172a;
-      --bg2:   #1e293b;
-      --bg3:   #334155;
-      --text:  #f1f5f9;
-      --muted: #94a3b8;
-      --green: #22c55e;
-      --yellow:#eab308;
-      --red:   #ef4444;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مراقب الإنترنت</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0f172a;--bg2:#1e293b;--bg3:#334155;--text:#f1f5f9;--muted:#94a3b8;--green:#22c55e;--yellow:#eab308;--red:#ef4444;--blue:#3b82f6;--radius:10px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Tahoma,sans-serif;min-height:100vh}
 
-    /* ── Header ── */
-    header {
-      background: var(--bg2); border-bottom: 1px solid var(--bg3);
-      padding: 14px 24px; display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 10;
-    }
-    #dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); transition: background .4s; flex-shrink: 0; }
-    header h1 { font-size: 15px; font-weight: 600; }
-    #hdr-right { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--muted); }
-    #hdr-time { font-variant-numeric: tabular-nums; }
+header{background:var(--bg2);border-bottom:1px solid var(--bg3);padding:12px 20px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100}
+#dot{width:10px;height:10px;border-radius:50%;background:var(--muted);transition:background .4s;flex-shrink:0}
+header h1{font-size:15px;font-weight:600}
+.hdr-right{margin-inline-start:auto;display:flex;align-items:center;gap:10px}
+#hdr-status,#hdr-time{font-size:13px;color:var(--muted)}
+#hdr-time{font-variant-numeric:tabular-nums}
+.lang-btn{background:var(--bg3);border:none;color:var(--text);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600}
+.lang-btn:hover{background:#475569}
 
-    /* ── Layout ── */
-    .content { padding: 24px; max-width: 1000px; margin: 0 auto; }
+.tabs{background:var(--bg2);border-bottom:1px solid var(--bg3);display:flex}
+.tab-btn{padding:12px 20px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;border-bottom:2px solid transparent;transition:all .2s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:600}
+.tab-content{display:none}
+.tab-content.active{display:block}
 
-    /* ── Status card ── */
-    #status-card {
-      border-radius: 12px; padding: 24px 28px; margin-bottom: 16px;
-      background: var(--bg2); border: 2px solid var(--bg3);
-      display: flex; align-items: center; gap: 20px; transition: border-color .4s;
-    }
-    #status-circle {
-      width: 52px; height: 52px; border-radius: 50%; background: var(--muted);
-      flex-shrink: 0; transition: background .4s; display: flex; align-items: center;
-      justify-content: center; font-size: 22px;
-    }
-    #status-text  { font-size: 26px; font-weight: 700; letter-spacing: .5px; }
-    #status-sub   { font-size: 13px; color: var(--muted); margin-top: 3px; }
-    #latency-big  { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
-    #latency-lbl  { font-size: 11px; color: var(--muted); text-align: right; text-transform: uppercase; letter-spacing: .5px; margin-top: 2px; }
+.content{padding:20px;max-width:1000px;margin:0 auto}
 
-    /* ── Stat cards ── */
-    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
-    .card  { background: var(--bg2); border: 1px solid var(--bg3); border-radius: 10px; padding: 16px 18px; }
-    .card-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .card-label { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
+#status-card{border-radius:12px;padding:20px 24px;margin-bottom:14px;background:var(--bg2);border:2px solid var(--bg3);display:flex;align-items:center;gap:16px;transition:border-color .4s}
+#status-circle{width:50px;height:50px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .4s;display:flex;align-items:center;justify-content:center;font-size:22px}
+#status-text{font-size:24px;font-weight:700}
+#status-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.status-right{margin-inline-start:auto;text-align:end}
+#latency-big{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+#latency-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.quality-badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;margin-top:4px}
 
-    /* ── Section ── */
-    .section { background: var(--bg2); border: 1px solid var(--bg3); border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
-    .section-title { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 14px; }
+.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
+.card{background:var(--bg2);border:1px solid var(--bg3);border-radius:var(--radius);padding:14px 16px}
+.card-value{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.card-label{font-size:11px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.5px}
 
-    /* ── Chart ── */
-    #chart-wrap { height: 150px; position: relative; }
-    .checks { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
-    .badge-check { font-size: 12px; padding: 3px 10px; border-radius: 999px; font-weight: 500; }
-    .ok   { background: rgba(34,197,94,.15);  color: var(--green); }
-    .fail { background: rgba(239,68,68,.15);  color: var(--red);   }
-    #loss-val { font-size: 12px; color: var(--muted); margin-left: auto; }
+.section{background:var(--bg2);border:1px solid var(--bg3);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px}
+.section-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
 
-    /* ── Event table ── */
-    table { width: 100%; border-collapse: collapse; }
-    th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); padding: 6px 10px; border-bottom: 1px solid var(--bg3); }
-    td { padding: 9px 10px; font-size: 13px; border-bottom: 1px solid rgba(51,65,85,.4); }
-    tr:last-child td { border-bottom: none; }
-    .badge { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
-    .badge-connected    { background: rgba(34,197,94,.15);  color: var(--green);  }
-    .badge-degraded     { background: rgba(234,179,8,.15);  color: var(--yellow); }
-    .badge-disconnected { background: rgba(239,68,68,.15);  color: var(--red);    }
-    .empty { text-align: center; padding: 28px; color: var(--muted); font-size: 13px; }
-    .mono { font-family: monospace; color: var(--muted); }
-  </style>
+#chart-wrap{height:140px;position:relative}
+.checks{display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap}
+.chk-badge{font-size:12px;padding:3px 10px;border-radius:999px;font-weight:600}
+.ok{background:rgba(34,197,94,.15);color:var(--green)}
+.fail{background:rgba(239,68,68,.15);color:var(--red)}
+#loss-val{font-size:12px;color:var(--muted);margin-inline-start:auto}
+
+table{width:100%;border-collapse:collapse}
+th{text-align:start;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);padding:6px 10px;border-bottom:1px solid var(--bg3)}
+td{padding:9px 10px;font-size:13px;border-bottom:1px solid rgba(51,65,85,.4)}
+tr:last-child td{border-bottom:none}
+.badge{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+.badge-connected{background:rgba(34,197,94,.15);color:var(--green)}
+.badge-degraded{background:rgba(234,179,8,.15);color:var(--yellow)}
+.badge-disconnected{background:rgba(239,68,68,.15);color:var(--red)}
+.empty{text-align:center;padding:28px;color:var(--muted);font-size:13px}
+.mono{font-family:monospace;color:var(--muted)}
+
+.logs-toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+select,input[type=text],input[type=number]{background:var(--bg3);border:1px solid #475569;color:var(--text);padding:7px 12px;border-radius:6px;font-size:13px;outline:none}
+select:focus,input:focus{border-color:var(--blue)}
+.btn{padding:7px 16px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:opacity .2s}
+.btn:hover{opacity:.85}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-secondary{background:var(--bg3);color:var(--text)}
+
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.field input,.field select{width:100%}
+.field-note{font-size:11px;color:var(--yellow);margin-top:2px}
+.settings-footer{display:flex;align-items:center;gap:12px;margin-top:18px;padding-top:18px;border-top:1px solid var(--bg3)}
+#save-msg{font-size:13px;font-weight:600}
+.msg-ok{color:var(--green)}.msg-err{color:var(--red)}
+.full-width{grid-column:1/-1}
+.tag-restart{font-size:10px;background:rgba(234,179,8,.15);color:var(--yellow);padding:1px 6px;border-radius:4px;margin-inline-start:4px}
+#log-count{font-size:12px;color:var(--muted)}
+.logs-reason{color:var(--muted);font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+</style>
 </head>
 <body>
 
 <header>
   <div id="dot"></div>
-  <h1>Internet Monitor</h1>
-  <div id="hdr-right">
-    <span id="hdr-status">Connecting...</span>
+  <h1 data-i18n="appName">مراقب الإنترنت</h1>
+  <div class="hdr-right">
+    <span id="hdr-status" data-i18n="status_checking">جاري الفحص...</span>
     <span id="hdr-time">--:--:--</span>
+    <button class="lang-btn" onclick="toggleLang()">EN / عر</button>
   </div>
 </header>
 
+<div class="tabs">
+  <button class="tab-btn active" data-tab="dashboard" onclick="showTab('dashboard')" data-i18n="nav_dashboard">لوحة التحكم</button>
+  <button class="tab-btn" data-tab="logs" onclick="showTab('logs')" data-i18n="nav_logs">السجلات</button>
+  <button class="tab-btn" data-tab="settings" onclick="showTab('settings')" data-i18n="nav_settings">الإعدادات</button>
+</div>
+
+<!-- ══ TAB: Dashboard ══ -->
+<div class="tab-content active" id="tab-dashboard">
 <div class="content">
 
-  <!-- Status Card -->
   <div id="status-card">
     <div id="status-circle">🌐</div>
     <div style="flex:1">
-      <div id="status-text">CHECKING...</div>
-      <div id="status-sub">Waiting for first check</div>
+      <div id="status-text" data-i18n="status_checking">جاري الفحص...</div>
+      <div id="status-sub" data-i18n="status_wait">في انتظار أول فحص</div>
     </div>
-    <div>
+    <div class="status-right">
       <div id="latency-big">—</div>
-      <div id="latency-lbl">Latency</div>
+      <div id="latency-lbl" data-i18n="latency">زمن الاستجابة</div>
+      <div id="quality-badge" class="quality-badge" style="display:none"></div>
     </div>
   </div>
 
-  <!-- Stat Cards -->
   <div class="cards">
-    <div class="card">
-      <div class="card-value" id="st-uptime">—</div>
-      <div class="card-label">Uptime</div>
-    </div>
-    <div class="card">
-      <div class="card-value" id="st-drops">0</div>
-      <div class="card-label">Disconnections</div>
-    </div>
-    <div class="card">
-      <div class="card-value" id="st-avg">—</div>
-      <div class="card-label">Avg Latency</div>
-    </div>
-    <div class="card">
-      <div class="card-value" id="st-checks">0</div>
-      <div class="card-label">Total Checks</div>
-    </div>
+    <div class="card"><div class="card-value" id="st-uptime">—</div><div class="card-label" data-i18n="uptime">وقت التشغيل</div></div>
+    <div class="card"><div class="card-value" id="st-uptime-pct">—</div><div class="card-label" data-i18n="uptime_pct">نسبة الاتصال</div></div>
+    <div class="card"><div class="card-value" id="st-drops">0</div><div class="card-label" data-i18n="disconnections">انقطاعات</div></div>
+    <div class="card"><div class="card-value" id="st-avg">—</div><div class="card-label" data-i18n="avg_latency">متوسط الاستجابة</div></div>
+    <div class="card"><div class="card-value" id="st-checks">0</div><div class="card-label" data-i18n="total_checks">إجمالي الفحوصات</div></div>
   </div>
 
-  <!-- Chart -->
   <div class="section">
-    <div class="section-title">Latency — Last 60 Checks</div>
+    <div class="section-title" data-i18n="chart_title">زمن الاستجابة — آخر 60 فحص</div>
     <div id="chart-wrap"><canvas id="the-chart"></canvas></div>
     <div class="checks">
-      <span class="badge-check ok"  id="chk-tcp">TCP ✓</span>
-      <span class="badge-check ok"  id="chk-http">HTTP ✓</span>
-      <span class="badge-check ok"  id="chk-dns">DNS ✓</span>
-      <span id="loss-val">Loss: 0.0%</span>
+      <span class="chk-badge ok" id="chk-tcp">TCP ✓</span>
+      <span class="chk-badge ok" id="chk-http">HTTP ✓</span>
+      <span class="chk-badge ok" id="chk-dns">DNS ✓</span>
+      <span id="loss-val">0.0%</span>
     </div>
   </div>
 
-  <!-- Event Log -->
   <div class="section">
-    <div class="section-title">Event Log</div>
+    <div class="section-title" data-i18n="events_title">سجل الأحداث</div>
     <table>
-      <thead>
-        <tr><th>Time</th><th>Event</th><th>Duration</th><th>Reason</th></tr>
-      </thead>
+      <thead><tr>
+        <th data-i18n="col_time">الوقت</th>
+        <th data-i18n="col_event">الحدث</th>
+        <th data-i18n="col_duration">المدة</th>
+        <th data-i18n="col_reason">السبب</th>
+      </tr></thead>
       <tbody id="event-tbody">
-        <tr><td colspan="4" class="empty">No events yet</td></tr>
+        <tr><td colspan="4" class="empty" data-i18n="no_events">لا توجد أحداث بعد</td></tr>
       </tbody>
     </table>
   </div>
 
 </div>
+</div>
+
+<!-- ══ TAB: Logs ══ -->
+<div class="tab-content" id="tab-logs">
+<div class="content">
+  <div class="section">
+    <div class="section-title" data-i18n="logs_title">عرض السجلات المخزنة</div>
+    <div class="logs-toolbar">
+      <select id="log-date-select" onchange="loadLogs()">
+        <option value="" data-i18n="logs_select">اختر تاريخاً...</option>
+      </select>
+      <button class="btn btn-secondary" onclick="exportCSV()" data-i18n="export_csv">تصدير CSV</button>
+      <span id="log-count"></span>
+    </div>
+    <table>
+      <thead><tr>
+        <th data-i18n="col_time">الوقت</th>
+        <th data-i18n="col_event">الحدث</th>
+        <th data-i18n="col_duration">المدة</th>
+        <th data-i18n="col_reason">السبب</th>
+        <th>Packet Loss</th>
+        <th>Latency</th>
+      </tr></thead>
+      <tbody id="log-tbody">
+        <tr><td colspan="6" class="empty" data-i18n="logs_select_hint">اختر تاريخاً لعرض السجلات</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- ══ TAB: Settings ══ -->
+<div class="tab-content" id="tab-settings">
+<div class="content">
+  <div class="section">
+    <div class="section-title" data-i18n="settings_title">الإعدادات</div>
+    <div class="settings-grid">
+      <div class="field">
+        <label data-i18n="check_interval">فترة الفحص (ثانية)</label>
+        <input type="number" id="cfg-interval" min="1" max="60">
+      </div>
+      <div class="field">
+        <label data-i18n="fail_threshold">عدد الفشل المتتالي للانقطاع</label>
+        <input type="number" id="cfg-fail-threshold" min="1" max="20">
+        <div class="field-note" data-i18n="fail_threshold_note">بعد كم فشل متتالي يُعتبر الاتصال منقطعاً</div>
+      </div>
+      <div class="field">
+        <label data-i18n="loss_threshold">حد فقدان الحزم (%)</label>
+        <input type="number" id="cfg-loss-threshold" min="0" max="100">
+        <div class="field-note" data-i18n="loss_threshold_note">فوق هذه النسبة يُعتبر الاتصال ضعيفاً</div>
+      </div>
+      <div class="field">
+        <label data-i18n="latency_threshold">حد زمن الاستجابة (مللي ثانية)</label>
+        <input type="number" id="cfg-latency-threshold" min="0">
+        <div class="field-note" data-i18n="latency_threshold_note">فوق هذا الحد يُعتبر الاتصال ضعيفاً</div>
+      </div>
+      <div class="field full-width">
+        <label data-i18n="webhook_url">عنوان الـ Webhook (اختياري)</label>
+        <input type="text" id="cfg-webhook" placeholder="https://...">
+        <div class="field-note" data-i18n="webhook_note">يُرسل إشعار JSON عند كل حدث — Discord / Slack / أي خدمة</div>
+      </div>
+      <div class="field">
+        <label data-i18n="log_dir">مجلد السجلات</label>
+        <input type="text" id="cfg-log-dir">
+      </div>
+      <div class="field">
+        <label><span data-i18n="dashboard_port">منفذ لوحة التحكم</span><span class="tag-restart" data-i18n="requires_restart">يتطلب إعادة تشغيل</span></label>
+        <input type="number" id="cfg-port" min="1024" max="65535">
+      </div>
+    </div>
+    <div class="settings-footer">
+      <button class="btn btn-primary" onclick="saveSettings()" data-i18n="settings_save">حفظ الإعدادات</button>
+      <span id="save-msg"></span>
+    </div>
+  </div>
+</div>
+</div>
 
 <script>
-// ── Clock ──────────────────────────────────────────────
-setInterval(() => {
-  document.getElementById('hdr-time').textContent =
-    new Date().toLocaleTimeString();
-}, 1000);
+// ── i18n ──────────────────────────────────────────────────────
+const LANGS = {
+  ar:{
+    appName:'مراقب الإنترنت',nav_dashboard:'لوحة التحكم',nav_logs:'السجلات',nav_settings:'الإعدادات',
+    status_connected:'متصل',status_disconnected:'منقطع',status_degraded:'ضعيف الإشارة',
+    status_checking:'جاري الفحص...',status_wait:'في انتظار أول فحص',
+    status_sub_ok:'جميع الفحوصات ناجحة',latency:'زمن الاستجابة',
+    uptime:'وقت التشغيل',uptime_pct:'نسبة الاتصال',
+    disconnections:'انقطاعات',avg_latency:'متوسط الاستجابة',total_checks:'إجمالي الفحوصات',
+    chart_title:'زمن الاستجابة — آخر 60 فحص',events_title:'سجل الأحداث',
+    col_time:'الوقت',col_event:'الحدث',col_duration:'المدة',col_reason:'السبب',
+    no_events:'لا توجد أحداث بعد',loss_label:'فقدان الحزم',
+    ev_connected:'متصل',ev_disconnected:'انقطاع',ev_degraded:'ضعيف',
+    logs_title:'عرض السجلات المخزنة',logs_select:'اختر تاريخاً...',
+    logs_select_hint:'اختر تاريخاً لعرض السجلات',logs_empty:'لا توجد سجلات لهذا التاريخ',
+    export_csv:'تصدير CSV',
+    settings_title:'الإعدادات',settings_save:'حفظ الإعدادات',
+    settings_saved:'✅ تم الحفظ بنجاح',settings_error:'❌ فشل الحفظ',
+    requires_restart:'يتطلب إعادة تشغيل',
+    check_interval:'فترة الفحص (ثانية)',fail_threshold:'عدد الفشل المتتالي للانقطاع',
+    fail_threshold_note:'بعد كم فشل متتالي يُعتبر الاتصال منقطعاً',
+    loss_threshold:'حد فقدان الحزم (%)',loss_threshold_note:'فوق هذه النسبة يُعتبر ضعيفاً',
+    latency_threshold:'حد زمن الاستجابة (مللي ثانية)',latency_threshold_note:'فوق هذا الحد يُعتبر ضعيفاً',
+    webhook_url:'عنوان الـ Webhook (اختياري)',webhook_note:'Discord / Slack / أي خدمة تدعم JSON',
+    log_dir:'مجلد السجلات',dashboard_port:'منفذ لوحة التحكم',
+    q_excellent:'ممتاز',q_good:'جيد',q_fair:'متوسط',q_poor:'ضعيف',q_critical:'حرج',
+    live:'مباشر',reconnecting:'جاري إعادة الاتصال...',log_count:'سجل'
+  },
+  en:{
+    appName:'Internet Monitor',nav_dashboard:'Dashboard',nav_logs:'Logs',nav_settings:'Settings',
+    status_connected:'Connected',status_disconnected:'Disconnected',status_degraded:'Degraded',
+    status_checking:'Checking...',status_wait:'Waiting for first check',
+    status_sub_ok:'All checks passing',latency:'Latency',
+    uptime:'Uptime',uptime_pct:'Connection %',
+    disconnections:'Drops',avg_latency:'Avg Latency',total_checks:'Total Checks',
+    chart_title:'Latency — Last 60 Checks',events_title:'Event Log',
+    col_time:'Time',col_event:'Event',col_duration:'Duration',col_reason:'Reason',
+    no_events:'No events yet',loss_label:'Packet Loss',
+    ev_connected:'Connected',ev_disconnected:'Disconnected',ev_degraded:'Degraded',
+    logs_title:'View Stored Logs',logs_select:'Select a date...',
+    logs_select_hint:'Select a date to view logs',logs_empty:'No logs for this date',
+    export_csv:'Export CSV',
+    settings_title:'Settings',settings_save:'Save Settings',
+    settings_saved:'✅ Saved successfully',settings_error:'❌ Save failed',
+    requires_restart:'Requires restart',
+    check_interval:'Check interval (seconds)',fail_threshold:'Failures before disconnect',
+    fail_threshold_note:'How many consecutive failures trigger disconnect',
+    loss_threshold:'Packet loss threshold (%)',loss_threshold_note:'Above this % = degraded',
+    latency_threshold:'Latency threshold (ms)',latency_threshold_note:'Above this ms = degraded',
+    webhook_url:'Webhook URL (optional)',webhook_note:'Discord / Slack / any JSON service',
+    log_dir:'Logs directory',dashboard_port:'Dashboard port',
+    q_excellent:'Excellent',q_good:'Good',q_fair:'Fair',q_poor:'Poor',q_critical:'Critical',
+    live:'Live',reconnecting:'Reconnecting...',log_count:'record'
+  }
+};
 
-// ── Chart ──────────────────────────────────────────────
-const chartData    = { labels: [], datasets: [{ label: 'ms', data: [], borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.07)', borderWidth: 2, pointRadius: 0, pointHoverRadius: 4, tension: .35, fill: true }] };
-const chart = new Chart(document.getElementById('the-chart').getContext('2d'), {
-  type: 'line', data: chartData,
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    animation: { duration: 250 },
-    scales: {
-      x: { display: false },
-      y: { beginAtZero: true, grid: { color: 'rgba(51,65,85,.5)' },
-           ticks: { color: '#94a3b8', callback: v => v + 'ms' }, border: { display: false } }
+let lang = localStorage.getItem('lang') || 'ar';
+function t(k){ return LANGS[lang][k] || k; }
+function applyLang(){
+  document.documentElement.lang = lang;
+  document.documentElement.dir  = lang==='ar'?'rtl':'ltr';
+  document.title = t('appName');
+  document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+}
+function toggleLang(){
+  lang = lang==='ar'?'en':'ar';
+  localStorage.setItem('lang',lang);
+  applyLang();
+  if(lastData) process(lastData);
+}
+
+setInterval(()=>{ document.getElementById('hdr-time').textContent=new Date().toLocaleTimeString(); },1000);
+
+function showTab(name){
+  document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el=>el.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelector('[data-tab="'+name+'"]').classList.add('active');
+  if(name==='logs') loadLogDates();
+  if(name==='settings') loadSettings();
+}
+
+// ── Chart ──────────────────────────────────────────────────────
+const chartData={labels:[],datasets:[{
+  label:'ms',data:[],borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.07)',
+  borderWidth:2,tension:.35,fill:true,pointRadius:0,pointHoverRadius:5,hitRadius:20
+}]};
+const chart=new Chart(document.getElementById('the-chart').getContext('2d'),{
+  type:'line',data:chartData,
+  options:{
+    responsive:true,maintainAspectRatio:false,animation:{duration:250},
+    interaction:{mode:'index',intersect:false},
+    scales:{
+      x:{display:false},
+      y:{beginAtZero:true,grid:{color:'rgba(51,65,85,.5)'},
+         ticks:{color:'#94a3b8',callback:v=>v+'ms'},border:{display:false}}
     },
-    plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y + 'ms' } } }
+    plugins:{
+      legend:{display:false},
+      tooltip:{
+        backgroundColor:'#1e293b',borderColor:'#334155',borderWidth:1,
+        titleColor:'#94a3b8',bodyColor:'#f1f5f9',
+        callbacks:{
+          title:items=>{
+            const i=items[0].dataIndex,total=chartData.datasets[0].data.length;
+            const s=(total-1-i)*5;
+            return s===0?(lang==='ar'?'الآن':'Now'):
+                   s<60?s+(lang==='ar'?' ث':'s ago'):
+                   Math.round(s/60)+(lang==='ar'?' د':' min ago');
+          },
+          label:ctx=>'  '+ctx.parsed.y+' ms'
+        }
+      }
+    }
   }
 });
 
-// ── Helpers ────────────────────────────────────────────
-const C = {
-  connected:    { dot: '#22c55e', border: 'rgba(34,197,94,.4)',  circle: '#22c55e', icon: '✅' },
-  degraded:     { dot: '#eab308', border: 'rgba(234,179,8,.4)',  circle: '#eab308', icon: '⚠️' },
-  disconnected: { dot: '#ef4444', border: 'rgba(239,68,68,.4)',  circle: '#ef4444', icon: '❌' },
-  checking:     { dot: '#94a3b8', border: 'rgba(148,163,184,.2)', circle: '#94a3b8', icon: '🌐' },
+const STATUS_C={
+  connected:  {dot:'#22c55e',border:'rgba(34,197,94,.35)',circle:'#22c55e',icon:'✅'},
+  degraded:   {dot:'#eab308',border:'rgba(234,179,8,.35)', circle:'#eab308',icon:'⚠️'},
+  disconnected:{dot:'#ef4444',border:'rgba(239,68,68,.35)',circle:'#ef4444',icon:'❌'},
+  checking:   {dot:'#94a3b8',border:'rgba(148,163,184,.2)',circle:'#94a3b8',icon:'🌐'},
 };
 
-function fmtDur(s) {
-  if (!s || s < 1) return '—';
-  if (s < 60) return s.toFixed(0) + 's';
-  if (s < 3600) return Math.floor(s/60) + 'm ' + (s%60|0) + 's';
-  return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm';
-}
-function fmtUptime(s) {
-  const h = s/3600|0, m = (s%3600/60)|0, sec = s%60|0;
-  return h > 0 ? h+'h '+m+'m' : m > 0 ? m+'m '+sec+'s' : sec+'s';
+function qualityGrade(pct,loss,lat){
+  if(pct<50) return{grade:'F',key:'q_critical',bg:'rgba(239,68,68,.2)', c:'#ef4444'};
+  if(pct<80) return{grade:'D',key:'q_poor',   bg:'rgba(239,68,68,.15)',c:'#ef4444'};
+  if(pct<95) return{grade:'C',key:'q_fair',   bg:'rgba(234,179,8,.15)',c:'#eab308'};
+  if(loss>5||lat>200) return{grade:'B',key:'q_good',bg:'rgba(234,179,8,.15)',c:'#eab308'};
+  return{grade:'A',key:'q_excellent',bg:'rgba(34,197,94,.15)',c:'#22c55e'};
 }
 
-let avgSum = 0, avgCnt = 0;
-
-function applyStatus(st) {
-  const c = C[st] || C.checking;
-  document.getElementById('dot').style.background            = c.dot;
-  document.getElementById('status-card').style.borderColor  = c.border;
-  document.getElementById('status-circle').style.background = c.circle;
-  document.getElementById('status-circle').textContent      = c.icon;
-  document.getElementById('status-text').textContent        = st.toUpperCase();
-  document.getElementById('hdr-status').textContent         = st.charAt(0).toUpperCase() + st.slice(1);
-  chartData.datasets[0].borderColor      = c.dot;
-  chartData.datasets[0].backgroundColor = c.dot + '12';
+function fmtDur(s){
+  if(!s||s<1) return'—';
+  if(s<60) return s.toFixed(0)+'s';
+  if(s<3600) return Math.floor(s/60)+'m '+(s%60|0)+'s';
+  return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m';
+}
+function fmtUptime(s){
+  const h=s/3600|0,m=(s%3600/60)|0,sec=s%60|0;
+  return h>0?h+'h '+m+'m':m>0?m+'m '+sec+'s':sec+'s';
 }
 
-function process(d) {
-  applyStatus(d.status || 'checking');
+let avgSum=0,avgCnt=0,lastData=null;
 
-  const lat = d.latency_ms || 0;
-  document.getElementById('latency-big').textContent = lat > 0 ? lat + 'ms' : '—';
-  document.getElementById('status-sub').textContent  =
-    d.tcp_ping_ok && d.http_ok && d.dns_ok
-      ? 'All checks passing'
-      : 'Packet loss: ' + (d.packet_loss||0).toFixed(1) + '%';
+function process(d){
+  lastData=d;
+  const st=d.status||'checking';
+  const c=STATUS_C[st]||STATUS_C.checking;
 
-  document.getElementById('st-uptime').textContent = fmtUptime(d.uptime_seconds || 0);
-  document.getElementById('st-drops').textContent  = d.disconnections || 0;
-  document.getElementById('st-checks').textContent = (d.total_checks || 0).toLocaleString();
+  document.getElementById('dot').style.background           =c.dot;
+  document.getElementById('status-card').style.borderColor  =c.border;
+  document.getElementById('status-circle').style.background =c.circle;
+  document.getElementById('status-circle').textContent      =c.icon;
+  document.getElementById('status-text').textContent        =t('status_'+st);
+  document.getElementById('hdr-status').textContent         =t('status_'+st);
 
-  if (lat > 0) { avgSum += lat; avgCnt++; }
-  document.getElementById('st-avg').textContent = avgCnt ? (avgSum/avgCnt|0) + 'ms' : '—';
+  const lat=d.latency_ms||0;
+  document.getElementById('latency-big').textContent=lat>0?lat+'ms':'—';
+  document.getElementById('status-sub').textContent=
+    d.tcp_ping_ok&&d.http_ok&&d.dns_ok?t('status_sub_ok'):
+    t('loss_label')+': '+(d.packet_loss||0).toFixed(1)+'%';
 
-  // Check badges
-  function setChk(id, ok, label) {
-    const el = document.getElementById(id);
-    el.textContent = label + (ok ? ' ✓' : ' ✗');
-    el.className   = 'badge-check ' + (ok ? 'ok' : 'fail');
+  if(d.total_checks>0){
+    const q=qualityGrade(d.uptime_pct||0,d.packet_loss||0,lat);
+    const badge=document.getElementById('quality-badge');
+    badge.style.display='inline-block';
+    badge.style.background=q.bg;badge.style.color=q.c;
+    badge.textContent=q.grade+' · '+t(q.key);
   }
-  setChk('chk-tcp',  d.tcp_ping_ok, 'TCP');
-  setChk('chk-http', d.http_ok,     'HTTP');
-  setChk('chk-dns',  d.dns_ok,      'DNS');
-  document.getElementById('loss-val').textContent = 'Loss: ' + (d.packet_loss||0).toFixed(1) + '%';
 
-  // Chart — use full history from server
-  if (d.latency_history && d.latency_history.length) {
-    chartData.labels   = d.latency_history.map((_, i) => i);
-    chartData.datasets[0].data = d.latency_history;
+  document.getElementById('st-uptime').textContent    =fmtUptime(d.uptime_seconds||0);
+  document.getElementById('st-uptime-pct').textContent=d.total_checks>0?(d.uptime_pct||0).toFixed(1)+'%':'—';
+  document.getElementById('st-drops').textContent     =d.disconnections||0;
+  document.getElementById('st-checks').textContent    =(d.total_checks||0).toLocaleString();
+  if(lat>0){avgSum+=lat;avgCnt++;}
+  document.getElementById('st-avg').textContent=avgCnt?(avgSum/avgCnt|0)+'ms':'—';
+
+  function setChk(id,ok,lbl){
+    const el=document.getElementById(id);
+    el.textContent=lbl+(ok?' ✓':' ✗');
+    el.className='chk-badge '+(ok?'ok':'fail');
+  }
+  setChk('chk-tcp', d.tcp_ping_ok,'TCP');
+  setChk('chk-http',d.http_ok,   'HTTP');
+  setChk('chk-dns', d.dns_ok,    'DNS');
+  document.getElementById('loss-val').textContent=t('loss_label')+': '+(d.packet_loss||0).toFixed(1)+'%';
+
+  if(d.latency_history&&d.latency_history.length){
+    chartData.labels=d.latency_history.map((_,i)=>i);
+    chartData.datasets[0].data=d.latency_history;
+    chartData.datasets[0].borderColor=c.dot;
+    chartData.datasets[0].backgroundColor=c.dot+'12';
     chart.update('none');
   }
 
-  // Events
-  if (d.events && d.events.length) {
-    const tbody = document.getElementById('event-tbody');
-    tbody.innerHTML = d.events.map(e => `
+  if(d.events&&d.events.length){
+    document.getElementById('event-tbody').innerHTML=d.events.map(e=>`
       <tr>
         <td class="mono">${e.time}</td>
-        <td><span class="badge badge-${e.event_type}">${e.event_type}</span></td>
+        <td><span class="badge badge-${e.event_type}">${t('ev_'+e.event_type)||e.event_type}</span></td>
         <td class="mono">${fmtDur(e.duration_seconds)}</td>
-        <td style="color:var(--muted)">${e.reason}</td>
+        <td style="color:var(--muted);font-size:12px">${e.reason}</td>
       </tr>`).join('');
   }
 }
 
-// ── SSE ────────────────────────────────────────────────
-function connect() {
-  const es = new EventSource('/events');
-  es.onopen    = () => document.getElementById('hdr-status').textContent = 'Live';
-  es.onmessage = e => { try { process(JSON.parse(e.data)); } catch(_) {} };
-  es.onerror   = () => {
-    document.getElementById('hdr-status').textContent = 'Reconnecting...';
-    es.close();
-    setTimeout(connect, 3000);
+function connect(){
+  const es=new EventSource('/events');
+  es.onopen   =()=>document.getElementById('hdr-status').textContent=t('live');
+  es.onmessage=e=>{try{process(JSON.parse(e.data));}catch(_){}};
+  es.onerror  =()=>{
+    document.getElementById('hdr-status').textContent=t('reconnecting');
+    es.close();setTimeout(connect,3000);
   };
 }
+
+// ── Logs tab ──────────────────────────────────────────────────
+let logsData=[];
+
+async function loadLogDates(){
+  const sel=document.getElementById('log-date-select');
+  if(sel.options.length>1) return;
+  try{
+    const dates=await(await fetch('/api/log-dates')).json();
+    dates.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;sel.appendChild(o);});
+    if(dates.length>0){sel.value=dates[0];loadLogs();}
+  }catch(e){}
+}
+
+async function loadLogs(){
+  const date=document.getElementById('log-date-select').value;
+  if(!date) return;
+  document.getElementById('log-tbody').innerHTML=`<tr><td colspan="6" class="empty">...</td></tr>`;
+  try{
+    logsData=await(await fetch('/api/logs?date='+date)).json();
+    renderLogTable(logsData);
+  }catch(e){}
+}
+
+function renderLogTable(entries){
+  document.getElementById('log-count').textContent=entries.length+' '+t('log_count');
+  if(!entries.length){
+    document.getElementById('log-tbody').innerHTML=`<tr><td colspan="6" class="empty">${t('logs_empty')}</td></tr>`;
+    return;
+  }
+  document.getElementById('log-tbody').innerHTML=entries.map(e=>{
+    const ts=new Date(e.timestamp);
+    const time=isNaN(ts)?e.timestamp:ts.toLocaleTimeString();
+    const evType=e.event||'';
+    const r=e.reason||{};
+    const parts=[];
+    if(r.tcp_ping_failed) parts.push('TCP');
+    if(r.http_failed) parts.push('HTTP');
+    if(r.dns_failed) parts.push('DNS');
+    return`<tr>
+      <td class="mono">${time}</td>
+      <td><span class="badge badge-${evType}">${t('ev_'+evType)||evType}</span></td>
+      <td class="mono">${fmtDur(e.duration_seconds||0)}</td>
+      <td class="logs-reason">${parts.length?parts.join(', ')+' failed':'—'}</td>
+      <td class="mono">${(r.packet_loss_pct||0).toFixed(1)}%</td>
+      <td class="mono">${r.avg_latency_ms>0?r.avg_latency_ms+'ms':'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function exportCSV(){
+  if(!logsData.length) return;
+  const rows=[['Time','Event','Duration(s)','TCP','HTTP','DNS','Loss%','Latency(ms)']];
+  logsData.forEach(e=>{
+    const r=e.reason||{};
+    rows.push([new Date(e.timestamp).toLocaleString(),e.event||'',(e.duration_seconds||0).toFixed(1),
+      r.tcp_ping_failed?'FAIL':'OK',r.http_failed?'FAIL':'OK',r.dns_failed?'FAIL':'OK',
+      (r.packet_loss_pct||0).toFixed(1),r.avg_latency_ms||0]);
+  });
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
+  a.download='internet-monitor-'+(document.getElementById('log-date-select').value||'logs')+'.csv';
+  a.click();
+}
+
+// ── Settings tab ──────────────────────────────────────────────
+async function loadSettings(){
+  try{
+    const cfg=await(await fetch('/api/config')).json();
+    document.getElementById('cfg-interval').value        =cfg.check_interval_sec||5;
+    document.getElementById('cfg-fail-threshold').value  =cfg.fail_threshold||3;
+    document.getElementById('cfg-loss-threshold').value  =cfg.packet_loss_threshold||20;
+    document.getElementById('cfg-latency-threshold').value=cfg.latency_threshold_ms||500;
+    document.getElementById('cfg-webhook').value         =cfg.webhook_url||'';
+    document.getElementById('cfg-log-dir').value         =cfg.log_dir||'logs';
+    document.getElementById('cfg-port').value            =cfg.dashboard_port||8765;
+  }catch(e){}
+}
+
+async function saveSettings(){
+  const msg=document.getElementById('save-msg');
+  msg.textContent='';
+  try{
+    const cfg=await(await fetch('/api/config')).json();
+    cfg.check_interval_sec   =parseInt(document.getElementById('cfg-interval').value)||5;
+    cfg.fail_threshold       =parseInt(document.getElementById('cfg-fail-threshold').value)||3;
+    cfg.packet_loss_threshold=parseFloat(document.getElementById('cfg-loss-threshold').value)||20;
+    cfg.latency_threshold_ms =parseInt(document.getElementById('cfg-latency-threshold').value)||500;
+    cfg.webhook_url          =document.getElementById('cfg-webhook').value.trim();
+    cfg.log_dir              =document.getElementById('cfg-log-dir').value.trim()||'logs';
+    cfg.dashboard_port       =parseInt(document.getElementById('cfg-port').value)||8765;
+    const res=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});
+    if(res.ok){msg.textContent=t('settings_saved');msg.className='msg-ok';}
+    else throw new Error(await res.text());
+  }catch(e){msg.textContent=t('settings_error')+': '+e.message;msg.className='msg-err';}
+  setTimeout(()=>msg.textContent='',4000);
+}
+
+applyLang();
 connect();
 </script>
 </body>

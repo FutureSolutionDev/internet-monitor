@@ -2,10 +2,16 @@ package dashboard
 
 import (
 	_ "embed"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"internet-monitor/config"
 	"internet-monitor/monitor"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -35,14 +41,20 @@ type Snapshot struct {
 	TotalChecks    int          `json:"total_checks"`
 	Disconnections int          `json:"disconnections"`
 	UptimeSeconds  float64      `json:"uptime_seconds"`
+	UptimePct      float64      `json:"uptime_pct"`
 	LatencyHistory []int64      `json:"latency_history"`
 	Events         []EventEntry `json:"events"`
 }
 
 type Server struct {
-	port    int
-	clients map[chan string]struct{}
-	mu      sync.Mutex
+	port       int
+	configPath string
+	logDir     string
+	clients    map[chan string]struct{}
+	mu         sync.Mutex
+
+	// Called when config is saved via dashboard
+	OnConfigChange func(*config.Config)
 
 	stateMu        sync.RWMutex
 	status         string
@@ -53,17 +65,20 @@ type Server struct {
 	dnsOK          bool
 	totalChecks    int
 	disconnections int
+	connectedTicks int
 	startTime      time.Time
 	latencyHistory []int64
 	events         []EventEntry
 }
 
-func NewServer(port int) *Server {
+func NewServer(port int, configPath, logDir string) *Server {
 	return &Server{
-		port:      port,
-		clients:   make(map[chan string]struct{}),
-		startTime: time.Now(),
-		status:    "checking",
+		port:       port,
+		configPath: configPath,
+		logDir:     logDir,
+		clients:    make(map[chan string]struct{}),
+		startTime:  time.Now(),
+		status:     "checking",
 	}
 }
 
@@ -72,12 +87,17 @@ func (s *Server) Start() {
 	mux.HandleFunc("/", s.serveIndex)
 	mux.HandleFunc("/events", s.serveSSE)
 	mux.HandleFunc("/api/state", s.serveState)
+	mux.HandleFunc("/api/config", s.serveConfig)
+	mux.HandleFunc("/api/logs", s.serveLogs)
+	mux.HandleFunc("/api/log-dates", s.serveLogDates)
 	go http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", s.port), mux)
 }
 
 func (s *Server) URL() string {
 	return fmt.Sprintf("http://localhost:%d", s.port)
 }
+
+// ── Public update methods (called from tray monitoring loop) ──────────────
 
 func (s *Server) UpdateTick(result monitor.CheckResult, status monitor.Status) {
 	s.stateMu.Lock()
@@ -88,6 +108,9 @@ func (s *Server) UpdateTick(result monitor.CheckResult, status monitor.Status) {
 	s.httpOK = result.HTTPOK
 	s.dnsOK = result.DNSOK
 	s.totalChecks++
+	if status == monitor.StatusConnected {
+		s.connectedTicks++
+	}
 	s.latencyHistory = append(s.latencyHistory, result.LatencyMs)
 	if len(s.latencyHistory) > maxHistory {
 		s.latencyHistory = s.latencyHistory[1:]
@@ -134,6 +157,8 @@ func (s *Server) AddEvent(event monitor.Event) {
 	s.broadcast("event")
 }
 
+// ── HTTP handlers ─────────────────────────────────────────────────────────
+
 func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	fmt.Fprint(w, indexHTML)
@@ -142,6 +167,97 @@ func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
 func (s *Server) serveState(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(s.snapshot("init"))
+}
+
+func (s *Server) serveConfig(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	switch r.Method {
+	case http.MethodGet:
+		data, err := os.ReadFile(s.configPath)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Write(data)
+
+	case http.MethodPost:
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		var cfg config.Config
+		if err := json.Unmarshal(body, &cfg); err != nil {
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		pretty, _ := json.MarshalIndent(cfg, "", "  ")
+		if err := os.WriteFile(s.configPath, pretty, 0644); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if s.OnConfigChange != nil {
+			s.OnConfigChange(&cfg)
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"ok":true}`))
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) serveLogs(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	date := r.URL.Query().Get("date")
+	if date == "" {
+		date = time.Now().Format("2006-01-02")
+	}
+
+	filename := filepath.Join(s.logDir, fmt.Sprintf("connectivity_%s.jsonl", date))
+	data, err := os.ReadFile(filename)
+	if os.IsNotExist(err) {
+		w.Write([]byte("[]"))
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Parse JSONL: one JSON object per line
+	lines := bytes.Split(bytes.TrimSpace(data), []byte{'\n'})
+	entries := make([]json.RawMessage, 0, len(lines))
+	for _, line := range lines {
+		line = bytes.TrimSpace(line)
+		if len(line) > 0 && json.Valid(line) {
+			entries = append(entries, json.RawMessage(line))
+		}
+	}
+	// Return newest first
+	for i, j := 0, len(entries)-1; i < j; i, j = i+1, j-1 {
+		entries[i], entries[j] = entries[j], entries[i]
+	}
+	json.NewEncoder(w).Encode(entries)
+}
+
+func (s *Server) serveLogDates(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	entries, err := os.ReadDir(s.logDir)
+	if err != nil {
+		w.Write([]byte("[]"))
+		return
+	}
+	dates := []string{}
+	for _, e := range entries {
+		name := e.Name()
+		if !e.IsDir() && strings.HasPrefix(name, "connectivity_") && strings.HasSuffix(name, ".jsonl") {
+			date := name[len("connectivity_") : len(name)-len(".jsonl")]
+			dates = append(dates, date)
+		}
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(dates)))
+	json.NewEncoder(w).Encode(dates)
 }
 
 func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {
@@ -166,7 +282,6 @@ func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {
 		s.mu.Unlock()
 	}()
 
-	// Send current state immediately on connect
 	if data, err := json.Marshal(s.snapshot("init")); err == nil {
 		fmt.Fprintf(w, "data: %s\n\n", data)
 		flusher.Flush()
@@ -183,6 +298,8 @@ func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ── Internal ──────────────────────────────────────────────────────────────
+
 func (s *Server) snapshot(msgType string) Snapshot {
 	s.stateMu.RLock()
 	defer s.stateMu.RUnlock()
@@ -191,6 +308,11 @@ func (s *Server) snapshot(msgType string) Snapshot {
 	copy(hist, s.latencyHistory)
 	evts := make([]EventEntry, len(s.events))
 	copy(evts, s.events)
+
+	uptimePct := 0.0
+	if s.totalChecks > 0 {
+		uptimePct = float64(s.connectedTicks) / float64(s.totalChecks) * 100
+	}
 
 	return Snapshot{
 		Type:           msgType,
@@ -203,6 +325,7 @@ func (s *Server) snapshot(msgType string) Snapshot {
 		TotalChecks:    s.totalChecks,
 		Disconnections: s.disconnections,
 		UptimeSeconds:  time.Since(s.startTime).Seconds(),
+		UptimePct:      uptimePct,
 		LatencyHistory: hist,
 		Events:         evts,
 	}

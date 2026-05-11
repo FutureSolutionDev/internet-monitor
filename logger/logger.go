@@ -31,7 +31,7 @@ func (l *Logger) Log(event monitor.Event) {
 
 	filename := filepath.Join(
 		l.cfg.LogDir,
-		fmt.Sprintf("connectivity_%s.json", time.Now().Format("2006-01-02")),
+		fmt.Sprintf("connectivity_%s.jsonl", time.Now().Format("2006-01-02")),
 	)
 
 	data, err := json.Marshal(event)

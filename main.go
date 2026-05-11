@@ -14,7 +14,6 @@ import (
 )
 
 func main() {
-	// Always resolve relative paths from the exe directory (handles startup installs)
 	if exePath, err := os.Executable(); err == nil {
 		os.Chdir(filepath.Dir(exePath))
 	}
@@ -30,15 +29,12 @@ func main() {
 		log.Fatalf("failed to init logger: %v", err)
 	}
 
-	// Start dashboard HTTP server
-	dash := dashboard.NewServer(cfg.DashboardPort)
+	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir)
 	dash.Start()
 
 	checker := monitor.NewChecker(cfg)
 	t := tray.New(cfg, checker, lgr, dash.URL())
-
-	// Wire dashboard updates from tray monitoring loop
-	t.OnTick = dash.UpdateTick
+	t.OnTick  = dash.UpdateTick
 	t.OnEvent = dash.AddEvent
 
 	systray.Run(t.OnReady, t.OnExit)

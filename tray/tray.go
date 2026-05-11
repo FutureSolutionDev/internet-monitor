@@ -57,7 +57,7 @@ func (t *Tray) handleMenu() {
 	for {
 		select {
 		case <-t.mOpenDash.ClickedCh:
-			exec.Command("cmd", "/c", "start", t.dashURL).Start()
+			OpenURL(t.dashURL)
 		case <-t.mOpenLogs.ClickedCh:
 			exec.Command("explorer", t.cfg.LogDir).Start()
 		case <-t.mExit.ClickedCh:

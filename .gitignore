@@ -1,3 +1,4 @@
 logs
 *.exe
 config.json
+*.exe*
