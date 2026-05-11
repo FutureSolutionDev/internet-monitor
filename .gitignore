@@ -6,3 +6,4 @@ config.json
 .specify
 .claude
 tmp
+.playwright-mcp
