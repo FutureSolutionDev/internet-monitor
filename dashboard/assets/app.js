@@ -121,6 +121,8 @@ const LANGS = {
     stab_speedtest: "قياس السرعة",
     grp_webhook: "الـ Webhook",
     grp_speed_settings: "إعدادات قياس السرعة",
+    speed_timeout: "مدة الاختبار (ثانية)",
+    speed_timeout_note: "الافتراضي 10 ثواني — زيادتها تُحسّن الدقة على الروابط السريعة",
     speed_privacy_note: "يستخدم speed.cloudflare.com",
     speed_dl_targets: "عناوين اختبار التنزيل",
     speed_targets_note: "سطر لكل عنوان",
@@ -256,6 +258,8 @@ const LANGS = {
     stab_speedtest: "Speed Test",
     grp_webhook: "Webhook",
     grp_speed_settings: "Speed Test Settings",
+    speed_timeout: "Test duration (seconds)",
+    speed_timeout_note: "Default 10s — increase for better accuracy on fast links",
     speed_privacy_note: "Uses speed.cloudflare.com — click for privacy policy",
     speed_dl_targets: "Download Test Targets",
     speed_targets_note: "One URL per line — default: speed.cloudflare.com/__down",
@@ -1080,6 +1084,8 @@ async function loadSettings() {
     renderSpeedTargets();
     const parallel = document.getElementById("cfg-speed-parallel");
     if (parallel) parallel.value = st.parallel_connections || 4;
+    const timeoutEl = document.getElementById("cfg-speed-timeout");
+    if (timeoutEl) timeoutEl.value = st.timeout_seconds || 10;
     const alertEl = document.getElementById("cfg-speed-alert");
     if (alertEl) alertEl.value = st.alert_threshold_mbps || 0;
 
@@ -1191,6 +1197,7 @@ async function saveSettings() {
     cfg.speed_test = {
       download_targets: stTargets.length ? stTargets : ["https://speed.cloudflare.com/__down"],
       parallel_connections: parseInt(document.getElementById("cfg-speed-parallel")?.value) || 4,
+      timeout_seconds: parseInt(document.getElementById("cfg-speed-timeout")?.value) || 10,
       upload_target: cfg.speed_test?.upload_target || "",
       alert_threshold_mbps: parseFloat(document.getElementById("cfg-speed-alert")?.value) || 0,
     };

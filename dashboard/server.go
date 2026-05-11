@@ -797,10 +797,14 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 	s.stCancel = cancel
 	s.stateMu.Unlock()
 
+	timeout := time.Duration(cfg.SpeedTest.TimeoutSeconds) * time.Second
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
 	stCfg := speedtest.Config{
 		Endpoints: cfg.SpeedTest.DownloadTargets,
 		Parallel:  cfg.SpeedTest.ParallelConnections,
-		Timeout:   10 * time.Second,
+		Timeout:   timeout,
 	}
 
 	go func() {

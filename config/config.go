@@ -10,6 +10,7 @@ import (
 type SpeedTestConfig struct {
 	DownloadTargets     []string `json:"download_targets"`
 	ParallelConnections int      `json:"parallel_connections"`
+	TimeoutSeconds      int      `json:"timeout_seconds"`
 	UploadTarget        string   `json:"upload_target"`       // reserved, ignored in v1
 	AlertThresholdMbps  float64  `json:"alert_threshold_mbps"`
 }
@@ -42,6 +43,7 @@ var Default = Config{
 	SpeedTest: SpeedTestConfig{
 		DownloadTargets:     []string{"https://speed.cloudflare.com/__down"},
 		ParallelConnections: 4,
+		TimeoutSeconds:      10,
 	},
 }
 
@@ -81,6 +83,9 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.SpeedTest.ParallelConnections == 0 {
 		cfg.SpeedTest.ParallelConnections = Default.SpeedTest.ParallelConnections
+	}
+	if cfg.SpeedTest.TimeoutSeconds == 0 {
+		cfg.SpeedTest.TimeoutSeconds = Default.SpeedTest.TimeoutSeconds
 	}
 
 	return &cfg, nil
