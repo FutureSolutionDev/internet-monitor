@@ -2,7 +2,10 @@ module internet-monitor
 
 go 1.21
 
-require github.com/getlantern/systray v1.2.2
+require (
+	github.com/getlantern/systray v1.2.2
+	github.com/webview/webview_go v0.0.0-20240831120633-6173450d4dd6
+)
 
 require (
 	github.com/getlantern/context v0.0.0-20190109183933-c447772a6520 // indirect
