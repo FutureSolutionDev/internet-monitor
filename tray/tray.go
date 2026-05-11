@@ -5,7 +5,6 @@ import (
 	"internet-monitor/config"
 	"internet-monitor/logger"
 	"internet-monitor/monitor"
-	"os/exec"
 	"time"
 
 	"github.com/getlantern/systray"
@@ -59,7 +58,7 @@ func (t *Tray) handleMenu() {
 		case <-t.mOpenDash.ClickedCh:
 			OpenURL(t.dashURL)
 		case <-t.mOpenLogs.ClickedCh:
-			exec.Command("explorer", t.cfg.LogDir).Start()
+			OpenFolder(t.cfg.LogDir)
 		case <-t.mExit.ClickedCh:
 			systray.Quit()
 		}

@@ -2,9 +2,12 @@ name: Build & Release
 
 on:
   push:
+    branches: [master, main]  # build at each push to master
     tags:
-      - 'v*'
-  workflow_dispatch:          # يسمح بتشغيل يدوي من GitHub UI
+      - 'v*'                  # release at tag
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:          # manual trigger from GitHub UI
 
 env:
   GO_VERSION: '1.21'
@@ -14,7 +17,7 @@ env:
 # ══════════════════════════════════════════════════════════════
 jobs:
 
-  # ── Windows Tray — بدون CGO، يُبنى من Linux ───────────────
+  # ── Windows Tray — without CGO، built from Linux ───────────────
   windows-tray:
     name: "🪟 Windows Tray (cross-compile)"
     runs-on: ubuntu-latest
@@ -38,7 +41,7 @@ jobs:
           name: windows-tray
           path: internet-monitor-windows.exe
 
-  # ── Windows GUI — CGO + WebView2، يحتاج Windows runner ────
+  # ── Windows GUI — CGO + WebView2، need Windows runner ────
   windows-gui:
     name: "🪟 Windows GUI (native)"
     runs-on: windows-latest
@@ -60,20 +63,11 @@ jobs:
           name: windows-gui
           path: internet-monitor-gui-windows.exe
 
-  # ── macOS — Intel (macos-13) + ARM64 (macos-latest) ────────
+  # ── macOS — arm64 native + amd64 cross-compile (single runner) ─
+  # macos-latest = Apple Silicon — Xcode supports cross-compiling to x86_64
   macos:
-    name: "🍎 macOS ${{ matrix.arch }}"
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-13       # Intel x86_64
-            arch: intel
-            goarch: amd64
-          - runner: macos-latest   # Apple Silicon ARM64
-            arch: arm64
-            goarch: arm64
+    name: "🍎 macOS (arm64 + intel)"
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -82,29 +76,37 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Build Tray
+      - name: Build ARM64 (native)
         env:
           CGO_ENABLED: 1
-          GOARCH: ${{ matrix.goarch }}
-        run: go build -ldflags="-s -w" -o internet-monitor-macos-${{ matrix.arch }} .
+          GOARCH: arm64
+        run: |
+          go build -ldflags="-s -w" -o internet-monitor-macos-arm64 .
+          go build -ldflags="-s -w" -o internet-monitor-gui-macos-arm64 ./cmd/gui/
 
-      - name: Build GUI
+      - name: Build Intel/amd64 (cross-compile via Xcode)
         env:
           CGO_ENABLED: 1
-          GOARCH: ${{ matrix.goarch }}
-        run: go build -ldflags="-s -w" -o internet-monitor-gui-macos-${{ matrix.arch }} ./cmd/gui/
+          GOARCH: amd64
+          CGO_CFLAGS: "-arch x86_64"
+          CGO_LDFLAGS: "-arch x86_64"
+        run: |
+          go build -ldflags="-s -w" -o internet-monitor-macos-intel .
+          go build -ldflags="-s -w" -o internet-monitor-gui-macos-intel ./cmd/gui/
 
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-${{ matrix.arch }}
+          name: macos
           path: |
-            internet-monitor-macos-${{ matrix.arch }}
-            internet-monitor-gui-macos-${{ matrix.arch }}
+            internet-monitor-macos-arm64
+            internet-monitor-macos-intel
+            internet-monitor-gui-macos-arm64
+            internet-monitor-gui-macos-intel
 
   # ── Linux — AppIndicator + WebKitGTK ───────────────────────
   linux:
     name: "🐧 Linux (ubuntu-22.04)"
-    runs-on: ubuntu-22.04          # مثبّت على 22.04 لضمان webkit2gtk-4.0
+    runs-on: ubuntu-22.04          # installed on 22.04 to ensure webkit2gtk-4.0
     steps:
       - uses: actions/checkout@v4
 
@@ -119,7 +121,6 @@ jobs:
           sudo apt-get install -y \
             libgtk-3-dev \
             libayatana-appindicator3-dev \
-            libappindicator3-dev \
             libwebkit2gtk-4.0-dev
 
       - name: Build Tray
@@ -140,7 +141,7 @@ jobs:
             internet-monitor-gui-linux
 
   # ══════════════════════════════════════════════════════════
-  # RELEASE — يعمل فقط عند push tag (v*)
+  # RELEASE — works only at push tag (v*)
   # ══════════════════════════════════════════════════════════
   release:
     name: "🚀 Create GitHub Release"
@@ -183,22 +184,20 @@ jobs:
           body: |
             ## مراقب الإنترنت — Internet Monitor ${{ github.ref_name }}
 
-            ### حمّل الملف المناسب لجهازك
+            ### Download the appropriate file for your device
 
-            | الملف | النظام | نوع التطبيق |
+            | File | System | App Type |
             |-------|--------|-------------|
-            | `internet-monitor-windows.exe` | Windows 10/11 | يعمل في الخلفية (Tray icon) |
-            | `internet-monitor-gui-windows.exe` | Windows 10/11 | نافذة مستقلة |
-            | `internet-monitor-macos-intel` | macOS Intel | يعمل في الخلفية |
-            | `internet-monitor-macos-arm64` | macOS M1/M2/M3 | يعمل في الخلفية |
-            | `internet-monitor-gui-macos-intel` | macOS Intel | نافذة مستقلة |
-            | `internet-monitor-gui-macos-arm64` | macOS M1/M2/M3 | نافذة مستقلة |
-            | `internet-monitor-linux` | Ubuntu/Debian | يعمل في الخلفية |
-            | `internet-monitor-gui-linux` | Ubuntu/Debian | نافذة مستقلة |
+            | `internet-monitor-windows.exe` | Windows 10/11 | Runs in the background (Tray icon) |
+            | `internet-monitor-gui-windows.exe` | Windows 10/11 | Standalone window |
+            | `internet-monitor-macos-intel` | macOS Intel | Runs in the background |
+            | `internet-monitor-macos-arm64` | macOS M1/M2/M3 | Runs in the background |
+            | `internet-monitor-gui-macos-intel` | macOS Intel | Standalone window |
+            | `internet-monitor-gui-macos-arm64` | macOS M1/M2/M3 | Standalone window |
+            | `internet-monitor-linux` | Ubuntu/Debian | Runs in the background |
+            | `internet-monitor-gui-linux` | Ubuntu/Debian | Standalone window |
 
-            > **تعليمات:** حمّل الملف التنفيذي + `config.json` وضعهم في نفس المجلد.
-            >
-            > **Instructions:** Download the binary + `config.json` in the same folder.
+            > **Instructions:** Download the binary and `config.json` in the same folder.
 
             ---
             Built automatically with GitHub Actions ·
