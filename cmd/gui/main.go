@@ -4,6 +4,7 @@ package main
 
 import (
 	"internet-monitor/config"
+	"internet-monitor/core"
 	"internet-monitor/dashboard"
 	"internet-monitor/logger"
 	"internet-monitor/monitor"
@@ -148,17 +149,5 @@ func monitoringLoop(cfg *config.Config, checker *monitor.Checker, lgr *logger.Lo
 }
 
 func determineStatus(result monitor.CheckResult, consecutiveFails *int, cfg *config.Config) monitor.Status {
-	if !result.TCPPingOK || !result.HTTPOK || !result.DNSOK {
-		*consecutiveFails++
-	} else {
-		*consecutiveFails = 0
-	}
-	if *consecutiveFails >= cfg.FailThreshold {
-		return monitor.StatusDisconnected
-	}
-	if result.PacketLoss > cfg.PacketLossThreshold ||
-		(result.LatencyMs > int64(cfg.LatencyThreshold) && result.LatencyMs > 0) {
-		return monitor.StatusDegraded
-	}
-	return monitor.StatusConnected
+	return core.DetermineStatus(result, consecutiveFails, cfg)
 }

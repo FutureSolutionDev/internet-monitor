@@ -3,6 +3,7 @@ package tray
 import (
 	"fmt"
 	"internet-monitor/config"
+	"internet-monitor/core"
 	"internet-monitor/logger"
 	"internet-monitor/monitor"
 	"time"
@@ -127,19 +128,7 @@ func (t *Tray) runCheck(currentStatus **monitor.Status, statusSince *time.Time, 
 }
 
 func (t *Tray) determineStatus(result monitor.CheckResult, consecutiveFails *int) monitor.Status {
-	if !result.TCPPingOK || !result.HTTPOK || !result.DNSOK {
-		*consecutiveFails++
-	} else {
-		*consecutiveFails = 0
-	}
-	if *consecutiveFails >= t.cfg.FailThreshold {
-		return monitor.StatusDisconnected
-	}
-	if result.PacketLoss > t.cfg.PacketLossThreshold ||
-		(result.LatencyMs > int64(t.cfg.LatencyThreshold) && result.LatencyMs > 0) {
-		return monitor.StatusDegraded
-	}
-	return monitor.StatusConnected
+	return core.DetermineStatus(result, consecutiveFails, t.cfg)
 }
 
 func (t *Tray) applyStatus(status monitor.Status, result monitor.CheckResult) {
