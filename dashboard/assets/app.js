@@ -1516,7 +1516,8 @@ function handleSpeedProgress(d) {
     return;
   }
   if (wrap) wrap.style.display = '';
-  if (fill) fill.style.width = Math.min((d.elapsed_seconds / 10) * 100, 99) + '%';
+  const total = d.total_seconds || 10;
+  if (fill) fill.style.width = Math.min((d.elapsed_seconds / total) * 100, 99) + '%';
   if (dl) dl.textContent = (d.current_mbps || 0).toFixed(1);
   if (status) status.textContent = t('speed_running') + ' ' + (d.elapsed_seconds || 0).toFixed(1) + 's';
 }

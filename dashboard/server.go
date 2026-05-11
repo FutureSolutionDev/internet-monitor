@@ -813,12 +813,14 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 			cancel()
 		}()
 
+		totalSecs := stCfg.Timeout.Seconds()
 		result, err := speedtest.Run(ctx, stCfg, func(mbps float64, elapsed time.Duration) {
 			progress, _ := json.Marshal(map[string]interface{}{
 				"type":            "speed_test_progress",
 				"phase":           "download",
 				"current_mbps":    mbps,
 				"elapsed_seconds": elapsed.Seconds(),
+				"total_seconds":   totalSecs,
 				"done":            false,
 			})
 			s.broadcastRaw(string(progress))
