@@ -6,17 +6,26 @@ import (
 	"time"
 )
 
+// SpeedTestConfig holds speed test parameters (all optional; defaults applied on load).
+type SpeedTestConfig struct {
+	DownloadTargets     []string `json:"download_targets"`
+	ParallelConnections int      `json:"parallel_connections"`
+	UploadTarget        string   `json:"upload_target"`       // reserved, ignored in v1
+	AlertThresholdMbps  float64  `json:"alert_threshold_mbps"`
+}
+
 type Config struct {
-	CheckIntervalSec    int      `json:"check_interval_sec"`
-	PingTargets         []string `json:"ping_targets"`
-	HTTPTargets         []string `json:"http_targets"`
-	DNSTargets          []string `json:"dns_targets"`
-	FailThreshold       int      `json:"fail_threshold"`
-	PacketLossThreshold float64  `json:"packet_loss_threshold"`
-	LatencyThreshold    int      `json:"latency_threshold_ms"`
-	LogDir              string   `json:"log_dir"`
-	WebhookURL          string   `json:"webhook_url"`
-	DashboardPort       int      `json:"dashboard_port"`
+	CheckIntervalSec    int             `json:"check_interval_sec"`
+	PingTargets         []string        `json:"ping_targets"`
+	HTTPTargets         []string        `json:"http_targets"`
+	DNSTargets          []string        `json:"dns_targets"`
+	FailThreshold       int             `json:"fail_threshold"`
+	PacketLossThreshold float64         `json:"packet_loss_threshold"`
+	LatencyThreshold    int             `json:"latency_threshold_ms"`
+	LogDir              string          `json:"log_dir"`
+	WebhookURL          string          `json:"webhook_url"`
+	DashboardPort       int             `json:"dashboard_port"`
+	SpeedTest           SpeedTestConfig `json:"speed_test,omitempty"`
 }
 
 var Default = Config{
@@ -30,6 +39,10 @@ var Default = Config{
 	LogDir:              "logs",
 	WebhookURL:          "",
 	DashboardPort:       8765,
+	SpeedTest: SpeedTestConfig{
+		DownloadTargets:     []string{"https://speed.cloudflare.com/__down"},
+		ParallelConnections: 4,
+	},
 }
 
 func Load(path string) (*Config, error) {
@@ -60,6 +73,14 @@ func Load(path string) (*Config, error) {
 		if len(cfg.DNSTargets) == 0 && old.DNSTarget != "" {
 			cfg.DNSTargets = []string{old.DNSTarget}
 		}
+	}
+
+	// Apply speed test defaults for existing configs without speed_test key
+	if len(cfg.SpeedTest.DownloadTargets) == 0 {
+		cfg.SpeedTest.DownloadTargets = Default.SpeedTest.DownloadTargets
+	}
+	if cfg.SpeedTest.ParallelConnections == 0 {
+		cfg.SpeedTest.ParallelConnections = Default.SpeedTest.ParallelConnections
 	}
 
 	return &cfg, nil
