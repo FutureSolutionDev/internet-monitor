@@ -42,112 +42,44 @@ func main() {
 
 	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir, Version)
 	dash.OnTestNotification = TestNotification
-	dash.OnTestWebhook      = lgr.SendTestWebhook
-	dash.OnApplyUpdate      = updater.Apply
-	dash.OnRestartApp       = updater.Restart
+	dash.OnTestWebhook = lgr.SendTestWebhook
+	dash.OnApplyUpdate = updater.Apply
+	dash.OnRestartApp = updater.Restart
 	dash.Start()
 
-	// Background update checker
-	go func() {
-		time.Sleep(30 * time.Second)
-		for {
-			if info, err := updater.Check(Version); err == nil && info.HasUpdate {
-				lgr.AppLog("UPDATE available: %s", info.LatestVersion)
-				dash.SetUpdateInfo(&dashboard.UpdateInfo{
-					HasUpdate:      info.HasUpdate,
-					LatestVersion:  info.LatestVersion,
-					CurrentVersion: info.CurrentVersion,
-					DownloadURL:    info.DownloadURL,
-					ReleaseNotes:   info.ReleaseNotes,
-				})
-			}
-			time.Sleep(6 * time.Hour)
-		}
-	}()
-
 	checker := monitor.NewChecker(cfg)
+	engine := core.New(cfg, checker, lgr, Version)
+	engine.Notifier = core.MultiNotifier{
+		dashboard.NewNotifier(dash),
+		&guiNotifier{},
+	}
+	engine.OnUpdateAvailable = func(info *updater.Info) {
+		dash.SetUpdateInfo(&dashboard.UpdateInfo{
+			HasUpdate:      info.HasUpdate,
+			LatestVersion:  info.LatestVersion,
+			CurrentVersion: info.CurrentVersion,
+			DownloadURL:    info.DownloadURL,
+			ReleaseNotes:   info.ReleaseNotes,
+		})
+	}
 
-	// Create webview window
 	w := webview.New(false)
 	defer w.Destroy()
 	w.SetTitle("مراقب الإنترنت — Internet Monitor")
 	w.SetSize(1100, 750, webview.HintNone)
 
-	// Get native window handle (HWND on Windows)
 	hwnd := uintptr(w.Window())
+	w.Bind("nativeMinimizeToTray", func() { hideWindow(hwnd) })
 
-	// Expose minimize-to-tray to JavaScript
-	w.Bind("nativeMinimizeToTray", func() {
-		hideWindow(hwnd)
-	})
-
-	// Start system tray (Windows: real tray; other OS: no-op)
 	stopTray := initTray(w, hwnd)
-	// Start monitoring loop
-	go monitoringLoop(cfg, checker, lgr, dash)
+	engine.Start()
 
 	time.Sleep(150 * time.Millisecond)
 	w.Navigate(dash.URL())
-	w.Run() // blocks until window is closed
+	w.Run()
 
-	// Window closed — wait for tray to fully exit then hard-kill
+	engine.Stop()
 	stopTray()
 	w.Destroy()
 	os.Exit(0)
-}
-
-func monitoringLoop(cfg *config.Config, checker *monitor.Checker, lgr *logger.Logger, dash *dashboard.Server) {
-	var currentStatus *monitor.Status
-	var statusSince time.Time
-	consecutiveFails := 0
-
-	doCheck := func() {
-		result := checker.Check()
-		newStatus := determineStatus(result, &consecutiveFails, cfg)
-
-		dash.UpdateTick(result, newStatus)
-
-		// Always keep tray icon in sync with current status
-		updateTrayStatus(newStatus)
-
-		if currentStatus == nil || *currentStatus != newStatus {
-			duration := 0.0
-			if !statusSince.IsZero() {
-				duration = time.Since(statusSince).Seconds()
-			}
-			statusSince = time.Now()
-
-			event := monitor.Event{
-				Timestamp:       result.Timestamp,
-				EventType:       newStatus.String(),
-				DurationSeconds: duration,
-				Reason: monitor.EventReason{
-					TCPPingFailed: !result.TCPPingOK,
-					HTTPFailed:    !result.HTTPOK,
-					DNSFailed:     !result.DNSOK,
-					PacketLossPct: result.PacketLoss,
-					AvgLatencyMs:  result.LatencyMs,
-				},
-			}
-			lgr.Log(event)
-			dash.AddEvent(event)
-
-			if currentStatus != nil {
-				go sendNotification(newStatus, result)
-			}
-			s := newStatus
-			currentStatus = &s
-		}
-	}
-
-	doCheck()
-	ticker := time.NewTicker(cfg.CheckInterval())
-	defer ticker.Stop()
-	for range ticker.C {
-		doCheck()
-	}
-}
-
-func determineStatus(result monitor.CheckResult, consecutiveFails *int, cfg *config.Config) monitor.Status {
-	return core.DetermineStatus(result, consecutiveFails, cfg)
 }
