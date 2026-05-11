@@ -16,7 +16,7 @@ import (
 	webview "github.com/webview/webview_go"
 )
 
-var Version = "v0.0.1"
+var Version = "dev"
 
 func main() {
 	ensureSingleInstance()

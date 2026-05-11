@@ -16,8 +16,7 @@ import (
 )
 
 // Version is embedded at build time via: -ldflags "-X main.Version=v1.x.x"
-// var Version = "dev"
-var Version = "v0.0.1"
+var Version = "dev"
 
 func main() {
 	ensureSingleInstance()
