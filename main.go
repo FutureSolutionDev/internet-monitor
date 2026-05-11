@@ -13,8 +13,16 @@ import (
 	"github.com/getlantern/systray"
 )
 
+// Version is embedded at build time via: -ldflags "-X main.Version=v1.x.x"
+var Version = "dev"
+
 func main() {
+	ensureSingleInstance()
+
 	if exePath, err := os.Executable(); err == nil {
+		if resolved, err2 := filepath.EvalSymlinks(exePath); err2 == nil {
+			exePath = resolved
+		}
 		os.Chdir(filepath.Dir(exePath))
 	}
 
@@ -29,7 +37,7 @@ func main() {
 		log.Fatalf("failed to init logger: %v", err)
 	}
 
-	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir)
+	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir, Version)
 	dash.Start()
 
 	// Use favicon.png as the tray icon (embedded in the dashboard assets)
@@ -37,10 +45,10 @@ func main() {
 		tray.SetCustomIcon(png)
 	}
 
-	// Wire test notification button → OS toast
 	dash.OnTestNotification = func() {
 		tray.Notify("اختبار الإشعار / Test Notification", "🔔 الإشعار يعمل بشكل صحيح")
 	}
+	dash.OnTestWebhook = lgr.SendTestWebhook
 
 	checker := monitor.NewChecker(cfg)
 	t := tray.New(cfg, checker, lgr, dash.URL())

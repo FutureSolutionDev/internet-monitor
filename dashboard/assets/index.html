@@ -13,6 +13,7 @@
 <header>
   <div id="dot"></div>
   <h1 data-i18n="appName">مراقب الإنترنت</h1>
+  <span id="app-version" style="font-size:11px;color:#475569;margin-inline-start:6px"></span>
   <div class="hdr-right">
     <span id="hdr-status" data-i18n="status_checking">جاري الفحص...</span>
     <span id="hdr-time">--:--:--</span>
@@ -223,6 +224,12 @@
           <label data-i18n="webhook_url">عنوان الـ Webhook (اختياري)</label>
           <input type="text" id="cfg-webhook" placeholder="https://...">
           <div class="field-note" data-i18n="webhook_note">يُرسل إشعار JSON عند كل حدث — Discord / Slack / أي خدمة</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+            <button class="btn btn-secondary btn-sm" id="test-webhook-btn" onclick="testWebhook()">
+              📡 <span data-i18n="test_webhook">اختبار الـ Webhook</span>
+            </button>
+            <span class="test-result" id="webhook-test-result"></span>
+          </div>
         </div>
       </div>
     </div>

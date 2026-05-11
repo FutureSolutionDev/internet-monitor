@@ -15,8 +15,15 @@ import (
 	webview "github.com/webview/webview_go"
 )
 
+var Version = "dev"
+
 func main() {
+	ensureSingleInstance()
+
 	if exePath, err := os.Executable(); err == nil {
+		if resolved, err2 := filepath.EvalSymlinks(exePath); err2 == nil {
+			exePath = resolved
+		}
 		os.Chdir(filepath.Dir(exePath))
 	}
 
@@ -31,8 +38,9 @@ func main() {
 		log.Fatalf("failed to init logger: %v", err)
 	}
 
-	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir)
+	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir, Version)
 	dash.OnTestNotification = TestNotification
+	dash.OnTestWebhook = lgr.SendTestWebhook
 	dash.Start()
 
 	checker := monitor.NewChecker(cfg)

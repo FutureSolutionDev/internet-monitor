@@ -45,9 +45,12 @@ func orFallback(cached []byte, r, g, b uint8) []byte {
 	return generateFallback(r, g, b)
 }
 
-// blendOnColor draws a colored circle background then overlays the favicon on top.
+// blendOnColor draws a colored circle, then places the favicon (70% size) centered on it.
+// The colored ring around the favicon is always visible regardless of favicon transparency.
 func blendOnColor(r, g, b uint8) []byte {
 	const size = 32
+	const iconSize = 22                    // favicon rendered at 22x22 (≈70%)
+	const offset = (size - iconSize) / 2  // centered: 5px border
 
 	// Decode favicon PNG
 	src, err := png.Decode(bytes.NewReader(customPNG))
@@ -57,33 +60,47 @@ func blendOnColor(r, g, b uint8) []byte {
 
 	dst := image.NewNRGBA(image.Rect(0, 0, size, size))
 
-	// 1. Draw colored circle background
+	// 1. Full colored circle background
 	cx, cy := float64(size)/2.0, float64(size)/2.0
-	radius := cx - 1.0
+	outerR := cx - 0.5
 	bg := color.NRGBA{R: r, G: g, B: b, A: 255}
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
 			dx := float64(x) - cx + 0.5
 			dy := float64(y) - cy + 0.5
-			if math.Sqrt(dx*dx+dy*dy) <= radius {
+			if math.Sqrt(dx*dx+dy*dy) <= outerR {
 				dst.Set(x, y, bg)
 			}
 		}
 	}
 
-	// 2. Scale favicon to 32x32 (nearest-neighbor)
-	srcB := src.Bounds()
-	scaled := image.NewNRGBA(image.Rect(0, 0, size, size))
+	// 2. White inner circle (background for the favicon)
+	innerR := float64(iconSize)/2.0 + 1.0
+	white := color.NRGBA{R: 255, G: 255, B: 255, A: 230}
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
-			sx := srcB.Min.X + x*srcB.Dx()/size
-			sy := srcB.Min.Y + y*srcB.Dy()/size
+			dx := float64(x) - cx + 0.5
+			dy := float64(y) - cy + 0.5
+			if math.Sqrt(dx*dx+dy*dy) <= innerR {
+				dst.Set(x, y, white)
+			}
+		}
+	}
+
+	// 3. Scale favicon to iconSize × iconSize (nearest-neighbor)
+	srcB := src.Bounds()
+	scaled := image.NewNRGBA(image.Rect(0, 0, iconSize, iconSize))
+	for y := 0; y < iconSize; y++ {
+		for x := 0; x < iconSize; x++ {
+			sx := srcB.Min.X + x*srcB.Dx()/iconSize
+			sy := srcB.Min.Y + y*srcB.Dy()/iconSize
 			scaled.Set(x, y, src.At(sx, sy))
 		}
 	}
 
-	// 3. Overlay favicon — transparent pixels reveal the colored background
-	draw.Draw(dst, dst.Bounds(), scaled, image.Point{}, draw.Over)
+	// 4. Draw favicon centered inside the white circle
+	iconRect := image.Rect(offset, offset, offset+iconSize, offset+iconSize)
+	draw.Draw(dst, iconRect, scaled, image.Point{}, draw.Over)
 
 	var buf bytes.Buffer
 	png.Encode(&buf, dst)

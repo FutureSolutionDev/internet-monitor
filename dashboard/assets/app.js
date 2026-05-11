@@ -20,6 +20,8 @@ const LANGS = {
     export_csv:'تصدير CSV', log_count:'سجل',
     grp_notif_test:'اختبار الإشعارات والصوت', notif_test_note:'يشغّل النغمة ويعرض إشعار تجريبي على سطح المكتب',
     test_notif:'اختبار الإشعار والصوت', test_notif_ok:'✅ تم الإرسال', test_notif_err:'❌ فشل',
+    test_webhook:'اختبار الـ Webhook', test_webhook_ok:'✅ وصل بنجاح', test_webhook_err:'❌ فشل',
+    test_webhook_no_url:'⚠️ لم يتم تعيين webhook_url',
     settings_title:'الإعدادات', settings_save:'حفظ الإعدادات',
     settings_saved:'✅ تم الحفظ بنجاح', settings_error:'❌ فشل الحفظ',
     requires_restart:'يتطلب إعادة تشغيل',
@@ -57,6 +59,8 @@ const LANGS = {
     export_csv:'Export CSV', log_count:'record',
     grp_notif_test:'Notification & Sound Test', notif_test_note:'Plays the ringtone and shows a desktop notification',
     test_notif:'Test Notification & Sound', test_notif_ok:'✅ Sent', test_notif_err:'❌ Failed',
+    test_webhook:'Test Webhook', test_webhook_ok:'✅ Delivered', test_webhook_err:'❌ Failed',
+    test_webhook_no_url:'⚠️ webhook_url not set',
     settings_title:'Settings', settings_save:'Save Settings',
     settings_saved:'✅ Saved successfully', settings_error:'❌ Save failed',
     requires_restart:'Requires restart',
@@ -646,27 +650,33 @@ function _browserAlert(status, d) {
 // ══════════════════════════════════════════════════════════════
 // NOTIFICATION TEST
 // ══════════════════════════════════════════════════════════════
+// isNativeGUI: true when running inside the Go webview window (not a regular browser)
+const isNativeGUI = typeof window['nativeMinimizeToTray'] !== 'undefined'
+  || document.location.hostname === '127.0.0.1'
+    && navigator.userAgent.includes('Chrome') && !navigator.userAgent.includes('Electron');
+
 async function testNotification() {
   const btn = document.getElementById('test-notif-btn');
   const res = document.getElementById('test-notif-result');
   if (btn) btn.disabled = true;
   if (res) { res.className = 'test-result'; res.textContent = '...'; }
 
-  // 1. Request permission if needed
-  if ('Notification' in window && Notification.permission === 'default') {
-    await Notification.requestPermission();
+  // In native GUI, the server-side will play sound + OS toast — skip browser duplicate
+  const isNative = typeof window['nativeMinimizeToTray'] === 'function';
+
+  if (!isNative) {
+    // Browser-only mode: play audio + show Web Notification
+    if ('Notification' in window && Notification.permission === 'default') {
+      await Notification.requestPermission();
+    }
+    playAlert();
+    showBrowserNotification(
+      lang === 'ar' ? '🔔 اختبار الإشعار' : '🔔 Test Notification',
+      lang === 'ar' ? 'الصوت والإشعار يعملان ✅' : 'Sound and notification are working ✅'
+    );
   }
 
-  // 2. Play audio in the browser immediately
-  playAlert();
-
-  // 3. Show browser notification
-  showBrowserNotification(
-    lang === 'ar' ? '🔔 اختبار الإشعار' : '🔔 Test Notification',
-    lang === 'ar' ? 'الصوت والإشعار يعملان بشكل صحيح ✅' : 'Sound and notification are working ✅'
-  );
-
-  // 4. Call server API (triggers OS toast in native window / tray mode)
+  // Always call server API (triggers OS toast + sound in native/tray mode)
   try {
     const r = await fetch('/api/test-notification', { method: 'POST' });
     if (res) {
@@ -678,6 +688,39 @@ async function testNotification() {
   } finally {
     if (btn) btn.disabled = false;
     setTimeout(() => { if (res) res.textContent = ''; }, 4000);
+  }
+}
+
+async function testWebhook() {
+  const btn = document.getElementById('test-webhook-btn');
+  const res = document.getElementById('webhook-test-result');
+  const url = document.getElementById('cfg-webhook')?.value?.trim();
+  if (btn) btn.disabled = true;
+  if (res) { res.className = 'test-result'; res.textContent = '...'; }
+
+  if (!url) {
+    if (res) { res.className = 'test-result test-warn'; res.textContent = t('test_webhook_no_url'); }
+    if (btn) btn.disabled = false;
+    return;
+  }
+
+  try {
+    const r = await fetch('/api/test-webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      if (res) { res.className = 'test-result test-ok'; res.textContent = t('test_webhook_ok'); }
+    } else {
+      if (res) { res.className = 'test-result test-err'; res.textContent = t('test_webhook_err') + ': ' + (data.error||''); }
+    }
+  } catch (e) {
+    if (res) { res.className = 'test-result test-err'; res.textContent = t('test_webhook_err'); }
+  } finally {
+    if (btn) btn.disabled = false;
+    setTimeout(() => { if (res) res.textContent = ''; }, 6000);
   }
 }
 
@@ -705,5 +748,11 @@ function minimizeToTray() {
 // ══════════════════════════════════════════════════════════════
 applyLang();
 connect();
+
+// Show version in header
+fetch('/api/version').then(r=>r.json()).then(d=>{
+  const el = document.getElementById('app-version');
+  if (el && d.version) el.textContent = d.version;
+}).catch(()=>{});
 // Check after a short delay so the Go binding has time to register
 setTimeout(checkNativeMode, 500);

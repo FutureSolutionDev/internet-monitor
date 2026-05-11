@@ -84,8 +84,11 @@ type Server struct {
 	clients    map[chan string]struct{}
 	mu         sync.Mutex
 
+	version string
+
 	OnConfigChange      func(*config.Config)
-	OnTestNotification  func() // called when user clicks "Test Notification"
+	OnTestNotification  func()
+	OnTestWebhook       func(url string) string
 
 	stateMu        sync.RWMutex
 	status         string
@@ -102,11 +105,12 @@ type Server struct {
 	events         []EventEntry
 }
 
-func NewServer(port int, configPath, logDir string) *Server {
+func NewServer(port int, configPath, logDir, version string) *Server {
 	return &Server{
 		port:       port,
 		configPath: configPath,
 		logDir:     logDir,
+		version:    version,
 		clients:    make(map[chan string]struct{}),
 		startTime:  time.Now(),
 		status:     "checking",
@@ -127,11 +131,16 @@ func (s *Server) Start() {
 
 	// JSON APIs
 	mux.HandleFunc("/api/state", s.serveState)
+	mux.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"version":%q}`, s.version)
+	})
 	mux.HandleFunc("/api/config", s.serveConfig)
 	mux.HandleFunc("/api/logs", s.serveLogs)
 	mux.HandleFunc("/api/log-dates", s.serveLogDates)
 	mux.HandleFunc("/api/test-targets", s.serveTestTargets)
 	mux.HandleFunc("/api/test-notification", s.serveTestNotification)
+	mux.HandleFunc("/api/test-webhook", s.serveTestWebhook)
 
 	go http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", s.port), mux)
 }
@@ -434,6 +443,49 @@ func (s *Server) serveTestNotification(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.OnTestNotification != nil {
 		go s.OnTestNotification()
+	}
+	w.Write([]byte(`{"ok":true}`))
+}
+
+func (s *Server) serveTestWebhook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+
+	// Read webhook URL from request body, or fall back to config file
+	var req struct {
+		URL string `json:"url"`
+	}
+	body := make([]byte, 2048)
+	n, _ := r.Body.Read(body)
+	json.Unmarshal(body[:n], &req)
+
+	url := req.URL
+	if url == "" {
+		// Fall back to config file
+		data, err := os.ReadFile(s.configPath)
+		if err == nil {
+			var cfg config.Config
+			if json.Unmarshal(data, &cfg) == nil {
+				url = cfg.WebhookURL
+			}
+		}
+	}
+
+	if url == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"ok":false,"error":"webhook_url not configured"}`))
+		return
+	}
+
+	if s.OnTestWebhook != nil {
+		if errMsg := s.OnTestWebhook(url); errMsg != "" {
+			resp, _ := json.Marshal(map[string]interface{}{"ok": false, "error": errMsg})
+			w.Write(resp)
+			return
+		}
 	}
 	w.Write([]byte(`{"ok":true}`))
 }
