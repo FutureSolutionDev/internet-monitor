@@ -26,10 +26,17 @@ echo [2/4] Installing to: %INSTALL_DIR%
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 if not exist "%INSTALL_DIR%\logs" mkdir "%INSTALL_DIR%\logs"
 
-rem Copy files
+rem Copy exe
 copy /Y %EXE% "%INSTALL_DIR%\%EXE%" >nul
-copy /Y config.json "%INSTALL_DIR%\config.json" >nul
-echo       Files copied.
+echo       Copied: %EXE%
+
+rem Copy config only if it exists — app creates default on first run if missing
+if exist config.json (
+    copy /Y config.json "%INSTALL_DIR%\config.json" >nul
+    echo       Copied: config.json
+) else (
+    echo       No config.json found — app will create default on first run.
+)
 
 rem Register startup (HKCU — no admin needed)
 echo [3/4] Adding to Windows startup...

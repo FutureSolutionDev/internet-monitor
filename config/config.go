@@ -35,7 +35,10 @@ var Default = Config{
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return &Default, nil
+		// First run: write default config so the user can find and edit it
+		cfg := Default
+		writeDefault(path, cfg)
+		return &cfg, nil
 	}
 	if err != nil {
 		return nil, err
@@ -45,6 +48,16 @@ func Load(path string) (*Config, error) {
 		return nil, err
 	}
 	return &cfg, nil
+}
+
+// writeDefault creates a config.json with default values.
+// Failure is silently ignored (e.g. read-only filesystem).
+func writeDefault(path string, cfg Config) {
+	pretty, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return
+	}
+	os.WriteFile(path, pretty, 0644)
 }
 
 func (c *Config) CheckInterval() time.Duration {
