@@ -1,0 +1,34 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/main.exe ."
+  bin = "./tmp/main.exe"
+  delay = 800
+  exclude_dir = ["tmp", "vendor", "testdata", "logs", ".specify", ".git",".code-review-graph", ".serena",".claude"]
+  exclude_regex = ["_test\\.go"]
+  include_ext = ["go", "html", "js", "css"]
+  kill_delay = "2s"
+  send_interrupt = true
+  stop_on_error = true
+  rerun_delay = 500
+
+  [build.windows]
+    cmd = "$env:CGO_ENABLED='0'; go build -o ./tmp/main.exe ."
+    bin = "tmp\\main.exe"
+
+[color]
+  build   = "yellow"
+  watcher = "cyan"
+  runner  = "green"
+  main    = "magenta"
+
+[log]
+  time = true
+
+[screen]
+  clear_on_rebuild = true
+  keep_scroll      = false
+
+[misc]
+  clean_on_exit = true
