@@ -119,8 +119,11 @@ select:focus, input:focus { border-color: var(--blue); }
 .target-input-row  { display: flex; align-items: center; gap: 8px; }
 .target-input-row input { flex: 1; }
 
+/* Ping target wrapper — result goes below the input row */
+.target-ping-wrap { display: flex; flex-direction: column; gap: 4px; }
+
 /* Test results */
-.test-result { font-size: 12px; font-weight: 600; min-width: 90px; white-space: nowrap; }
+.test-result { font-size: 12px; font-weight: 600; white-space: nowrap; min-height: 16px; }
 .test-ok   { color: var(--green);  }
 .test-warn { color: var(--yellow); }
 .test-err  { color: var(--red);    }

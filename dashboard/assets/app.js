@@ -375,13 +375,15 @@ function renderPingTargets() {
   const container = document.getElementById('ping-targets-container');
   if (!container) return;
   container.innerHTML = pingTargets.map((target, i) => `
-    <div class="target-row" id="ping-row-${i}">
-      <input type="text" id="ping-${i}" value="${escHtml(target)}"
-             placeholder="host:port"
-             oninput="pingTargets[${i}]=this.value; markUntested()">
-      <button class="btn btn-secondary btn-sm" onclick="testSingle('ping',${i})">${t('test')}</button>
+    <div class="target-ping-wrap">
+      <div class="target-row" id="ping-row-${i}">
+        <input type="text" id="ping-${i}" value="${escHtml(target)}"
+               placeholder="host:port"
+               oninput="pingTargets[${i}]=this.value; markUntested()">
+        <button class="btn btn-secondary btn-sm" onclick="testSingle('ping',${i})">${t('test')}</button>
+        <button class="btn-remove" onclick="removePingTarget(${i})" title="${t('remove')}">×</button>
+      </div>
       <span class="test-result" id="ping-result-${i}"></span>
-      <button class="btn-remove" onclick="removePingTarget(${i})" title="${t('remove')}">×</button>
     </div>
   `).join('');
 }

@@ -53,7 +53,7 @@ type Snapshot struct {
 type testTargetResult struct {
 	Target    string `json:"target"`
 	OK        bool   `json:"ok"`
-	LatencyMs int64  `json:"latency_ms,omitempty"`
+	LatencyMs int64  `json:"latency_ms"`
 	Error     string `json:"error,omitempty"`
 }
 
@@ -369,6 +369,47 @@ func (s *Server) serveTestTargets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(resp)
+
+	// Send results via webhook if configured (non-blocking)
+	go s.sendTestWebhook(resp)
+}
+
+func (s *Server) sendTestWebhook(results testTargetsResponse) {
+	data, err := os.ReadFile(s.configPath)
+	if err != nil {
+		return
+	}
+	var cfg config.Config
+	if err := json.Unmarshal(data, &cfg); err != nil || cfg.WebhookURL == "" {
+		return
+	}
+
+	allOK := true
+	for _, r := range results.PingTargets {
+		if !r.OK {
+			allOK = false
+		}
+	}
+	if results.HTTPTarget.Target != "" && !results.HTTPTarget.OK {
+		allOK = false
+	}
+	if results.DNSTarget.Target != "" && !results.DNSTarget.OK {
+		allOK = false
+	}
+
+	payload := map[string]interface{}{
+		"type":      "manual_test",
+		"status":    map[bool]string{true: "all_ok", false: "some_failed"}[allOK],
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"results":   results,
+	}
+
+	body, _ := json.Marshal(payload)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Post(cfg.WebhookURL, "application/json", bytes.NewReader(body))
+	if err == nil {
+		resp.Body.Close()
+	}
 }
 
 func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {
