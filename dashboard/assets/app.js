@@ -44,6 +44,9 @@ const LANGS = {
     live:'مباشر', reconnecting:'جاري إعادة الاتصال...',
     reason_tcp:'فشل TCP Ping', reason_http:'فشل HTTP', reason_dns:'فشل DNS',
     reason_loss:'فقدان', reason_latency:'زمن استجابة عالٍ', reason_ok:'اتصال طبيعي',
+    update_available:'إصدار جديد متاح', update_now:'تحديث الآن',
+    update_downloading:'⏳ جاري التحميل...', update_applying:'⚙️ جاري التطبيق...',
+    update_done:'✅ تم — سيُعاد التشغيل', update_err:'❌ فشل التحديث',
   },
   en: {
     appName:'Internet Monitor', nav_dashboard:'Dashboard', nav_logs:'Logs', nav_settings:'Settings',
@@ -85,6 +88,9 @@ const LANGS = {
     live:'Live', reconnecting:'Reconnecting...',
     reason_tcp:'TCP Ping failed', reason_http:'HTTP failed', reason_dns:'DNS failed',
     reason_loss:'Loss', reason_latency:'High latency', reason_ok:'All checks passing',
+    update_available:'New version available', update_now:'Update Now',
+    update_downloading:'⏳ Downloading...', update_applying:'⚙️ Applying...',
+    update_done:'✅ Done — restarting', update_err:'❌ Update failed',
   }
 };
 
@@ -786,5 +792,61 @@ fetch('/api/version').then(r=>r.json()).then(d=>{
   const el = document.getElementById('app-version');
   if (el && d.version) el.textContent = d.version;
 }).catch(()=>{});
+
+// ── Auto-update ──────────────────────────────────────────────
+function showUpdateBanner(info) {
+  const banner = document.getElementById('update-banner');
+  const verEl  = document.getElementById('update-version');
+  if (!banner || !info.has_update) return;
+  if (verEl) verEl.textContent = info.latest_version;
+  banner.style.display = 'flex';
+  // Also update i18n text in case language changed
+  banner.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+}
+
+async function applyUpdate() {
+  const btn    = document.getElementById('update-btn');
+  const status = document.getElementById('update-status');
+  if (btn) btn.disabled = true;
+
+  try {
+    if (status) { status.className = ''; status.textContent = t('update_downloading'); }
+
+    const r = await fetch('/api/update', { method: 'POST' });
+    const d = await r.json();
+
+    if (d.ok) {
+      if (status) { status.textContent = t('update_done'); }
+      // App will restart itself; show countdown
+      let secs = 5;
+      const iv = setInterval(() => {
+        if (status) status.textContent = t('update_done') + ' (' + secs + ')';
+        if (--secs < 0) clearInterval(iv);
+      }, 1000);
+    } else {
+      if (status) { status.textContent = t('update_err') + ': ' + (d.error || ''); }
+      if (btn) btn.disabled = false;
+    }
+  } catch (e) {
+    if (status) { status.textContent = t('update_err'); }
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Check for available update on page load
+fetch('/api/update').then(r=>r.json()).then(d=>{
+  if (d.has_update) showUpdateBanner(d);
+}).catch(()=>{});
+
+// Also check via SSE snapshot (server pushes update info)
+const _origConnect = connect;
+// Patch process() to also handle update info from snapshot
+const _procOrig = process;
+// Note: update info is separate from SSE; we poll /api/update every 30min
+setInterval(() => {
+  fetch('/api/update').then(r=>r.json()).then(d=>{
+    if (d.has_update) showUpdateBanner(d);
+  }).catch(()=>{});
+}, 30 * 60 * 1000);
 // Check after a short delay so the Go binding has time to register
 setTimeout(checkNativeMode, 500);

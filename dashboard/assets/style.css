@@ -125,6 +125,10 @@ select:focus, input:focus { border-color: var(--blue); }
 .target-ping-wrap { display: flex; flex-direction: column; gap: 4px; }
 
 /* Test results */
+/* Update banner */
+.update-banner { background: linear-gradient(135deg,rgba(59,130,246,.15),rgba(59,130,246,.08)); border-bottom: 1px solid rgba(59,130,246,.35); padding: 10px 20px; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #93c5fd; }
+.update-banner .btn { background: var(--blue); color: #fff; padding: 4px 14px; }
+
 .test-result { font-size: 12px; font-weight: 600; white-space: nowrap; min-height: 16px; }
 .test-ok   { color: var(--green);  }
 .test-warn { color: var(--yellow); }

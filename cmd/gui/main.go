@@ -7,6 +7,7 @@ import (
 	"internet-monitor/dashboard"
 	"internet-monitor/logger"
 	"internet-monitor/monitor"
+	"internet-monitor/updater"
 	"log"
 	"os"
 	"path/filepath"
@@ -40,8 +41,28 @@ func main() {
 
 	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir, Version)
 	dash.OnTestNotification = TestNotification
-	dash.OnTestWebhook = lgr.SendTestWebhook
+	dash.OnTestWebhook      = lgr.SendTestWebhook
+	dash.OnApplyUpdate      = updater.Apply
+	dash.OnRestartApp       = updater.Restart
 	dash.Start()
+
+	// Background update checker
+	go func() {
+		time.Sleep(30 * time.Second)
+		for {
+			if info, err := updater.Check(Version); err == nil && info.HasUpdate {
+				lgr.AppLog("UPDATE available: %s", info.LatestVersion)
+				dash.SetUpdateInfo(&dashboard.UpdateInfo{
+					HasUpdate:      info.HasUpdate,
+					LatestVersion:  info.LatestVersion,
+					CurrentVersion: info.CurrentVersion,
+					DownloadURL:    info.DownloadURL,
+					ReleaseNotes:   info.ReleaseNotes,
+				})
+			}
+			time.Sleep(6 * time.Hour)
+		}
+	}()
 
 	checker := monitor.NewChecker(cfg)
 

@@ -28,6 +28,78 @@ func FaviconPNG() []byte {
 	return data
 }
 
+// UpdateInfo holds update availability data — exported so callers can populate it.
+type UpdateInfo struct {
+	HasUpdate      bool   `json:"has_update"`
+	LatestVersion  string `json:"latest_version"`
+	CurrentVersion string `json:"current_version"`
+	DownloadURL    string `json:"download_url"`
+	ReleaseNotes   string `json:"release_notes"`
+}
+
+// internal alias for the stored snapshot (same fields)
+type updateSnapshot = UpdateInfo
+
+// SetUpdateInfo is called by the updater goroutine when a new version is found.
+func (s *Server) SetUpdateInfo(info *updateSnapshot) {
+	s.updateMu.Lock()
+	s.updateInfo = info
+	s.updateMu.Unlock()
+	// Broadcast so the dashboard banner appears without refresh
+	s.broadcast("tick")
+}
+
+// serveUpdate handles GET (check status) and POST (apply update).
+func (s *Server) serveUpdate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	switch r.Method {
+	case http.MethodGet:
+		s.updateMu.RLock()
+		info := s.updateInfo
+		s.updateMu.RUnlock()
+		if info == nil {
+			w.Write([]byte(`{"has_update":false}`))
+			return
+		}
+		json.NewEncoder(w).Encode(info)
+
+	case http.MethodPost:
+		s.updateMu.RLock()
+		info := s.updateInfo
+		s.updateMu.RUnlock()
+
+		if info == nil || !info.HasUpdate {
+			http.Error(w, `{"error":"no update available"}`, http.StatusBadRequest)
+			return
+		}
+		if s.OnApplyUpdate == nil {
+			http.Error(w, `{"error":"updater not configured"}`, http.StatusInternalServerError)
+			return
+		}
+
+		if err := s.OnApplyUpdate(info.DownloadURL); err != nil {
+			resp, _ := json.Marshal(map[string]string{"error": err.Error()})
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write(resp)
+			return
+		}
+
+		w.Write([]byte(`{"ok":true,"restart":true}`))
+
+		// Restart after a short delay so the HTTP response is flushed
+		if s.OnRestartApp != nil {
+			go func() {
+				time.Sleep(500 * time.Millisecond)
+				s.OnRestartApp()
+			}()
+		}
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 // RingtoneMp3 returns the raw bytes of the embedded Ringtone.mp3.
 func RingtoneMp3() []byte {
 	data, _ := staticFiles.ReadFile("assets/Ringtone.mp3")
@@ -95,6 +167,11 @@ type Server struct {
 	OnConfigChange      func(*config.Config)
 	OnTestNotification  func()
 	OnTestWebhook       func(url string) string
+	OnApplyUpdate       func(downloadURL string) error
+	OnRestartApp        func()
+
+	updateMu   sync.RWMutex
+	updateInfo *updateSnapshot
 
 	stateMu        sync.RWMutex
 	status         string
@@ -147,6 +224,7 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/test-targets", s.serveTestTargets)
 	mux.HandleFunc("/api/test-notification", s.serveTestNotification)
 	mux.HandleFunc("/api/test-webhook", s.serveTestWebhook)
+	mux.HandleFunc("/api/update", s.serveUpdate)
 
 	go http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", s.port), mux)
 }

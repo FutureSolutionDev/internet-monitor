@@ -6,9 +6,11 @@ import (
 	"internet-monitor/logger"
 	"internet-monitor/monitor"
 	"internet-monitor/tray"
+	"internet-monitor/updater"
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/getlantern/systray"
 )
@@ -38,9 +40,31 @@ func main() {
 	}
 
 	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir, Version)
+
+	// Wire update callbacks
+	dash.OnApplyUpdate = updater.Apply
+	dash.OnRestartApp  = updater.Restart
+
 	dash.Start()
 
-	// Use favicon.png as the tray icon (embedded in the dashboard assets)
+	// Background update checker: first check after 30s, then every 6h
+	go func() {
+		time.Sleep(30 * time.Second)
+		for {
+			if info, err := updater.Check(Version); err == nil && info.HasUpdate {
+				lgr.AppLog("UPDATE available: %s (current: %s)", info.LatestVersion, info.CurrentVersion)
+				dash.SetUpdateInfo(&dashboard.UpdateInfo{
+					HasUpdate:      info.HasUpdate,
+					LatestVersion:  info.LatestVersion,
+					CurrentVersion: info.CurrentVersion,
+					DownloadURL:    info.DownloadURL,
+					ReleaseNotes:   info.ReleaseNotes,
+				})
+			}
+			time.Sleep(6 * time.Hour)
+		}
+	}()
+
 	if png := dashboard.FaviconPNG(); len(png) > 0 {
 		tray.SetCustomIcon(png)
 	}

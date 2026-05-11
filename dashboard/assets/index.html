@@ -32,6 +32,18 @@
   <button class="tab-btn" data-tab="settings" onclick="showTab('settings')" data-i18n="nav_settings">الإعدادات</button>
 </div>
 
+<!-- ══ Update Banner (shown when new version available) ══ -->
+<div id="update-banner" style="display:none"
+     class="update-banner">
+  <span id="update-text">🆕 <span data-i18n="update_available">إصدار جديد متاح</span></span>
+  <span id="update-version" style="font-weight:700;margin:0 6px"></span>
+  <button class="btn btn-sm" id="update-btn" onclick="applyUpdate()" data-i18n="update_now">تحديث الآن</button>
+  <span id="update-status" style="font-size:12px;margin-inline-start:8px"></span>
+  <button onclick="document.getElementById('update-banner').style.display=\'none\'"
+          style="background:none;border:none;cursor:pointer;color:inherit;margin-inline-start:auto;font-size:16px"
+          title="إغلاق">×</button>
+</div>
+
 <!-- ══════════════════════════════════════════
      TAB: Dashboard
 ══════════════════════════════════════════ -->
