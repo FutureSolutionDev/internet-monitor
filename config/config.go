@@ -9,8 +9,8 @@ import (
 type Config struct {
 	CheckIntervalSec    int      `json:"check_interval_sec"`
 	PingTargets         []string `json:"ping_targets"`
-	HTTPTarget          string   `json:"http_target"`
-	DNSTarget           string   `json:"dns_target"`
+	HTTPTargets         []string `json:"http_targets"`
+	DNSTargets          []string `json:"dns_targets"`
 	FailThreshold       int      `json:"fail_threshold"`
 	PacketLossThreshold float64  `json:"packet_loss_threshold"`
 	LatencyThreshold    int      `json:"latency_threshold_ms"`
@@ -22,8 +22,8 @@ type Config struct {
 var Default = Config{
 	CheckIntervalSec:    5,
 	PingTargets:         []string{"8.8.8.8:53", "1.1.1.1:53"},
-	HTTPTarget:          "https://connectivitycheck.gstatic.com/generate_204",
-	DNSTarget:           "www.google.com",
+	HTTPTargets:         []string{"https://connectivitycheck.gstatic.com/generate_204"},
+	DNSTargets:          []string{"www.google.com", "www.cloudflare.com"},
 	FailThreshold:       3,
 	PacketLossThreshold: 20.0,
 	LatencyThreshold:    500,
@@ -35,7 +35,6 @@ var Default = Config{
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		// First run: write default config so the user can find and edit it
 		cfg := Default
 		writeDefault(path, cfg)
 		return &cfg, nil
@@ -43,15 +42,29 @@ func Load(path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	cfg := Default
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
+
+	// Migrate from old single-value fields (http_target, dns_target → http_targets, dns_targets)
+	var old struct {
+		HTTPTarget string `json:"http_target"`
+		DNSTarget  string `json:"dns_target"`
+	}
+	if json.Unmarshal(data, &old) == nil {
+		if len(cfg.HTTPTargets) == 0 && old.HTTPTarget != "" {
+			cfg.HTTPTargets = []string{old.HTTPTarget}
+		}
+		if len(cfg.DNSTargets) == 0 && old.DNSTarget != "" {
+			cfg.DNSTargets = []string{old.DNSTarget}
+		}
+	}
+
 	return &cfg, nil
 }
 
-// writeDefault creates a config.json with default values.
-// Failure is silently ignored (e.g. read-only filesystem).
 func writeDefault(path string, cfg Config) {
 	pretty, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {

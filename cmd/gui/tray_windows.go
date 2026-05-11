@@ -14,27 +14,24 @@ import (
 )
 
 var (
-	modUser32      = syscall.NewLazyDLL("user32.dll")
-	procShowWindow = modUser32.NewProc("ShowWindow")
+	modUser32               = syscall.NewLazyDLL("user32.dll")
+	procShowWindow          = modUser32.NewProc("ShowWindow")
 	procSetForegroundWindow = modUser32.NewProc("SetForegroundWindow")
 )
 
-// hideWindow hides the webview window (minimizes to tray).
-func hideWindow(hwnd uintptr) {
-	procShowWindow.Call(hwnd, 0) // SW_HIDE
-}
+func hideWindow(hwnd uintptr) { procShowWindow.Call(hwnd, 0) }
 
-// restoreWindow brings the webview window back.
 func restoreWindow(hwnd uintptr) {
-	procShowWindow.Call(hwnd, 9) // SW_RESTORE
-	procShowWindow.Call(hwnd, 5) // SW_SHOW
+	procShowWindow.Call(hwnd, 9)
+	procShowWindow.Call(hwnd, 5)
 	procSetForegroundWindow.Call(hwnd)
 }
 
-// initTray starts the system tray in a background OS thread.
-// Returns a stop function to quit the tray when the app exits.
+// initTray starts systray in a locked OS thread.
+// The returned stop func blocks until systray has fully exited — prevents zombie processes.
 func initTray(w webview.WebView, hwnd uintptr) func() {
 	quit := make(chan struct{})
+	done := make(chan struct{}) // closed when systray.Run() returns
 
 	go func() {
 		runtime.LockOSThread()
@@ -61,6 +58,7 @@ func initTray(w webview.WebView, hwnd uintptr) func() {
 				}
 			}()
 		}, nil)
+		close(done) // signal that the message loop has fully exited
 	}()
 
 	return func() {
@@ -69,10 +67,10 @@ func initTray(w webview.WebView, hwnd uintptr) func() {
 		default:
 			close(quit)
 		}
+		<-done // wait for systray to actually exit before returning
 	}
 }
 
-// updateTrayStatus changes the tray icon and tooltip to reflect connection state.
 func updateTrayStatus(status monitor.Status) {
 	switch status {
 	case monitor.StatusConnected:

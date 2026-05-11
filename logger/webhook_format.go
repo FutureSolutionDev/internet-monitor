@@ -19,12 +19,11 @@ func IsSlack(url string) bool {
 		strings.Contains(url, "slack.com/services/")
 }
 
-// IsSupportedWebhook returns true only for Discord and Slack URLs.
 func IsSupportedWebhook(url string) bool {
 	return IsDiscord(url) || IsSlack(url)
 }
 
-// ── Connectivity Event Payloads ───────────────────────────────
+// ── Connectivity Event Payloads (developer-detail level) ──────
 
 func BuildEventPayload(event monitor.Event, url string) interface{} {
 	if IsDiscord(url) {
@@ -34,89 +33,116 @@ func BuildEventPayload(event monitor.Event, url string) interface{} {
 }
 
 func discordEventPayload(event monitor.Event) map[string]interface{} {
-	colorMap := map[string]int{
+	colors := map[string]int{
 		"connected":    0x22C55E,
 		"degraded":     0xEAB308,
 		"disconnected": 0xEF4444,
 	}
-	emojiMap := map[string]string{
+	emojis := map[string]string{
 		"connected":    "✅",
 		"degraded":     "⚠️",
 		"disconnected": "❌",
 	}
-	color := colorMap[event.EventType]
-	emoji := emojiMap[event.EventType]
 
-	fields := []map[string]interface{}{}
+	color := colors[event.EventType]
+	emoji := emojis[event.EventType]
+
+	// ── Check results section ────────────────────────────────
+	checks := []map[string]interface{}{}
+
+	tcpVal := "✅ OK"
 	if event.Reason.TCPPingFailed {
-		fields = append(fields, field("TCP Ping", "❌ Failed", true))
+		tcpVal = "❌ Failed"
 	}
+	checks = append(checks, field("🔌 TCP Ping", tcpVal, true))
+
+	httpVal := "✅ OK"
 	if event.Reason.HTTPFailed {
-		fields = append(fields, field("HTTP", "❌ Failed", true))
+		httpVal = "❌ Failed"
 	}
+	checks = append(checks, field("🌐 HTTP", httpVal, true))
+
+	dnsVal := "✅ OK"
 	if event.Reason.DNSFailed {
-		fields = append(fields, field("DNS", "❌ Failed", true))
+		dnsVal = "❌ Failed"
 	}
-	if event.Reason.PacketLossPct > 0 {
-		fields = append(fields, field("Packet Loss", fmt.Sprintf("%.0f%%", event.Reason.PacketLossPct), true))
+	checks = append(checks, field("🔍 DNS", dnsVal, true))
+
+	// ── Metrics section ──────────────────────────────────────
+	metrics := []map[string]interface{}{}
+
+	lossStr := fmt.Sprintf("%.1f%%", event.Reason.PacketLossPct)
+	if event.Reason.PacketLossPct == 0 {
+		lossStr = "0%"
 	}
-	if event.Reason.AvgLatencyMs > 0 {
-		fields = append(fields, field("Latency", fmt.Sprintf("%dms", event.Reason.AvgLatencyMs), true))
+	metrics = append(metrics, field("📉 Packet Loss", lossStr, true))
+
+	latStr := fmt.Sprintf("%dms", event.Reason.AvgLatencyMs)
+	if event.Reason.AvgLatencyMs == 0 {
+		latStr = "—"
 	}
+	metrics = append(metrics, field("⚡ Latency", latStr, true))
+
+	durStr := "—"
 	if event.DurationSeconds > 0 {
-		fields = append(fields, field("Duration", fmt.Sprintf("%.0fs", event.DurationSeconds), true))
+		d := time.Duration(event.DurationSeconds) * time.Second
+		if d < time.Minute {
+			durStr = fmt.Sprintf("%.0fs", event.DurationSeconds)
+		} else {
+			durStr = fmt.Sprintf("%dm %ds", int(d.Minutes()), int(d.Seconds())%60)
+		}
 	}
+	metrics = append(metrics, field("⏱️ Duration", durStr, true))
+
+	// ── Combine all fields ───────────────────────────────────
+	allFields := append(checks, metrics...)
 
 	return map[string]interface{}{
 		"username": "Internet Monitor",
 		"embeds": []map[string]interface{}{{
-			"title":     fmt.Sprintf("%s Internet %s", emoji, event.EventType),
-			"color":     color,
-			"fields":    fields,
-			"timestamp": event.Timestamp.UTC().Format(time.RFC3339),
-			"footer":    map[string]string{"text": "Internet Monitor"},
+			"title":       fmt.Sprintf("%s Internet %s", emoji, strings.Title(event.EventType)),
+			"color":       color,
+			"fields":      allFields,
+			"timestamp":   event.Timestamp.UTC().Format(time.RFC3339),
+			"footer":      map[string]string{"text": "Internet Monitor • Event Log"},
 		}},
 	}
 }
 
 func slackEventPayload(event monitor.Event) map[string]interface{} {
-	emojiMap := map[string]string{
+	emojis := map[string]string{
 		"connected":    ":white_check_mark:",
 		"degraded":     ":warning:",
 		"disconnected": ":x:",
 	}
-	emoji := emojiMap[event.EventType]
+	emoji := emojis[event.EventType]
 
-	reasons := []string{}
-	if event.Reason.TCPPingFailed {
-		reasons = append(reasons, "TCP Ping failed")
+	lines := []string{
+		fmt.Sprintf("%s *Internet %s*", emoji, strings.Title(event.EventType)),
+		"",
 	}
-	if event.Reason.HTTPFailed {
-		reasons = append(reasons, "HTTP failed")
-	}
-	if event.Reason.DNSFailed {
-		reasons = append(reasons, "DNS failed")
-	}
+
+	lines = append(lines, fmt.Sprintf("*TCP Ping:* %s  *HTTP:* %s  *DNS:* %s",
+		boolCheck(!event.Reason.TCPPingFailed),
+		boolCheck(!event.Reason.HTTPFailed),
+		boolCheck(!event.Reason.DNSFailed),
+	))
+
 	if event.Reason.PacketLossPct > 0 {
-		reasons = append(reasons, fmt.Sprintf("Loss %.0f%%", event.Reason.PacketLossPct))
+		lines = append(lines, fmt.Sprintf("*Packet Loss:* %.1f%%", event.Reason.PacketLossPct))
 	}
-
-	text := fmt.Sprintf("%s *Internet %s*", emoji, event.EventType)
-	if len(reasons) > 0 {
-		text += "\n" + strings.Join(reasons, " | ")
+	if event.Reason.AvgLatencyMs > 0 {
+		lines = append(lines, fmt.Sprintf("*Latency:* %dms", event.Reason.AvgLatencyMs))
 	}
 	if event.DurationSeconds > 0 {
-		text += fmt.Sprintf("\nDuration: %.0fs", event.DurationSeconds)
+		lines = append(lines, fmt.Sprintf("*Duration:* %.0fs", event.DurationSeconds))
 	}
 
-	return map[string]interface{}{
-		"text": text,
-	}
+	return map[string]interface{}{"text": strings.Join(lines, "\n")}
 }
 
 // ── Test Results Payloads ─────────────────────────────────────
 
-// TestResult holds a single target test result (shared between caller and formatter).
 type TestResult struct {
 	Target    string
 	OK        bool
@@ -126,8 +152,8 @@ type TestResult struct {
 
 type TestResults struct {
 	PingTargets []TestResult
-	HTTPTarget  *TestResult
-	DNSTarget   *TestResult
+	HTTPTargets []TestResult
+	DNSTargets  []TestResult
 }
 
 func (r TestResults) AllOK() bool {
@@ -136,11 +162,15 @@ func (r TestResults) AllOK() bool {
 			return false
 		}
 	}
-	if r.HTTPTarget != nil && !r.HTTPTarget.OK {
-		return false
+	for _, h := range r.HTTPTargets {
+		if !h.OK {
+			return false
+		}
 	}
-	if r.DNSTarget != nil && !r.DNSTarget.OK {
-		return false
+	for _, d := range r.DNSTargets {
+		if !d.OK {
+			return false
+		}
 	}
 	return true
 }
@@ -168,23 +198,29 @@ func discordTestPayload(results TestResults) map[string]interface{} {
 	for _, r := range results.PingTargets {
 		val := fmt.Sprintf("✅ %dms", r.LatencyMs)
 		if !r.OK {
-			val = "❌ " + r.Error
+			val = fmt.Sprintf("❌ %s", r.Error)
 		}
-		fields = append(fields, field("TCP: "+r.Target, val, true))
+		fields = append(fields, field("🔌 TCP: "+r.Target, val, true))
 	}
-	if results.HTTPTarget != nil {
-		val := fmt.Sprintf("✅ %dms", results.HTTPTarget.LatencyMs)
-		if !results.HTTPTarget.OK {
-			val = "❌ " + results.HTTPTarget.Error
+
+	for _, r := range results.HTTPTargets {
+		val := fmt.Sprintf("✅ %dms", r.LatencyMs)
+		if !r.OK {
+			val = fmt.Sprintf("❌ %s", r.Error)
 		}
-		fields = append(fields, field("HTTP", val, true))
+		short := r.Target
+		if len(short) > 35 {
+			short = short[:32] + "…"
+		}
+		fields = append(fields, field("🌐 HTTP: "+short, val, true))
 	}
-	if results.DNSTarget != nil {
-		val := fmt.Sprintf("✅ %dms", results.DNSTarget.LatencyMs)
-		if !results.DNSTarget.OK {
-			val = "❌ " + results.DNSTarget.Error
+
+	for _, r := range results.DNSTargets {
+		val := fmt.Sprintf("✅ %dms", r.LatencyMs)
+		if !r.OK {
+			val = fmt.Sprintf("❌ %s", r.Error)
 		}
-		fields = append(fields, field("DNS", val, true))
+		fields = append(fields, field("🔍 DNS: "+r.Target, val, true))
 	}
 
 	return map[string]interface{}{
@@ -194,7 +230,7 @@ func discordTestPayload(results TestResults) map[string]interface{} {
 			"color":     color,
 			"fields":    fields,
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
-			"footer":    map[string]string{"text": "Internet Monitor"},
+			"footer":    map[string]string{"text": "Internet Monitor • Manual Test"},
 		}},
 	}
 }
@@ -208,33 +244,34 @@ func slackTestPayload(results TestResults) map[string]interface{} {
 
 	lines := []string{header}
 	for _, r := range results.PingTargets {
-		if r.OK {
-			lines = append(lines, fmt.Sprintf("• TCP %s: ✅ %dms", r.Target, r.LatencyMs))
-		} else {
-			lines = append(lines, fmt.Sprintf("• TCP %s: ❌ %s", r.Target, r.Error))
-		}
+		lines = append(lines, formatSlackResult("TCP: "+r.Target, r.OK, r.LatencyMs, r.Error))
 	}
-	if results.HTTPTarget != nil {
-		if results.HTTPTarget.OK {
-			lines = append(lines, fmt.Sprintf("• HTTP: ✅ %dms", results.HTTPTarget.LatencyMs))
-		} else {
-			lines = append(lines, "• HTTP: ❌ "+results.HTTPTarget.Error)
-		}
+	for _, r := range results.HTTPTargets {
+		lines = append(lines, formatSlackResult("HTTP: "+r.Target, r.OK, r.LatencyMs, r.Error))
 	}
-	if results.DNSTarget != nil {
-		if results.DNSTarget.OK {
-			lines = append(lines, fmt.Sprintf("• DNS: ✅ %dms", results.DNSTarget.LatencyMs))
-		} else {
-			lines = append(lines, "• DNS: ❌ "+results.DNSTarget.Error)
-		}
+	for _, r := range results.DNSTargets {
+		lines = append(lines, formatSlackResult("DNS: "+r.Target, r.OK, r.LatencyMs, r.Error))
 	}
 
-	return map[string]interface{}{
-		"text": strings.Join(lines, "\n"),
-	}
+	return map[string]interface{}{"text": strings.Join(lines, "\n")}
 }
 
-// field is a Discord embed field helper.
+// ── Helpers ───────────────────────────────────────────────────
+
 func field(name, value string, inline bool) map[string]interface{} {
 	return map[string]interface{}{"name": name, "value": value, "inline": inline}
+}
+
+func boolCheck(ok bool) string {
+	if ok {
+		return ":white_check_mark:"
+	}
+	return ":x:"
+}
+
+func formatSlackResult(label string, ok bool, latMs int64, errStr string) string {
+	if ok {
+		return fmt.Sprintf("• %s: ✅ %dms", label, latMs)
+	}
+	return fmt.Sprintf("• %s: ❌ %s", label, errStr)
 }

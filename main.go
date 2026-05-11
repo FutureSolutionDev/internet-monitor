@@ -80,4 +80,6 @@ func main() {
 	t.OnEvent = dash.AddEvent
 
 	systray.Run(t.OnReady, t.OnExit)
+	// Explicit exit — kills all background goroutines cleanly
+	os.Exit(0)
 }

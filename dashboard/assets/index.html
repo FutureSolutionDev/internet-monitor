@@ -186,26 +186,20 @@
         <div class="field-note" data-i18n="ping_targets_note">صيغة: host:port — مثال: 8.8.8.8:53</div>
       </div>
 
-      <!-- HTTP target -->
+      <!-- HTTP targets list -->
       <div class="field full-width">
-        <label data-i18n="http_target_label">عنوان HTTP للاختبار</label>
-        <div class="target-input-row">
-          <input type="text" id="cfg-http" placeholder="https://..." oninput="markUntested()">
-          <button class="btn btn-secondary btn-sm" onclick="testSingle('http')" data-i18n="test">اختبار</button>
-        </div>
-        <span class="test-result" id="http-result"></span>
-        <div class="field-note" data-i18n="http_target_note">يجب أن يرجع 200 أو 204 — مثال: https://connectivitycheck.gstatic.com/generate_204</div>
+        <label data-i18n="http_targets_label">عناوين HTTP للاختبار</label>
+        <div id="http-targets-container" class="targets-container"></div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addHttpTarget()" data-i18n="add_target">+ إضافة عنوان</button>
+        <div class="field-note" data-i18n="http_targets_note">يجب أن يرجع 200 أو 204 — يُجرَّب الأول ثم الثاني عند الفشل</div>
       </div>
 
-      <!-- DNS target -->
+      <!-- DNS targets list -->
       <div class="field full-width">
-        <label data-i18n="dns_target_label">اسم النطاق لاختبار DNS</label>
-        <div class="target-input-row">
-          <input type="text" id="cfg-dns" placeholder="www.google.com" oninput="markUntested()">
-          <button class="btn btn-secondary btn-sm" onclick="testSingle('dns')" data-i18n="test">اختبار</button>
-        </div>
-        <span class="test-result" id="dns-result"></span>
-        <div class="field-note" data-i18n="dns_target_note">مثال: www.google.com</div>
+        <label data-i18n="dns_targets_label">نطاقات اختبار DNS</label>
+        <div id="dns-targets-container" class="targets-container"></div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addDnsTarget()" data-i18n="add_target">+ إضافة نطاق</button>
+        <div class="field-note" data-i18n="dns_targets_note">مثال: www.google.com — يُجرَّب الأول ثم الثاني عند الفشل</div>
       </div>
 
       <!-- Test All button -->

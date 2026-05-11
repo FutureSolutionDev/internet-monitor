@@ -150,8 +150,11 @@ type testTargetResult struct {
 
 type testTargetsResponse struct {
 	PingTargets []testTargetResult `json:"ping_targets"`
-	HTTPTarget  testTargetResult   `json:"http_target"`
-	DNSTarget   testTargetResult   `json:"dns_target"`
+	HTTPTargets []testTargetResult `json:"http_targets"`
+	DNSTargets  []testTargetResult `json:"dns_targets"`
+	// Legacy single-value fields kept for backward compat with old JS
+	HTTPTarget testTargetResult `json:"http_target"`
+	DNSTarget  testTargetResult `json:"dns_target"`
 }
 
 // ── Server ────────────────────────────────────────────────────
@@ -397,17 +400,26 @@ func (s *Server) serveTestTargets(w http.ResponseWriter, r *http.Request) {
 
 	var req struct {
 		PingTargets []string `json:"ping_targets"`
-		HTTPTarget  string   `json:"http_target"`
-		DNSTarget   string   `json:"dns_target"`
+		HTTPTargets []string `json:"http_targets"`
+		DNSTargets  []string `json:"dns_targets"`
+		// Legacy single-value (old JS clients)
+		HTTPTarget string `json:"http_target"`
+		DNSTarget  string `json:"dns_target"`
 	}
 	body, _ := io.ReadAll(r.Body)
 	json.Unmarshal(body, &req)
 
-	resp := testTargetsResponse{
-		PingTargets: make([]testTargetResult, 0),
+	// Merge legacy single values into arrays
+	if req.HTTPTarget != "" && len(req.HTTPTargets) == 0 {
+		req.HTTPTargets = []string{req.HTTPTarget}
+	}
+	if req.DNSTarget != "" && len(req.DNSTargets) == 0 {
+		req.DNSTargets = []string{req.DNSTarget}
 	}
 
-	// Test TCP ping targets
+	httpClient := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{DisableKeepAlives: true}}
+	resp := testTargetsResponse{PingTargets: make([]testTargetResult, 0)}
+
 	for _, target := range req.PingTargets {
 		target = strings.TrimSpace(target)
 		if target == "" {
@@ -416,50 +428,61 @@ func (s *Server) serveTestTargets(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		conn, err := net.DialTimeout("tcp", target, 3*time.Second)
 		lat := time.Since(start).Milliseconds()
-		r := testTargetResult{Target: target}
+		rt := testTargetResult{Target: target}
 		if err == nil {
 			conn.Close()
-			r.OK = true
-			r.LatencyMs = lat
+			rt.OK = true
+			rt.LatencyMs = lat
 		} else {
-			r.Error = simplifyError(err.Error())
+			rt.Error = simplifyError(err.Error())
 		}
-		resp.PingTargets = append(resp.PingTargets, r)
+		resp.PingTargets = append(resp.PingTargets, rt)
 	}
 
-	// Test HTTP target
-	if req.HTTPTarget != "" {
-		start := time.Now()
-		client := &http.Client{
-			Timeout: 5 * time.Second,
-			Transport: &http.Transport{DisableKeepAlives: true},
+	for _, target := range req.HTTPTargets {
+		target = strings.TrimSpace(target)
+		if target == "" {
+			continue
 		}
-		httpResp, err := client.Get(req.HTTPTarget)
+		start := time.Now()
+		httpResp, err := httpClient.Get(target)
 		lat := time.Since(start).Milliseconds()
-		resp.HTTPTarget = testTargetResult{Target: req.HTTPTarget}
+		rt := testTargetResult{Target: target}
 		if err == nil {
 			httpResp.Body.Close()
-			resp.HTTPTarget.OK = true
-			resp.HTTPTarget.LatencyMs = lat
+			rt.OK = true
+			rt.LatencyMs = lat
 		} else {
-			resp.HTTPTarget.Error = simplifyError(err.Error())
+			rt.Error = simplifyError(err.Error())
 		}
+		resp.HTTPTargets = append(resp.HTTPTargets, rt)
+	}
+	// Populate legacy field with first result for backward compat
+	if len(resp.HTTPTargets) > 0 {
+		resp.HTTPTarget = resp.HTTPTargets[0]
 	}
 
-	// Test DNS target
-	if req.DNSTarget != "" {
+	for _, target := range req.DNSTargets {
+		target = strings.TrimSpace(target)
+		if target == "" {
+			continue
+		}
 		start := time.Now()
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		_, err := net.DefaultResolver.LookupHost(ctx, req.DNSTarget)
+		_, err := net.DefaultResolver.LookupHost(ctx, target)
+		cancel()
 		lat := time.Since(start).Milliseconds()
-		resp.DNSTarget = testTargetResult{Target: req.DNSTarget}
+		rt := testTargetResult{Target: target}
 		if err == nil {
-			resp.DNSTarget.OK = true
-			resp.DNSTarget.LatencyMs = lat
+			rt.OK = true
+			rt.LatencyMs = lat
 		} else {
-			resp.DNSTarget.Error = simplifyError(err.Error())
+			rt.Error = simplifyError(err.Error())
 		}
+		resp.DNSTargets = append(resp.DNSTargets, rt)
+	}
+	if len(resp.DNSTargets) > 0 {
+		resp.DNSTarget = resp.DNSTargets[0]
 	}
 
 	json.NewEncoder(w).Encode(resp)
@@ -491,21 +514,11 @@ func (s *Server) sendTestWebhook(results testTargetsResponse) {
 			Error:     r.Error,
 		})
 	}
-	if results.HTTPTarget.Target != "" {
-		tr.HTTPTarget = &logger.TestResult{
-			Target:    results.HTTPTarget.Target,
-			OK:        results.HTTPTarget.OK,
-			LatencyMs: results.HTTPTarget.LatencyMs,
-			Error:     results.HTTPTarget.Error,
-		}
+	for _, r := range results.HTTPTargets {
+		tr.HTTPTargets = append(tr.HTTPTargets, logger.TestResult{Target: r.Target, OK: r.OK, LatencyMs: r.LatencyMs, Error: r.Error})
 	}
-	if results.DNSTarget.Target != "" {
-		tr.DNSTarget = &logger.TestResult{
-			Target:    results.DNSTarget.Target,
-			OK:        results.DNSTarget.OK,
-			LatencyMs: results.DNSTarget.LatencyMs,
-			Error:     results.DNSTarget.Error,
-		}
+	for _, r := range results.DNSTargets {
+		tr.DNSTargets = append(tr.DNSTargets, logger.TestResult{Target: r.Target, OK: r.OK, LatencyMs: r.LatencyMs, Error: r.Error})
 	}
 
 	payload := logger.BuildTestPayload(tr, cfg.WebhookURL)

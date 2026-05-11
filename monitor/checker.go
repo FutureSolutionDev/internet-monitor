@@ -11,7 +11,7 @@ import (
 type Checker struct {
 	cfg        *config.Config
 	httpClient *http.Client
-	history    []bool // TCP ping results for packet loss calculation
+	history    []bool
 	histSize   int
 }
 
@@ -25,7 +25,6 @@ func NewChecker(cfg *config.Config) *Checker {
 			Transport: &http.Transport{
 				DisableKeepAlives:   true,
 				DisableCompression:  true,
-				MaxIdleConns:        0,
 				TLSHandshakeTimeout: 3 * time.Second,
 			},
 		},
@@ -35,7 +34,7 @@ func NewChecker(cfg *config.Config) *Checker {
 func (c *Checker) Check() CheckResult {
 	result := CheckResult{Timestamp: time.Now()}
 
-	// TCP ping: try each target, record success + latency of first success
+	// ── TCP Ping: try each target, succeed on first success ──────
 	start := time.Now()
 	for _, target := range c.cfg.PingTargets {
 		conn, err := net.DialTimeout("tcp", target, 2*time.Second)
@@ -47,7 +46,7 @@ func (c *Checker) Check() CheckResult {
 		}
 	}
 
-	// Packet loss: track last N TCP ping outcomes
+	// Packet loss history (based on TCP ping results)
 	c.history = append(c.history, result.TCPPingOK)
 	if len(c.history) > c.histSize {
 		c.history = c.history[1:]
@@ -62,18 +61,28 @@ func (c *Checker) Check() CheckResult {
 		result.PacketLoss = float64(failures) / float64(len(c.history)) * 100
 	}
 
-	// HTTP check
-	resp, err := c.httpClient.Get(c.cfg.HTTPTarget)
-	if err == nil {
-		resp.Body.Close()
-		result.HTTPOK = resp.StatusCode == 204 || resp.StatusCode == 200
+	// ── HTTP: try all targets, succeed on first 200/204 ──────────
+	for _, target := range c.cfg.HTTPTargets {
+		resp, err := c.httpClient.Get(target)
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode == 200 || resp.StatusCode == 204 {
+				result.HTTPOK = true
+				break
+			}
+		}
 	}
 
-	// DNS check
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	_, dnsErr := net.DefaultResolver.LookupHost(ctx, c.cfg.DNSTarget)
-	result.DNSOK = dnsErr == nil
+	// ── DNS: try all targets, succeed on first successful resolve ─
+	for _, target := range c.cfg.DNSTargets {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		_, err := net.DefaultResolver.LookupHost(ctx, target)
+		cancel()
+		if err == nil {
+			result.DNSOK = true
+			break
+		}
+	}
 
 	return result
 }

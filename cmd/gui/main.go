@@ -82,14 +82,17 @@ func main() {
 
 	// Start system tray (Windows: real tray; other OS: no-op)
 	stopTray := initTray(w, hwnd)
-	defer stopTray()
-
 	// Start monitoring loop
 	go monitoringLoop(cfg, checker, lgr, dash)
 
 	time.Sleep(150 * time.Millisecond)
 	w.Navigate(dash.URL())
-	w.Run()
+	w.Run() // blocks until window is closed
+
+	// Window closed — wait for tray to fully exit then hard-kill
+	stopTray()
+	w.Destroy()
+	os.Exit(0)
 }
 
 func monitoringLoop(cfg *config.Config, checker *monitor.Checker, lgr *logger.Logger, dash *dashboard.Server) {

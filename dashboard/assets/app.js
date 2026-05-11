@@ -33,6 +33,8 @@ const LANGS = {
     loss_threshold:'حد فقدان الحزم (%)', loss_threshold_note:'فوق هذه النسبة يُعتبر ضعيفاً',
     latency_threshold:'حد زمن الاستجابة (مللي ثانية)', latency_threshold_note:'فوق هذا الحد يُعتبر ضعيفاً',
     ping_targets_label:'عناوين TCP Ping', ping_targets_note:'صيغة: host:port — مثال: 8.8.8.8:53',
+    http_targets_label:'عناوين HTTP للاختبار', http_targets_note:'يُجرَّب الأول ثم الثاني عند الفشل — يجب أن يرجع 200 أو 204',
+    dns_targets_label:'نطاقات اختبار DNS', dns_targets_note:'يُجرَّب الأول ثم الثاني عند الفشل — مثال: www.google.com',
     add_target:'+ إضافة عنوان', remove:'حذف',
     http_target_label:'عنوان HTTP للاختبار', http_target_note:'يجب أن يرجع 200 أو 204',
     dns_target_label:'اسم النطاق لاختبار DNS', dns_target_note:'مثال: www.google.com',
@@ -78,6 +80,8 @@ const LANGS = {
     loss_threshold:'Packet loss threshold (%)', loss_threshold_note:'Above this % = degraded',
     latency_threshold:'Latency threshold (ms)', latency_threshold_note:'Above this ms = degraded',
     ping_targets_label:'TCP Ping Targets', ping_targets_note:'Format: host:port — e.g. 8.8.8.8:53',
+    http_targets_label:'HTTP Test URLs', http_targets_note:'First OK result is used — must return 200 or 204',
+    dns_targets_label:'DNS Test Domains', dns_targets_note:'First OK result is used — e.g. www.google.com',
     add_target:'+ Add Target', remove:'Remove',
     http_target_label:'HTTP Check URL', http_target_note:'Should return 200 or 204',
     dns_target_label:'DNS Resolution Domain', dns_target_note:'e.g. www.google.com',
@@ -411,8 +415,10 @@ function exportCSV() {
 // ══════════════════════════════════════════════════════════════
 // SETTINGS TAB — target management + validation
 // ══════════════════════════════════════════════════════════════
-let pingTargets   = [];
-let settingsTested = false; // tracks whether user tested before saving
+let pingTargets  = [];
+let httpTargets  = [];
+let dnsTargets   = [];
+let settingsTested = false;
 
 function markUntested() {
   settingsTested = false;
@@ -445,10 +451,57 @@ function renderPingTargets() {
 function addPingTarget() {
   pingTargets.push('');
   renderPingTargets();
-  const idx = pingTargets.length - 1;
-  document.getElementById('ping-' + idx)?.focus();
+  document.getElementById('ping-' + (pingTargets.length-1))?.focus();
   markUntested();
 }
+
+// ── HTTP targets ──────────────────────────────────────────────
+function renderHttpTargets() {
+  const c = document.getElementById('http-targets-container');
+  if (!c) return;
+  c.innerHTML = httpTargets.map((v,i) => `
+    <div class="target-ping-wrap">
+      <div class="target-row" id="http-row-${i}">
+        <input type="text" id="http-${i}" value="${escHtml(v)}"
+               placeholder="https://..."
+               oninput="httpTargets[${i}]=this.value; markUntested()">
+        <button class="btn btn-secondary btn-sm" onclick="testSingle('http',${i})">${t('test')}</button>
+        <button class="btn-remove" onclick="removeHttpTarget(${i})" title="${t('remove')}">×</button>
+      </div>
+      <span class="test-result" id="http-result-${i}"></span>
+    </div>`).join('');
+}
+function addHttpTarget() {
+  httpTargets.push('');
+  renderHttpTargets();
+  document.getElementById('http-' + (httpTargets.length-1))?.focus();
+  markUntested();
+}
+function removeHttpTarget(i) { httpTargets.splice(i,1); renderHttpTargets(); markUntested(); }
+
+// ── DNS targets ───────────────────────────────────────────────
+function renderDnsTargets() {
+  const c = document.getElementById('dns-targets-container');
+  if (!c) return;
+  c.innerHTML = dnsTargets.map((v,i) => `
+    <div class="target-ping-wrap">
+      <div class="target-row" id="dns-row-${i}">
+        <input type="text" id="dns-${i}" value="${escHtml(v)}"
+               placeholder="www.google.com"
+               oninput="dnsTargets[${i}]=this.value; markUntested()">
+        <button class="btn btn-secondary btn-sm" onclick="testSingle('dns',${i})">${t('test')}</button>
+        <button class="btn-remove" onclick="removeDnsTarget(${i})" title="${t('remove')}">×</button>
+      </div>
+      <span class="test-result" id="dns-result-${i}"></span>
+    </div>`).join('');
+}
+function addDnsTarget() {
+  dnsTargets.push('');
+  renderDnsTargets();
+  document.getElementById('dns-' + (dnsTargets.length-1))?.focus();
+  markUntested();
+}
+function removeDnsTarget(i) { dnsTargets.splice(i,1); renderDnsTargets(); markUntested(); }
 
 function removePingTarget(i) {
   pingTargets.splice(i, 1);
@@ -467,11 +520,15 @@ async function testSingle(type, index) {
     req.ping_targets = [val];
     resultId = 'ping-result-' + index;
   } else if (type === 'http') {
-    req.http_target = document.getElementById('cfg-http').value.trim();
-    resultId = 'http-result';
+    const val = (httpTargets[index] || document.getElementById('http-'+index)?.value || '').trim();
+    if (!val) return;
+    req.http_target = val;
+    resultId = 'http-result-' + index;
   } else if (type === 'dns') {
-    req.dns_target = document.getElementById('cfg-dns').value.trim();
-    resultId = 'dns-result';
+    const val = (dnsTargets[index] || document.getElementById('dns-'+index)?.value || '').trim();
+    if (!val) return;
+    req.dns_target = val;
+    resultId = 'dns-result-' + index;
   }
 
   setResult(resultId, null, t('testing'));
@@ -501,23 +558,28 @@ async function testAllTargets() {
   const btn = document.getElementById('test-all-btn');
   if (btn) btn.disabled = true;
 
-  // Sync pingTargets from inputs first
-  pingTargets.forEach((_, i) => {
-    const inp = document.getElementById('ping-' + i);
-    if (inp) pingTargets[i] = inp.value;
-  });
+  // Sync arrays from inputs
+  pingTargets.forEach((_,i) => { const el=document.getElementById('ping-'+i); if(el) pingTargets[i]=el.value; });
+  httpTargets.forEach((_,i) => { const el=document.getElementById('http-'+i); if(el) httpTargets[i]=el.value; });
+  dnsTargets.forEach((_,i)  => { const el=document.getElementById('dns-'+i);  if(el) dnsTargets[i]=el.value;  });
 
-  const req = {
-    ping_targets: pingTargets.map(t => t.trim()).filter(Boolean),
-    http_target:  document.getElementById('cfg-http').value.trim(),
-    dns_target:   document.getElementById('cfg-dns').value.trim(),
-  };
+  // Test each HTTP and DNS target individually (so we can show per-item results)
+  const pingList = pingTargets.map(v=>v.trim()).filter(Boolean);
+  const httpList = httpTargets.map(v=>v.trim()).filter(Boolean);
+  const dnsList  = dnsTargets.map(v=>v.trim()).filter(Boolean);
 
-  // Show loading
-  req.ping_targets.forEach((_, i) => setResult('ping-result-' + i, null, t('testing')));
-  setResult('http-result', null, t('testing'));
-  setResult('dns-result',  null, t('testing'));
+  // Show loading for all
+  pingList.forEach((_,i) => setResult('ping-result-'+i, null, t('testing')));
+  httpList.forEach((_,i) => setResult('http-result-'+i, null, t('testing')));
+  dnsList.forEach((_,i)  => setResult('dns-result-'+i,  null, t('testing')));
   setResult('test-all-result', null, t('testing'));
+
+  // Build one request with all targets
+  const req = {
+    ping_targets: pingList,
+    http_targets: httpList,
+    dns_targets:  dnsList,
+  };
 
   try {
     const res  = await fetch('/api/test-targets', {
@@ -527,13 +589,16 @@ async function testAllTargets() {
     });
     const data = await res.json();
 
-    (data.ping_targets || []).forEach((r, i) => showTestResult('ping-result-' + i, r));
-    showTestResult('http-result', data.http_target);
-    showTestResult('dns-result',  data.dns_target);
+    (data.ping_targets || []).forEach((r,i) => showTestResult('ping-result-'+i, r));
+    (data.http_targets || []).forEach((r,i) => showTestResult('http-result-'+i, r));
+    (data.dns_targets  || []).forEach((r,i) => showTestResult('dns-result-'+i,  r));
 
-    // Summary
-    const allOk = [...(data.ping_targets || []), data.http_target, data.dns_target]
-      .filter(Boolean).every(r => r.ok);
+    const allResults = [
+      ...(data.ping_targets||[]),
+      ...(data.http_targets||[]),
+      ...(data.dns_targets||[]),
+    ].filter(Boolean);
+    const allOk = allResults.every(r => r.ok);
     setResult('test-all-result', allOk ? 'test-ok' : 'test-warn',
       allOk ? t('test_all_ok') : t('test_all_warn'));
 
@@ -592,26 +657,26 @@ async function loadSettings() {
   try {
     const cfg = await (await fetch('/api/config')).json();
 
-    // Simple fields
-    document.getElementById('cfg-interval').value         = cfg.check_interval_sec   || 5;
-    document.getElementById('cfg-fail-threshold').value   = cfg.fail_threshold        || 3;
-    document.getElementById('cfg-loss-threshold').value   = cfg.packet_loss_threshold || 20;
-    document.getElementById('cfg-latency-threshold').value = cfg.latency_threshold_ms || 500;
-    document.getElementById('cfg-webhook').value          = cfg.webhook_url           || '';
+    document.getElementById('cfg-interval').value          = cfg.check_interval_sec   || 5;
+    document.getElementById('cfg-fail-threshold').value    = cfg.fail_threshold        || 3;
+    document.getElementById('cfg-loss-threshold').value    = cfg.packet_loss_threshold || 20;
+    document.getElementById('cfg-latency-threshold').value = cfg.latency_threshold_ms  || 500;
+    document.getElementById('cfg-webhook').value           = cfg.webhook_url            || '';
     validateWebhookURL(cfg.webhook_url || '');
-    document.getElementById('cfg-log-dir').value          = cfg.log_dir               || 'logs';
-    document.getElementById('cfg-port').value             = cfg.dashboard_port        || 8765;
-    document.getElementById('cfg-http').value             = cfg.http_target           || '';
-    document.getElementById('cfg-dns').value              = cfg.dns_target            || '';
+    document.getElementById('cfg-log-dir').value           = cfg.log_dir                || 'logs';
+    document.getElementById('cfg-port').value              = cfg.dashboard_port         || 8765;
 
-    // Ping targets list
-    pingTargets = Array.isArray(cfg.ping_targets) ? [...cfg.ping_targets] : ['8.8.8.8:53'];
+    pingTargets = Array.isArray(cfg.ping_targets)  ? [...cfg.ping_targets]  : ['8.8.8.8:53'];
+    httpTargets = Array.isArray(cfg.http_targets)  ? [...cfg.http_targets]  : ['https://connectivitycheck.gstatic.com/generate_204'];
+    dnsTargets  = Array.isArray(cfg.dns_targets)   ? [...cfg.dns_targets]   : ['www.google.com'];
+
     renderPingTargets();
+    renderHttpTargets();
+    renderDnsTargets();
 
-    // Clear any previous test results
-    ['http-result','dns-result','test-all-result'].forEach(id => setResult(id, null, ''));
+    setResult('test-all-result', null, '');
     settingsTested = false;
-    showWarnBanner(false); // fresh load — no warning yet
+    showWarnBanner(false);
   } catch (e) {}
 }
 
@@ -620,26 +685,24 @@ async function saveSettings() {
   const msg = document.getElementById('save-msg');
   msg.textContent = '';
 
-  // Sync ping targets from inputs
-  pingTargets.forEach((_, i) => {
-    const inp = document.getElementById('ping-' + i);
-    if (inp) pingTargets[i] = inp.value.trim();
-  });
+  // Sync all target arrays from inputs
+  pingTargets.forEach((_,i) => { const el=document.getElementById('ping-'+i); if(el) pingTargets[i]=el.value.trim(); });
+  httpTargets.forEach((_,i) => { const el=document.getElementById('http-'+i); if(el) httpTargets[i]=el.value.trim(); });
+  dnsTargets.forEach((_,i)  => { const el=document.getElementById('dns-'+i);  if(el) dnsTargets[i]=el.value.trim();  });
 
   try {
-    // Fetch current config to preserve unknown fields
     const cfg = await (await fetch('/api/config')).json();
 
-    cfg.check_interval_sec    = parseInt(document.getElementById('cfg-interval').value)         || 5;
-    cfg.fail_threshold        = parseInt(document.getElementById('cfg-fail-threshold').value)   || 3;
-    cfg.packet_loss_threshold = parseFloat(document.getElementById('cfg-loss-threshold').value) || 20;
+    cfg.check_interval_sec    = parseInt(document.getElementById('cfg-interval').value)          || 5;
+    cfg.fail_threshold        = parseInt(document.getElementById('cfg-fail-threshold').value)    || 3;
+    cfg.packet_loss_threshold = parseFloat(document.getElementById('cfg-loss-threshold').value)  || 20;
     cfg.latency_threshold_ms  = parseInt(document.getElementById('cfg-latency-threshold').value) || 500;
     cfg.webhook_url           = document.getElementById('cfg-webhook').value.trim();
     cfg.log_dir               = document.getElementById('cfg-log-dir').value.trim() || 'logs';
-    cfg.dashboard_port        = parseInt(document.getElementById('cfg-port').value)  || 8765;
-    cfg.http_target           = document.getElementById('cfg-http').value.trim();
-    cfg.dns_target            = document.getElementById('cfg-dns').value.trim();
-    cfg.ping_targets          = pingTargets.filter(t => t.trim());
+    cfg.dashboard_port        = parseInt(document.getElementById('cfg-port').value) || 8765;
+    cfg.ping_targets          = pingTargets.filter(v => v.trim());
+    cfg.http_targets          = httpTargets.filter(v => v.trim());
+    cfg.dns_targets           = dnsTargets.filter(v => v.trim());
 
     const res = await fetch('/api/config', {
       method:  'POST',
