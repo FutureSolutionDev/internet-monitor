@@ -739,6 +739,7 @@ function exportCSV() {
 let pingTargets = [];
 let httpTargets = [];
 let dnsTargets = [];
+let speedTargets = [];
 let settingsTested = false;
 
 function markUntested() {
@@ -848,6 +849,33 @@ function removePingTarget(i) {
   pingTargets.splice(i, 1);
   renderPingTargets();
   markUntested();
+}
+
+// ── Speed download targets ─────────────────────────────────────
+function renderSpeedTargets() {
+  const c = document.getElementById("speed-targets-container");
+  if (!c) return;
+  c.innerHTML = speedTargets.map((target, i) => `
+    <div class="target-row" id="speed-row-${i}">
+      <input type="text" id="speed-target-${i}" value="${escHtml(target)}"
+             placeholder="https://speed.cloudflare.com/__down"
+             oninput="speedTargets[${i}]=this.value">
+      <button class="btn-remove" onclick="removeSpeedTarget(${i})" title="${t('remove')}">×</button>
+    </div>
+  `).join("");
+}
+
+function addSpeedTarget() {
+  speedTargets.push("");
+  renderSpeedTargets();
+  document.getElementById("speed-target-" + (speedTargets.length - 1))?.focus();
+}
+
+function removeSpeedTarget(i) {
+  if (speedTargets.length > 1) {
+    speedTargets.splice(i, 1);
+    renderSpeedTargets();
+  }
 }
 
 // ── Single target test ─────────────────────────────────────────
@@ -1031,12 +1059,12 @@ async function loadSettings() {
     document.getElementById("cfg-log-dir").value = cfg.log_dir || "logs";
     document.getElementById("cfg-port").value = cfg.dashboard_port || 8765;
     const st = cfg.speed_test || {};
-    const targets = document.getElementById("cfg-speed-targets");
-    if (targets) targets.value = (st.download_targets || ["https://speed.cloudflare.com/__down"]).join("\n");
+    speedTargets = [...(st.download_targets || ["https://speed.cloudflare.com/__down"])];
+    renderSpeedTargets();
     const parallel = document.getElementById("cfg-speed-parallel");
     if (parallel) parallel.value = st.parallel_connections || 4;
-    const alert = document.getElementById("cfg-speed-alert");
-    if (alert) alert.value = st.alert_threshold_mbps || 0;
+    const alertEl = document.getElementById("cfg-speed-alert");
+    if (alertEl) alertEl.value = st.alert_threshold_mbps || 0;
 
     pingTargets = Array.isArray(cfg.ping_targets)
       ? [...cfg.ping_targets]
@@ -1140,8 +1168,7 @@ async function saveSettings() {
     cfg.http_targets = httpTargets.filter((v) => v.trim());
     cfg.dns_targets = dnsTargets.filter((v) => v.trim());
 
-    const stTargetsEl = document.getElementById("cfg-speed-targets");
-    const stTargets = stTargetsEl ? stTargetsEl.value.split("\n").map(s => s.trim()).filter(Boolean) : [];
+    const stTargets = speedTargets.map(s => s.trim()).filter(Boolean);
     cfg.speed_test = {
       download_targets: stTargets.length ? stTargets : ["https://speed.cloudflare.com/__down"],
       parallel_connections: parseInt(document.getElementById("cfg-speed-parallel")?.value) || 4,

@@ -353,8 +353,9 @@
       <div class="settings-grid">
         <div class="field full-width">
           <label data-i18n="speed_dl_targets">عناوين اختبار التنزيل</label>
-          <textarea id="cfg-speed-targets" rows="2" style="width:100%;font-family:monospace;font-size:12px"></textarea>
-          <div class="field-note" data-i18n="speed_targets_note">سطر لكل عنوان — الافتراضي: speed.cloudflare.com/__down</div>
+          <div id="speed-targets-container" class="targets-container"></div>
+          <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addSpeedTarget()" data-i18n="add_target">+ إضافة عنوان</button>
+          <div class="field-note" data-i18n="speed_targets_note">الافتراضي: speed.cloudflare.com/__down</div>
         </div>
         <div class="field">
           <label data-i18n="speed_parallel">اتصالات متوازية (1–8)</label>
