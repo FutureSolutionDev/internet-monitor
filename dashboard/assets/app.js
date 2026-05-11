@@ -42,6 +42,8 @@ const LANGS = {
     log_dir:'مجلد السجلات', dashboard_port:'منفذ لوحة التحكم',
     q_excellent:'ممتاز', q_good:'جيد', q_fair:'متوسط', q_poor:'ضعيف', q_critical:'حرج',
     live:'مباشر', reconnecting:'جاري إعادة الاتصال...',
+    reason_tcp:'فشل TCP Ping', reason_http:'فشل HTTP', reason_dns:'فشل DNS',
+    reason_loss:'فقدان', reason_latency:'زمن استجابة عالٍ', reason_ok:'اتصال طبيعي',
   },
   en: {
     appName:'Internet Monitor', nav_dashboard:'Dashboard', nav_logs:'Logs', nav_settings:'Settings',
@@ -81,6 +83,8 @@ const LANGS = {
     log_dir:'Logs directory', dashboard_port:'Dashboard port',
     q_excellent:'Excellent', q_good:'Good', q_fair:'Fair', q_poor:'Poor', q_critical:'Critical',
     live:'Live', reconnecting:'Reconnecting...',
+    reason_tcp:'TCP Ping failed', reason_http:'HTTP failed', reason_dns:'DNS failed',
+    reason_loss:'Loss', reason_latency:'High latency', reason_ok:'All checks passing',
   }
 };
 
@@ -99,7 +103,31 @@ function toggleLang() {
   localStorage.setItem('lang', lang);
   applyLang();
   if (lastData) process(lastData);
-  renderPingTargets(); // re-render buttons with new language
+  if (logsData.length) renderLogTable(logsData); // re-translate logs tab
+  renderPingTargets();
+}
+
+// Builds a translated reason string from structured event data (EventEntry or JSONL reason object)
+function formatEventReason(e) {
+  const parts = [];
+  const tcp  = e.tcp_failed  ?? e.tcp_ping_failed  ?? false;
+  const http = e.http_failed ?? false;
+  const dns  = e.dns_failed  ?? false;
+  const loss = e.packet_loss_pct ?? e.packet_loss ?? 0;
+  const lat  = e.latency_ms ?? e.avg_latency_ms ?? 0;
+
+  if (tcp)  parts.push(t('reason_tcp'));
+  if (http) parts.push(t('reason_http'));
+  if (dns)  parts.push(t('reason_dns'));
+
+  if (!parts.length) {
+    if (loss > 20) parts.push(t('reason_loss') + ' ' + loss.toFixed(0) + '%');
+    else if (lat > 500) parts.push(t('reason_latency') + ' (' + lat + 'ms)');
+  } else if (loss > 20) {
+    parts.push(t('reason_loss') + ' ' + loss.toFixed(0) + '%');
+  }
+
+  return parts.length ? parts.join(' + ') : t('reason_ok');
 }
 
 // ── Clock ──────────────────────────────────────────────────────
@@ -269,7 +297,7 @@ function process(d) {
         <td class="mono">${e.time}</td>
         <td><span class="badge badge-${e.event_type}">${t('ev_' + e.event_type) || e.event_type}</span></td>
         <td class="mono">${fmtDur(e.duration_seconds)}</td>
-        <td style="color:var(--muted);font-size:12px">${e.reason}</td>
+        <td style="color:var(--muted);font-size:12px">${formatEventReason(e)}</td>
       </tr>`).join('');
   }
 }
@@ -327,19 +355,23 @@ function renderLogTable(entries) {
     return;
   }
   document.getElementById('log-tbody').innerHTML = entries.map(e => {
-    const ts   = new Date(e.timestamp);
-    const time = isNaN(ts) ? e.timestamp : ts.toLocaleTimeString();
+    const ts     = new Date(e.timestamp);
+    const time   = isNaN(ts) ? e.timestamp : ts.toLocaleTimeString();
     const evType = e.event || '';
-    const r = e.reason || {};
-    const parts = [];
-    if (r.tcp_ping_failed) parts.push('TCP');
-    if (r.http_failed)     parts.push('HTTP');
-    if (r.dns_failed)      parts.push('DNS');
+    const r      = e.reason || {};
+    // Pass reason fields to formatEventReason for client-side translation
+    const reasonObj = {
+      tcp_ping_failed: r.tcp_ping_failed || false,
+      http_failed:     r.http_failed     || false,
+      dns_failed:      r.dns_failed      || false,
+      packet_loss_pct: r.packet_loss_pct || 0,
+      avg_latency_ms:  r.avg_latency_ms  || 0,
+    };
     return `<tr>
       <td class="mono">${time}</td>
       <td><span class="badge badge-${evType}">${t('ev_' + evType) || evType}</span></td>
       <td class="mono">${fmtDur(e.duration_seconds || 0)}</td>
-      <td class="logs-reason">${parts.length ? parts.join(', ') + ' failed' : '—'}</td>
+      <td class="logs-reason">${formatEventReason(reasonObj)}</td>
       <td class="mono">${(r.packet_loss_pct || 0).toFixed(1)}%</td>
       <td class="mono">${r.avg_latency_ms > 0 ? r.avg_latency_ms + 'ms' : '—'}</td>
     </tr>`;

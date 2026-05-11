@@ -39,11 +39,17 @@ const maxEvents = 100
 
 // ── Types ─────────────────────────────────────────────────────
 
+// EventEntry is the in-memory / SSE representation of a connectivity event.
+// Reason is sent as structured booleans so the client can translate it.
 type EventEntry struct {
-	Time      string  `json:"time"`
-	EventType string  `json:"event_type"`
-	Duration  float64 `json:"duration_seconds"`
-	Reason    string  `json:"reason"`
+	Time          string  `json:"time"`
+	EventType     string  `json:"event_type"`
+	Duration      float64 `json:"duration_seconds"`
+	TCPFailed     bool    `json:"tcp_failed"`
+	HTTPFailed    bool    `json:"http_failed"`
+	DNSFailed     bool    `json:"dns_failed"`
+	PacketLoss    float64 `json:"packet_loss_pct"`
+	LatencyMs     int64   `json:"latency_ms"`
 }
 
 type Snapshot struct {
@@ -172,29 +178,15 @@ func (s *Server) UpdateTick(result monitor.CheckResult, status monitor.Status) {
 }
 
 func (s *Server) AddEvent(event monitor.Event) {
-	parts := []string{}
-	if event.Reason.TCPPingFailed {
-		parts = append(parts, "TCP ping")
-	}
-	if event.Reason.HTTPFailed {
-		parts = append(parts, "HTTP")
-	}
-	if event.Reason.DNSFailed {
-		parts = append(parts, "DNS")
-	}
-	reason := "—"
-	if len(parts) > 0 {
-		reason = strings.Join(parts, ", ") + " failed"
-	}
-	if event.Reason.PacketLossPct > 20 {
-		reason += fmt.Sprintf(" (loss %.0f%%)", event.Reason.PacketLossPct)
-	}
-
 	entry := EventEntry{
-		Time:      event.Timestamp.Format("15:04:05"),
-		EventType: event.EventType,
-		Duration:  event.DurationSeconds,
-		Reason:    reason,
+		Time:       event.Timestamp.Format("15:04:05"),
+		EventType:  event.EventType,
+		Duration:   event.DurationSeconds,
+		TCPFailed:  event.Reason.TCPPingFailed,
+		HTTPFailed: event.Reason.HTTPFailed,
+		DNSFailed:  event.Reason.DNSFailed,
+		PacketLoss: event.Reason.PacketLossPct,
+		LatencyMs:  event.Reason.AvgLatencyMs,
 	}
 
 	s.stateMu.Lock()
