@@ -244,6 +244,24 @@
       </div>
     </div>
 
+    <!-- ── Startup ── -->
+    <div class="settings-group" id="startup-group" style="display:none">
+      <div class="settings-group-title" data-i18n="grp_startup">System Startup</div>
+      <div class="settings-grid">
+        <div class="field full-width">
+          <label data-i18n="startup_label">Run at Windows Startup</label>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
+            <label class="toggle-switch">
+              <input type="checkbox" id="cfg-startup" onchange="toggleStartup(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+            <span id="startup-status" class="test-result"></span>
+          </div>
+          <div class="field-note" data-i18n="startup_note">Starts automatically when Windows boots</div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Notification Test ── -->
     <div class="settings-group">
       <div class="settings-group-title" data-i18n="grp_notif_test">اختبار الإشعارات والصوت</div>

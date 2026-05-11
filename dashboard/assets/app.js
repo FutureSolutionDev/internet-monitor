@@ -50,6 +50,10 @@ const LANGS = {
     update_available:'إصدار جديد متاح', update_now:'تحديث الآن',
     update_downloading:'⏳ جاري التحميل...', update_applying:'⚙️ جاري التطبيق...',
     update_done:'✅ تم — سيُعاد التشغيل', update_err:'❌ فشل التحديث',
+    grp_startup:'بدء التشغيل التلقائي',
+    startup_label:'تشغيل مع بدء Windows',
+    startup_note:'يبدأ التطبيق تلقائياً عند تشغيل الجهاز',
+    startup_on:'✅ مفعّل', startup_off:'تم الإيقاف', startup_err:'❌ فشل',
   },
   en: {
     appName:'Internet Monitor', nav_dashboard:'Dashboard', nav_logs:'Logs', nav_settings:'Settings',
@@ -97,6 +101,10 @@ const LANGS = {
     update_available:'New version available', update_now:'Update Now',
     update_downloading:'⏳ Downloading...', update_applying:'⚙️ Applying...',
     update_done:'✅ Done — restarting', update_err:'❌ Update failed',
+    grp_startup:'System Startup',
+    startup_label:'Run at Windows Startup',
+    startup_note:'Starts automatically when Windows boots',
+    startup_on:'✅ Enabled', startup_off:'Disabled', startup_err:'❌ Failed',
   }
 };
 
@@ -678,6 +686,45 @@ async function loadSettings() {
     settingsTested = false;
     showWarnBanner(false);
   } catch (e) {}
+
+  loadStartup();
+}
+
+// ── Startup toggle ─────────────────────────────────────────────
+async function loadStartup() {
+  try {
+    const data = await (await fetch('/api/startup')).json();
+    const group = document.getElementById('startup-group');
+    if (!data.supported) { if (group) group.style.display = 'none'; return; }
+    if (group) group.style.display = '';
+    const cb = document.getElementById('cfg-startup');
+    if (cb) cb.checked = data.enabled;
+    setResult('startup-status', data.enabled ? 'test-ok' : null,
+      data.enabled ? t('startup_on') : '');
+  } catch (e) {}
+}
+
+async function toggleStartup(enabled) {
+  try {
+    const res  = await fetch('/api/startup', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ enabled })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setResult('startup-status', data.enabled ? 'test-ok' : null,
+        data.enabled ? t('startup_on') : t('startup_off'));
+    } else {
+      setResult('startup-status', 'test-err', t('startup_err'));
+      const cb = document.getElementById('cfg-startup');
+      if (cb) cb.checked = !enabled;
+    }
+  } catch (e) {
+    setResult('startup-status', 'test-err', t('startup_err'));
+    const cb = document.getElementById('cfg-startup');
+    if (cb) cb.checked = !enabled;
+  }
 }
 
 // ── Save settings ──────────────────────────────────────────────

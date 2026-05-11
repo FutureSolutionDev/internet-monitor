@@ -134,5 +134,13 @@ select:focus, input:focus { border-color: var(--blue); }
 .test-warn { color: var(--yellow); }
 .test-err  { color: var(--red);    }
 
+/* Toggle switch */
+.toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle-slider { position: absolute; inset: 0; background: var(--bg3); border-radius: 24px; cursor: pointer; transition: background .2s; border: 1px solid #475569; }
+.toggle-slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px; background: var(--muted); border-radius: 50%; transition: transform .2s, background .2s; }
+.toggle-switch input:checked + .toggle-slider { background: rgba(34,197,94,.25); border-color: var(--green); }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); background: var(--green); }
+
 /* Warning banner */
 .warn-banner { background: rgba(234,179,8,.08); border: 1px solid rgba(234,179,8,.3); border-radius: 8px; padding: 10px 14px; display: flex; align-items: flex-start; gap: 8px; margin-bottom: 16px; font-size: 13px; color: var(--yellow); }

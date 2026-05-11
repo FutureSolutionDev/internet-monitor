@@ -40,6 +40,8 @@
 
 ## 🚀 التثبيت السريع
 
+> **ظهور تحذير Windows SmartScreen؟** اضغط **"مزيد من المعلومات" ← "تشغيل على أي حال"**. الملف غير موقّع رقمياً — وهذا أمر طبيعي للأدوات مفتوحة المصدر، والكود المصدري متاح كاملاً للمراجعة.
+
 حمّل الملف المناسب من [Releases](https://github.com/FutureSolutionDev/internet-monitor/releases/latest):
 
 | الملف | النظام | النوع |
@@ -70,6 +72,40 @@ scripts\install.cmd
 chmod +x internet-monitor-*
 ./internet-monitor-macos-arm64
 ```
+
+---
+
+## 🧑‍💻 التشغيل في وضع التطوير
+
+لا حاجة لبناء مسبق — شغّل مباشرة من المصدر:
+
+```bash
+git clone https://github.com/FutureSolutionDev/internet-monitor.git
+cd internet-monitor
+go mod tidy
+```
+
+**تشغيل (نسخة Tray — بدون GCC):**
+
+```bat
+scripts\run.cmd
+```
+
+أو يدوياً:
+
+```bash
+go run .
+```
+
+**إيقاف جميع النسخ الشغّالة:**
+
+```bat
+scripts\stop.cmd
+```
+
+افتح لوحة التحكم على **<http://localhost:8765>** — عدّل أي ملف `.go` وأعد التشغيل لترى التغييرات.
+
+> نسخة النافذة المستقلة (GUI) تحتاج GCC — راجع **البناء من المصدر** أدناه.
 
 ---
 

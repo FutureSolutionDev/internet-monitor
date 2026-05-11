@@ -34,6 +34,8 @@ Users often complain about internet drops without any concrete evidence — no t
 
 ## 🚀 Quick Start
 
+> **Windows SmartScreen warning?** Click **"More info" → "Run anyway"**. The binary is unsigned (no code-signing certificate). This is normal for open-source tools — the source code is fully auditable above.
+
 Download a pre-built binary from [Releases](https://github.com/FutureSolutionDev/internet-monitor/releases/latest):
 
 | File | OS | Mode |
@@ -64,6 +66,38 @@ chmod +x internet-monitor-*
 ```
 
 Open the dashboard at **<http://localhost:8765>**
+
+## 🧑‍💻 Run in Dev Mode
+
+No build step needed — run directly from source with live reload via `scripts\run.cmd`:
+
+```bash
+git clone https://github.com/FutureSolutionDev/internet-monitor.git
+cd internet-monitor
+go mod tidy
+```
+
+**Start (tray version — no GCC needed):**
+
+```bat
+scripts\run.cmd
+```
+
+Or manually:
+
+```bash
+go run .
+```
+
+**Stop all running instances:**
+
+```bat
+scripts\stop.cmd
+```
+
+Open the dashboard at **<http://localhost:8765>** — edit any `.go` file, re-run to see changes.
+
+> The native window (GUI) version requires GCC — see **Build from Source** below.
 
 ## 🛠️ Build from Source
 

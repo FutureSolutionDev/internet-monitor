@@ -9,6 +9,7 @@ import (
 	"internet-monitor/config"
 	"internet-monitor/logger"
 	"internet-monitor/monitor"
+	"internet-monitor/startup"
 	"io"
 	"net"
 	"net/http"
@@ -229,6 +230,7 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/test-notification", s.serveTestNotification)
 	mux.HandleFunc("/api/test-webhook", s.serveTestWebhook)
 	mux.HandleFunc("/api/update", s.serveUpdate)
+	mux.HandleFunc("/api/startup", s.serveStartup)
 
 	go http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", s.port), mux)
 }
@@ -583,6 +585,38 @@ func (s *Server) serveTestWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.Write([]byte(`{"ok":true}`))
+}
+
+func (s *Server) serveStartup(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	switch r.Method {
+	case http.MethodGet:
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"supported": startup.Supported(),
+			"enabled":   startup.IsEnabled(),
+		})
+
+	case http.MethodPost:
+		var req struct {
+			Enabled bool `json:"enabled"`
+		}
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &req)
+
+		if err := startup.SetEnabled(req.Enabled); err != nil {
+			resp, _ := json.Marshal(map[string]interface{}{"ok": false, "error": err.Error()})
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write(resp)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":      true,
+			"enabled": startup.IsEnabled(),
+		})
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {
