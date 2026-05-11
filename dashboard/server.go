@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"internet-monitor/config"
 	"internet-monitor/logger"
-	"internet-monitor/monitor"
 	"internet-monitor/startup"
+	"internet-monitor/types"
 	"io"
 	"net"
 	"net/http"
@@ -242,7 +242,7 @@ func (s *Server) URL() string {
 
 // ── Public update methods ─────────────────────────────────────
 
-func (s *Server) UpdateTick(result monitor.CheckResult, status monitor.Status) {
+func (s *Server) UpdateTick(result types.CheckResult, status types.Status) {
 	s.stateMu.Lock()
 	s.status = status.String()
 	s.latencyMs = result.LatencyMs
@@ -251,7 +251,7 @@ func (s *Server) UpdateTick(result monitor.CheckResult, status monitor.Status) {
 	s.httpOK = result.HTTPOK
 	s.dnsOK = result.DNSOK
 	s.totalChecks++
-	if status == monitor.StatusConnected {
+	if status == types.StatusConnected {
 		s.connectedTicks++
 	}
 	s.latencyHistory = append(s.latencyHistory, result.LatencyMs)
@@ -262,7 +262,7 @@ func (s *Server) UpdateTick(result monitor.CheckResult, status monitor.Status) {
 	s.broadcast("tick")
 }
 
-func (s *Server) AddEvent(event monitor.Event) {
+func (s *Server) AddEvent(event types.Event) {
 	entry := EventEntry{
 		Time:       event.Timestamp.Format("15:04:05"),
 		EventType:  event.EventType,
