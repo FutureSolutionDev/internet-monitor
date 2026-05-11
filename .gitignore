@@ -2,3 +2,5 @@ logs
 *.exe
 config.json
 *.exe*
+.serena
+.specify
