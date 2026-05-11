@@ -2,9 +2,6 @@ package tray
 
 import (
 	"fmt"
-	"internet-monitor/config"
-	"internet-monitor/core"
-	"internet-monitor/logger"
 	"internet-monitor/monitor"
 	"time"
 
@@ -12,15 +9,8 @@ import (
 )
 
 type Tray struct {
-	cfg     *config.Config
-	checker *monitor.Checker
-	lgr     *logger.Logger
 	dashURL string
-
-	// Called on every check cycle (for dashboard updates)
-	OnTick  func(result monitor.CheckResult, status monitor.Status)
-	// Called when status changes (for dashboard events)
-	OnEvent func(event monitor.Event)
+	logDir  string
 
 	mStatus    *systray.MenuItem
 	mLastEvent *systray.MenuItem
@@ -29,8 +19,8 @@ type Tray struct {
 	mExit      *systray.MenuItem
 }
 
-func New(cfg *config.Config, checker *monitor.Checker, lgr *logger.Logger, dashURL string) *Tray {
-	return &Tray{cfg: cfg, checker: checker, lgr: lgr, dashURL: dashURL}
+func New(logDir, dashURL string) *Tray {
+	return &Tray{logDir: logDir, dashURL: dashURL}
 }
 
 func (t *Tray) OnReady() {
@@ -47,7 +37,6 @@ func (t *Tray) OnReady() {
 	systray.AddSeparator()
 	t.mExit = systray.AddMenuItem("Exit", "Stop monitoring and exit")
 
-	go t.monitorLoop()
 	go t.handleMenu()
 }
 
@@ -59,76 +48,11 @@ func (t *Tray) handleMenu() {
 		case <-t.mOpenDash.ClickedCh:
 			OpenURL(t.dashURL)
 		case <-t.mOpenLogs.ClickedCh:
-			OpenFolder(t.cfg.LogDir)
+			OpenFolder(t.logDir)
 		case <-t.mExit.ClickedCh:
 			systray.Quit()
 		}
 	}
-}
-
-func (t *Tray) monitorLoop() {
-	var currentStatus *monitor.Status
-	var statusSince time.Time
-	consecutiveFails := 0
-
-	t.runCheck(&currentStatus, &statusSince, &consecutiveFails)
-
-	ticker := time.NewTicker(t.cfg.CheckInterval())
-	defer ticker.Stop()
-	for range ticker.C {
-		t.runCheck(&currentStatus, &statusSince, &consecutiveFails)
-	}
-}
-
-func (t *Tray) runCheck(currentStatus **monitor.Status, statusSince *time.Time, consecutiveFails *int) {
-	result := t.checker.Check()
-	newStatus := t.determineStatus(result, consecutiveFails)
-
-	// Notify dashboard of every tick
-	if t.OnTick != nil {
-		t.OnTick(result, newStatus)
-	}
-
-	if *currentStatus == nil || **currentStatus != newStatus {
-		duration := 0.0
-		if !statusSince.IsZero() {
-			duration = time.Since(*statusSince).Seconds()
-		}
-		*statusSince = time.Now()
-
-		event := monitor.Event{
-			Timestamp:       result.Timestamp,
-			EventType:       newStatus.String(),
-			DurationSeconds: duration,
-			Reason: monitor.EventReason{
-				TCPPingFailed: !result.TCPPingOK,
-				HTTPFailed:    !result.HTTPOK,
-				DNSFailed:     !result.DNSOK,
-				PacketLossPct: result.PacketLoss,
-				AvgLatencyMs:  result.LatencyMs,
-			},
-		}
-		t.lgr.Log(event)
-
-		if t.OnEvent != nil {
-			t.OnEvent(event)
-		}
-
-		t.applyStatus(newStatus, result)
-
-		if *currentStatus != nil {
-			go Notify(t.notifyTitle(newStatus), t.notifyBody(result))
-		}
-
-		s := newStatus
-		*currentStatus = &s
-	} else {
-		t.updateTooltip(newStatus, result)
-	}
-}
-
-func (t *Tray) determineStatus(result monitor.CheckResult, consecutiveFails *int) monitor.Status {
-	return core.DetermineStatus(result, consecutiveFails, t.cfg)
 }
 
 func (t *Tray) applyStatus(status monitor.Status, result monitor.CheckResult) {
@@ -150,39 +74,4 @@ func (t *Tray) applyStatus(status monitor.Status, result monitor.CheckResult) {
 func (t *Tray) updateTooltip(status monitor.Status, result monitor.CheckResult) {
 	systray.SetTooltip(fmt.Sprintf("Internet Monitor — %s | Loss: %.0f%% | %dms",
 		status, result.PacketLoss, result.LatencyMs))
-}
-
-func (t *Tray) notifyTitle(status monitor.Status) string {
-	switch status {
-	case monitor.StatusConnected:
-		return "Internet Restored"
-	case monitor.StatusDegraded:
-		return "Connection Degraded"
-	default:
-		return "Internet Disconnected"
-	}
-}
-
-func (t *Tray) notifyBody(result monitor.CheckResult) string {
-	parts := []string{}
-	if !result.TCPPingOK {
-		parts = append(parts, "TCP ping failed")
-	}
-	if !result.HTTPOK {
-		parts = append(parts, "HTTP failed")
-	}
-	if !result.DNSOK {
-		parts = append(parts, "DNS failed")
-	}
-	if len(parts) == 0 {
-		return fmt.Sprintf("Latency: %dms  |  Loss: %.0f%%", result.LatencyMs, result.PacketLoss)
-	}
-	msg := ""
-	for i, p := range parts {
-		if i > 0 {
-			msg += ", "
-		}
-		msg += p
-	}
-	return msg
 }

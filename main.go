@@ -2,6 +2,7 @@ package main
 
 import (
 	"internet-monitor/config"
+	"internet-monitor/core"
 	"internet-monitor/dashboard"
 	"internet-monitor/logger"
 	"internet-monitor/monitor"
@@ -10,7 +11,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/getlantern/systray"
 )
@@ -40,46 +40,38 @@ func main() {
 	}
 
 	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir, Version)
-
-	// Wire update callbacks
 	dash.OnApplyUpdate = updater.Apply
-	dash.OnRestartApp  = updater.Restart
-
+	dash.OnRestartApp = updater.Restart
+	dash.OnTestWebhook = lgr.SendTestWebhook
 	dash.Start()
 
-	// Background update checker: first check after 30s, then every 6h
-	go func() {
-		time.Sleep(30 * time.Second)
-		for {
-			if info, err := updater.Check(Version); err == nil && info.HasUpdate {
-				lgr.AppLog("UPDATE available: %s (current: %s)", info.LatestVersion, info.CurrentVersion)
-				dash.SetUpdateInfo(&dashboard.UpdateInfo{
-					HasUpdate:      info.HasUpdate,
-					LatestVersion:  info.LatestVersion,
-					CurrentVersion: info.CurrentVersion,
-					DownloadURL:    info.DownloadURL,
-					ReleaseNotes:   info.ReleaseNotes,
-				})
-			}
-			time.Sleep(6 * time.Hour)
-		}
-	}()
+	checker := monitor.NewChecker(cfg)
+	t := tray.New(cfg.LogDir, dash.URL())
+
+	engine := core.New(cfg, checker, lgr, Version)
+	engine.Notifier = core.MultiNotifier{
+		tray.NewNotifier(t),
+		dashboard.NewNotifier(dash),
+	}
+	engine.OnUpdateAvailable = func(info *updater.Info) {
+		dash.SetUpdateInfo(&dashboard.UpdateInfo{
+			HasUpdate:      info.HasUpdate,
+			LatestVersion:  info.LatestVersion,
+			CurrentVersion: info.CurrentVersion,
+			DownloadURL:    info.DownloadURL,
+			ReleaseNotes:   info.ReleaseNotes,
+		})
+	}
 
 	if png := dashboard.FaviconPNG(); len(png) > 0 {
 		tray.SetCustomIcon(png)
 	}
-
 	dash.OnTestNotification = func() {
 		tray.Notify("اختبار الإشعار / Test Notification", "🔔 الإشعار يعمل بشكل صحيح")
 	}
-	dash.OnTestWebhook = lgr.SendTestWebhook
 
-	checker := monitor.NewChecker(cfg)
-	t := tray.New(cfg, checker, lgr, dash.URL())
-	t.OnTick  = dash.UpdateTick
-	t.OnEvent = dash.AddEvent
-
+	engine.Start()
 	systray.Run(t.OnReady, t.OnExit)
-	// Explicit exit — kills all background goroutines cleanly
+	engine.Stop()
 	os.Exit(0)
 }
