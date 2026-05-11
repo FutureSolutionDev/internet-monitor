@@ -546,12 +546,37 @@ async function testAllTargets() {
   }
 }
 
+// Error code → human-readable text (bilingual)
+const ERR_CODES = {
+  ar: {
+    timeout:       'لا استجابة — انتهى الوقت',
+    refused:       'البورت مغلق أو الخادم رفض الاتصال',
+    not_found:     'العنوان غير موجود (DNS)',
+    unreachable:   'الشبكة غير متاحة',
+    no_permission: 'لا توجد صلاحية للوصول',
+    error:         'خطأ في الاتصال',
+  },
+  en: {
+    timeout:       'No response — timed out',
+    refused:       'Port closed or connection refused',
+    not_found:     'Host not found (DNS)',
+    unreachable:   'Network unreachable',
+    no_permission: 'Access denied',
+    error:         'Connection error',
+  }
+};
+
+function translateError(code) {
+  const codes = ERR_CODES[lang] || ERR_CODES.en;
+  return codes[code] || code;
+}
+
 function showTestResult(id, r) {
   if (!r) { setResult(id, null, ''); return; }
   if (r.ok) {
     setResult(id, 'test-ok', '✅ ' + r.latency_ms + 'ms');
   } else {
-    setResult(id, 'test-warn', '⚠️ ' + (r.error || 'failed'));
+    setResult(id, 'test-warn', '⚠️ ' + translateError(r.error));
   }
 }
 

@@ -660,22 +660,44 @@ func (s *Server) broadcast(msgType string) {
 }
 
 // simplifyError extracts a short, human-readable error from a net error string.
+// simplifyError maps raw Go/Windows network errors to short codes.
+// The frontend (app.js errCodes) translates these codes into user-friendly text.
 func simplifyError(e string) string {
 	e = strings.ToLower(e)
 	switch {
-	case strings.Contains(e, "timeout") || strings.Contains(e, "i/o timeout"):
+	// Timeout — server didn't respond in time
+	case strings.Contains(e, "timeout"),
+		strings.Contains(e, "i/o timeout"),
+		strings.Contains(e, "timed out"),
+		strings.Contains(e, "did not properly respond"):
 		return "timeout"
-	case strings.Contains(e, "connection refused"):
+
+	// Connection refused — port closed or firewall blocked
+	// "connectex" is Windows-specific for refused/timeout
+	case strings.Contains(e, "connection refused"),
+		strings.Contains(e, "actively refused"),
+		strings.Contains(e, "connectex"):
 		return "refused"
-	case strings.Contains(e, "no such host") || strings.Contains(e, "no route"):
-		return "not found"
-	case strings.Contains(e, "network unreachable"):
+
+	// DNS / host not found
+	case strings.Contains(e, "no such host"),
+		strings.Contains(e, "no route"),
+		strings.Contains(e, "name or service not known"),
+		strings.Contains(e, "name resolution"):
+		return "not_found"
+
+	// Network-level unreachable
+	case strings.Contains(e, "network unreachable"),
+		strings.Contains(e, "host unreachable"),
+		strings.Contains(e, "network is down"):
 		return "unreachable"
+
+	// Permission / firewall
+	case strings.Contains(e, "permission denied"),
+		strings.Contains(e, "access is denied"):
+		return "no_permission"
+
 	default:
-		// Return first 40 chars to avoid flooding the UI
-		if len(e) > 40 {
-			return e[:40] + "…"
-		}
-		return e
+		return "error"
 	}
 }
