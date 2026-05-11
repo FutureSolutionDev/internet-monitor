@@ -115,6 +115,11 @@ const LANGS = {
     startup_off: "تم الإيقاف",
     startup_err: "❌ فشل",
     nav_speed: "قياس السرعة",
+    stab_monitoring: "المراقبة",
+    stab_targets: "العناوين",
+    stab_notifs: "الإشعارات",
+    stab_speedtest: "قياس السرعة",
+    grp_webhook: "الـ Webhook",
     grp_speed_settings: "إعدادات قياس السرعة",
     speed_privacy_note: "يستخدم speed.cloudflare.com",
     speed_dl_targets: "عناوين اختبار التنزيل",
@@ -245,6 +250,11 @@ const LANGS = {
     startup_off: "Disabled",
     startup_err: "❌ Failed",
     nav_speed: "Speed Test",
+    stab_monitoring: "Monitoring",
+    stab_targets: "Targets",
+    stab_notifs: "Notifications",
+    stab_speedtest: "Speed Test",
+    grp_webhook: "Webhook",
     grp_speed_settings: "Speed Test Settings",
     speed_privacy_note: "Uses speed.cloudflare.com — click for privacy policy",
     speed_dl_targets: "Download Test Targets",
@@ -330,8 +340,15 @@ function showTab(name) {
   document.getElementById("tab-" + name).classList.add("active");
   document.querySelector('[data-tab="' + name + '"]').classList.add("active");
   if (name === "logs") loadLogDates();
-  if (name === "settings") loadSettings();
+  if (name === "settings") { loadSettings(); showSettingsTab('monitoring'); }
   if (name === "speed") loadSpeedHistory();
+}
+
+function showSettingsTab(name) {
+  document.querySelectorAll(".stab-content").forEach(el => el.classList.remove("active"));
+  document.querySelectorAll(".settings-nav-btn").forEach(el => el.classList.remove("active"));
+  document.getElementById("stab-" + name)?.classList.add("active");
+  document.querySelector('[data-stab="' + name + '"]')?.classList.add("active");
 }
 
 // ── Chart ──────────────────────────────────────────────────────
@@ -1132,8 +1149,10 @@ async function toggleStartup(enabled) {
 
 // ── Save settings ──────────────────────────────────────────────
 async function saveSettings() {
-  const msg = document.getElementById("save-msg");
-  msg.textContent = "";
+  const allMsgs = ['save-msg','save-msg-targets','save-msg-notifs','save-msg-speed']
+    .map(id => document.getElementById(id)).filter(Boolean);
+  const msg = allMsgs.find(el => el.offsetParent !== null) || allMsgs[0];
+  if (msg) msg.textContent = "";
 
   // Sync all target arrays from inputs
   pingTargets.forEach((_, i) => {

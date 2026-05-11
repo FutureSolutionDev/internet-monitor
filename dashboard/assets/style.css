@@ -146,6 +146,14 @@ select:focus, input:focus { border-color: var(--blue); }
 /* Warning banner */
 .warn-banner { background: rgba(234,179,8,.08); border: 1px solid rgba(234,179,8,.3); border-radius: 8px; padding: 10px 14px; display: flex; align-items: flex-start; gap: 8px; margin-bottom: 16px; font-size: 13px; color: var(--yellow); }
 
+/* Settings Inner Tabs */
+.settings-nav { display: flex; gap: 4px; padding: 16px 20px 0; border-bottom: 1px solid var(--border); background: var(--bg); }
+.settings-nav-btn { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); font-size: 13px; font-weight: 500; padding: 8px 14px; cursor: pointer; margin-bottom: -1px; border-radius: 6px 6px 0 0; transition: color .15s, background .15s; }
+.settings-nav-btn:hover { color: var(--text); background: var(--bg2); }
+.settings-nav-btn.active { color: var(--blue); border-bottom-color: var(--blue); background: var(--bg2); }
+.stab-content { display: none; }
+.stab-content.active { display: block; }
+
 /* Speed Test Tab */
 .speed-test-panel { display: flex; flex-direction: column; gap: 20px; }
 .speed-controls { display: flex; gap: 10px; align-items: center; }

@@ -199,176 +199,211 @@
 ══════════════════════════════════════════ -->
 <div class="tab-content" id="tab-settings">
 <div class="content">
-  <div class="section">
-    <div class="section-title" data-i18n="settings_title">الإعدادات</div>
 
-    <!-- Test warning banner (shown when untested) -->
-    <div id="test-warn-banner" class="warn-banner" style="display:none">
-      <span>⚠️</span>
-      <span data-i18n="test_warn_banner">العناوين المؤثرة على الأداء لم تُختبر بعد — انقر "اختبار الكل" للتحقق قبل الحفظ</span>
-    </div>
-
-    <!-- ── Monitoring behaviour ── -->
-    <div class="settings-group">
-      <div class="settings-group-title" data-i18n="grp_behaviour">سلوك المراقبة</div>
-      <div class="settings-grid">
-        <div class="field">
-          <label data-i18n="check_interval">فترة الفحص (ثانية)</label>
-          <input type="number" id="cfg-interval" min="1" max="60">
-        </div>
-        <div class="field">
-          <label data-i18n="fail_threshold">عدد الفشل المتتالي للانقطاع</label>
-          <input type="number" id="cfg-fail-threshold" min="1" max="20">
-          <div class="field-note" data-i18n="fail_threshold_note">بعد كم فشل متتالي يُعتبر الاتصال منقطعاً</div>
-        </div>
-        <div class="field">
-          <label data-i18n="loss_threshold">حد فقدان الحزم (%)</label>
-          <input type="number" id="cfg-loss-threshold" min="0" max="100">
-          <div class="field-note" data-i18n="loss_threshold_note">فوق هذه النسبة يُعتبر الاتصال ضعيفاً</div>
-        </div>
-        <div class="field">
-          <label data-i18n="latency_threshold">حد زمن الاستجابة (مللي ثانية)</label>
-          <input type="number" id="cfg-latency-threshold" min="0">
-          <div class="field-note" data-i18n="latency_threshold_note">فوق هذا الحد يُعتبر الاتصال ضعيفاً</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Targets (affect performance — must test) ── -->
-    <div class="settings-group">
-      <div class="settings-group-title">
-        <span data-i18n="grp_targets">العناوين المستهدفة</span>
-        <span class="tag-perf" data-i18n="tag_affects_perf">تؤثر على الأداء</span>
-      </div>
-
-      <!-- Ping targets list -->
-      <div class="field full-width">
-        <label data-i18n="ping_targets_label">عناوين TCP Ping</label>
-        <div id="ping-targets-container" class="targets-container"></div>
-        <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addPingTarget()" data-i18n="add_target">+ إضافة عنوان</button>
-        <div class="field-note" data-i18n="ping_targets_note">صيغة: host:port — مثال: 8.8.8.8:53</div>
-      </div>
-
-      <!-- HTTP targets list -->
-      <div class="field full-width">
-        <label data-i18n="http_targets_label">عناوين HTTP للاختبار</label>
-        <div id="http-targets-container" class="targets-container"></div>
-        <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addHttpTarget()" data-i18n="add_target">+ إضافة عنوان</button>
-        <div class="field-note" data-i18n="http_targets_note">يجب أن يرجع 200 أو 204 — يُجرَّب الأول ثم الثاني عند الفشل</div>
-      </div>
-
-      <!-- DNS targets list -->
-      <div class="field full-width">
-        <label data-i18n="dns_targets_label">نطاقات اختبار DNS</label>
-        <div id="dns-targets-container" class="targets-container"></div>
-        <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addDnsTarget()" data-i18n="add_target">+ إضافة نطاق</button>
-        <div class="field-note" data-i18n="dns_targets_note">مثال: www.google.com — يُجرَّب الأول ثم الثاني عند الفشل</div>
-      </div>
-
-      <!-- Test All button -->
-      <div class="field full-width">
-        <button class="btn btn-secondary" id="test-all-btn" onclick="testAllTargets()">
-          <span data-i18n="test_all">⚡ اختبار جميع العناوين</span>
-        </button>
-        <span class="test-result" id="test-all-result"></span>
-      </div>
-    </div>
-
-    <!-- ── Storage & Notifications ── -->
-    <div class="settings-group">
-      <div class="settings-group-title" data-i18n="grp_storage">التخزين والإشعارات</div>
-      <div class="settings-grid">
-        <div class="field">
-          <label data-i18n="log_dir">مجلد السجلات</label>
-          <input type="text" id="cfg-log-dir">
-        </div>
-        <div class="field">
-          <label>
-            <span data-i18n="dashboard_port">منفذ لوحة التحكم</span>
-            <span class="tag-restart" data-i18n="requires_restart">يتطلب إعادة تشغيل</span>
-          </label>
-          <input type="number" id="cfg-port" min="1024" max="65535">
-        </div>
-        <div class="field full-width">
-          <label data-i18n="webhook_url">عنوان الـ Webhook (اختياري)</label>
-          <input type="text" id="cfg-webhook" placeholder="https://discord.com/api/webhooks/... أو https://hooks.slack.com/..."
-                 oninput="validateWebhookURL(this.value)">
-          <div id="webhook-url-warn" style="display:none;font-size:11px;color:var(--yellow);margin-top:3px">
-            ⚠️ <span data-i18n="webhook_unsupported">يُدعم Discord و Slack فقط</span>
-          </div>
-          <div class="field-note" data-i18n="webhook_note">يُرسل إشعار JSON عند كل حدث — Discord / Slack / أي خدمة</div>
-          <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-            <button class="btn btn-secondary btn-sm" id="test-webhook-btn" onclick="testWebhook()">
-              📡 <span data-i18n="test_webhook">اختبار الـ Webhook</span>
-            </button>
-            <span class="test-result" id="webhook-test-result"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Startup ── -->
-    <div class="settings-group" id="startup-group" style="display:none">
-      <div class="settings-group-title" data-i18n="grp_startup">System Startup</div>
-      <div class="settings-grid">
-        <div class="field full-width">
-          <label data-i18n="startup_label">Run at Windows Startup</label>
-          <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
-            <label class="toggle-switch">
-              <input type="checkbox" id="cfg-startup" onchange="toggleStartup(this.checked)">
-              <span class="toggle-slider"></span>
-            </label>
-            <span id="startup-status" class="test-result"></span>
-          </div>
-          <div class="field-note" data-i18n="startup_note">Starts automatically when Windows boots</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Notification Test ── -->
-    <div class="settings-group">
-      <div class="settings-group-title" data-i18n="grp_notif_test">اختبار الإشعارات والصوت</div>
-      <div class="settings-grid">
-        <div class="field full-width">
-          <div class="field-note" data-i18n="notif_test_note">يشغّل النغمة ويعرض إشعار تجريبي على سطح المكتب</div>
-          <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-            <button class="btn btn-secondary" id="test-notif-btn" onclick="testNotification()">
-              🔔 <span data-i18n="test_notif">اختبار الإشعار والصوت</span>
-            </button>
-            <span class="test-result" id="test-notif-result"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="settings-footer">
-      <button class="btn btn-primary" onclick="saveSettings()" data-i18n="settings_save">حفظ الإعدادات</button>
-      <span id="save-msg"></span>
-    </div>
-
-    <!-- ── Speed Test Settings ── -->
-    <div class="settings-group">
-      <div class="settings-group-title" data-i18n="grp_speed_settings">إعدادات قياس السرعة</div>
-      <div class="field-note" style="margin-bottom:12px;color:var(--muted);font-size:12px" data-i18n="speed_privacy_note">يستخدم speed.cloudflare.com — اضغط هنا للاطلاع على سياسة الخصوصية</div>
-      <div class="settings-grid">
-        <div class="field full-width">
-          <label data-i18n="speed_dl_targets">عناوين اختبار التنزيل</label>
-          <div id="speed-targets-container" class="targets-container"></div>
-          <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addSpeedTarget()" data-i18n="add_target">+ إضافة عنوان</button>
-          <div class="field-note" data-i18n="speed_targets_note">الافتراضي: speed.cloudflare.com/__down</div>
-        </div>
-        <div class="field">
-          <label data-i18n="speed_parallel">اتصالات متوازية (1–8)</label>
-          <input type="number" id="cfg-speed-parallel" min="1" max="8" value="4">
-        </div>
-        <div class="field">
-          <label data-i18n="speed_alert_threshold">حد التنبيه (Mbps، 0 = معطّل)</label>
-          <input type="number" id="cfg-speed-alert" min="0" step="1" value="0">
-        </div>
-      </div>
-    </div>
-
+  <!-- ── Inner Settings Tabs ── -->
+  <div class="settings-nav">
+    <button class="settings-nav-btn active" data-stab="monitoring"  onclick="showSettingsTab('monitoring')"  data-i18n="stab_monitoring">المراقبة</button>
+    <button class="settings-nav-btn"         data-stab="targets"    onclick="showSettingsTab('targets')"    data-i18n="stab_targets">العناوين</button>
+    <button class="settings-nav-btn"         data-stab="notifs"     onclick="showSettingsTab('notifs')"     data-i18n="stab_notifs">الإشعارات</button>
+    <button class="settings-nav-btn"         data-stab="speedtest"  onclick="showSettingsTab('speedtest')"  data-i18n="stab_speedtest">قياس السرعة</button>
   </div>
+
+  <!-- ══ Monitoring ══ -->
+  <div class="stab-content active" id="stab-monitoring">
+    <div class="section">
+      <div class="settings-group">
+        <div class="settings-group-title" data-i18n="grp_behaviour">سلوك المراقبة</div>
+        <div class="settings-grid">
+          <div class="field">
+            <label data-i18n="check_interval">فترة الفحص (ثانية)</label>
+            <input type="number" id="cfg-interval" min="1" max="60">
+          </div>
+          <div class="field">
+            <label data-i18n="fail_threshold">عدد الفشل المتتالي للانقطاع</label>
+            <input type="number" id="cfg-fail-threshold" min="1" max="20">
+            <div class="field-note" data-i18n="fail_threshold_note">بعد كم فشل متتالي يُعتبر الاتصال منقطعاً</div>
+          </div>
+          <div class="field">
+            <label data-i18n="loss_threshold">حد فقدان الحزم (%)</label>
+            <input type="number" id="cfg-loss-threshold" min="0" max="100">
+            <div class="field-note" data-i18n="loss_threshold_note">فوق هذه النسبة يُعتبر الاتصال ضعيفاً</div>
+          </div>
+          <div class="field">
+            <label data-i18n="latency_threshold">حد زمن الاستجابة (مللي ثانية)</label>
+            <input type="number" id="cfg-latency-threshold" min="0">
+            <div class="field-note" data-i18n="latency_threshold_note">فوق هذا الحد يُعتبر الاتصال ضعيفاً</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title" data-i18n="grp_storage">التخزين</div>
+        <div class="settings-grid">
+          <div class="field">
+            <label data-i18n="log_dir">مجلد السجلات</label>
+            <input type="text" id="cfg-log-dir">
+          </div>
+          <div class="field">
+            <label>
+              <span data-i18n="dashboard_port">منفذ لوحة التحكم</span>
+              <span class="tag-restart" data-i18n="requires_restart">يتطلب إعادة تشغيل</span>
+            </label>
+            <input type="number" id="cfg-port" min="1024" max="65535">
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-footer">
+        <button class="btn btn-primary" onclick="saveSettings()" data-i18n="settings_save">حفظ الإعدادات</button>
+        <span id="save-msg"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Targets ══ -->
+  <div class="stab-content" id="stab-targets">
+    <div class="section">
+      <div id="test-warn-banner" class="warn-banner" style="display:none">
+        <span>⚠️</span>
+        <span data-i18n="test_warn_banner">العناوين المؤثرة على الأداء لم تُختبر بعد — انقر "اختبار الكل" للتحقق قبل الحفظ</span>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title">
+          <span data-i18n="grp_targets">العناوين المستهدفة</span>
+          <span class="tag-perf" data-i18n="tag_affects_perf">تؤثر على الأداء</span>
+        </div>
+
+        <div class="field full-width">
+          <label data-i18n="ping_targets_label">عناوين TCP Ping</label>
+          <div id="ping-targets-container" class="targets-container"></div>
+          <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addPingTarget()" data-i18n="add_target">+ إضافة عنوان</button>
+          <div class="field-note" data-i18n="ping_targets_note">صيغة: host:port — مثال: 8.8.8.8:53</div>
+        </div>
+
+        <div class="field full-width">
+          <label data-i18n="http_targets_label">عناوين HTTP للاختبار</label>
+          <div id="http-targets-container" class="targets-container"></div>
+          <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addHttpTarget()" data-i18n="add_target">+ إضافة عنوان</button>
+          <div class="field-note" data-i18n="http_targets_note">يجب أن يرجع 200 أو 204 — يُجرَّب الأول ثم الثاني عند الفشل</div>
+        </div>
+
+        <div class="field full-width">
+          <label data-i18n="dns_targets_label">نطاقات اختبار DNS</label>
+          <div id="dns-targets-container" class="targets-container"></div>
+          <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addDnsTarget()" data-i18n="add_target">+ إضافة نطاق</button>
+          <div class="field-note" data-i18n="dns_targets_note">مثال: www.google.com — يُجرَّب الأول ثم الثاني عند الفشل</div>
+        </div>
+
+        <div class="field full-width">
+          <button class="btn btn-secondary" id="test-all-btn" onclick="testAllTargets()">
+            <span data-i18n="test_all">⚡ اختبار جميع العناوين</span>
+          </button>
+          <span class="test-result" id="test-all-result"></span>
+        </div>
+      </div>
+
+      <div class="settings-footer">
+        <button class="btn btn-primary" onclick="saveSettings()" data-i18n="settings_save">حفظ الإعدادات</button>
+        <span id="save-msg-targets"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Notifications ══ -->
+  <div class="stab-content" id="stab-notifs">
+    <div class="section">
+      <div class="settings-group">
+        <div class="settings-group-title" data-i18n="grp_webhook">الـ Webhook</div>
+        <div class="settings-grid">
+          <div class="field full-width">
+            <label data-i18n="webhook_url">عنوان الـ Webhook (اختياري)</label>
+            <input type="text" id="cfg-webhook" placeholder="https://discord.com/api/webhooks/... أو https://hooks.slack.com/..."
+                   oninput="validateWebhookURL(this.value)">
+            <div id="webhook-url-warn" style="display:none;font-size:11px;color:var(--yellow);margin-top:3px">
+              ⚠️ <span data-i18n="webhook_unsupported">يُدعم Discord و Slack فقط</span>
+            </div>
+            <div class="field-note" data-i18n="webhook_note">يُرسل إشعار JSON عند كل حدث — Discord / Slack</div>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+              <button class="btn btn-secondary btn-sm" id="test-webhook-btn" onclick="testWebhook()">
+                📡 <span data-i18n="test_webhook">اختبار الـ Webhook</span>
+              </button>
+              <span class="test-result" id="webhook-test-result"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <div class="settings-group-title" data-i18n="grp_notif_test">اختبار الإشعارات والصوت</div>
+        <div class="settings-grid">
+          <div class="field full-width">
+            <div class="field-note" data-i18n="notif_test_note">يشغّل النغمة ويعرض إشعار تجريبي على سطح المكتب</div>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+              <button class="btn btn-secondary" id="test-notif-btn" onclick="testNotification()">
+                🔔 <span data-i18n="test_notif">اختبار الإشعار والصوت</span>
+              </button>
+              <span class="test-result" id="test-notif-result"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-group" id="startup-group" style="display:none">
+        <div class="settings-group-title" data-i18n="grp_startup">System Startup</div>
+        <div class="settings-grid">
+          <div class="field full-width">
+            <label data-i18n="startup_label">Run at Windows Startup</label>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
+              <label class="toggle-switch">
+                <input type="checkbox" id="cfg-startup" onchange="toggleStartup(this.checked)">
+                <span class="toggle-slider"></span>
+              </label>
+              <span id="startup-status" class="test-result"></span>
+            </div>
+            <div class="field-note" data-i18n="startup_note">Starts automatically when Windows boots</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-footer">
+        <button class="btn btn-primary" onclick="saveSettings()" data-i18n="settings_save">حفظ الإعدادات</button>
+        <span id="save-msg-notifs"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ Speed Test ══ -->
+  <div class="stab-content" id="stab-speedtest">
+    <div class="section">
+      <div class="settings-group">
+        <div class="settings-group-title" data-i18n="grp_speed_settings">إعدادات قياس السرعة</div>
+        <div class="field-note" style="margin-bottom:12px;color:var(--muted);font-size:12px" data-i18n="speed_privacy_note">يستخدم speed.cloudflare.com</div>
+        <div class="settings-grid">
+          <div class="field full-width">
+            <label data-i18n="speed_dl_targets">عناوين اختبار التنزيل</label>
+            <div id="speed-targets-container" class="targets-container"></div>
+            <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addSpeedTarget()" data-i18n="add_target">+ إضافة عنوان</button>
+            <div class="field-note" data-i18n="speed_targets_note">الافتراضي: speed.cloudflare.com/__down</div>
+          </div>
+          <div class="field">
+            <label data-i18n="speed_parallel">اتصالات متوازية (1–8)</label>
+            <input type="number" id="cfg-speed-parallel" min="1" max="8" value="4">
+          </div>
+          <div class="field">
+            <label data-i18n="speed_alert_threshold">حد التنبيه (Mbps، 0 = معطّل)</label>
+            <input type="number" id="cfg-speed-alert" min="0" step="1" value="0">
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-footer">
+        <button class="btn btn-primary" onclick="saveSettings()" data-i18n="settings_save">حفظ الإعدادات</button>
+        <span id="save-msg-speed"></span>
+      </div>
+    </div>
+  </div>
+
 </div>
 </div>
 
