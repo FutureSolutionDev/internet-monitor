@@ -100,7 +100,7 @@ const LANGS = {
   }
 };
 
-let lang = localStorage.getItem('lang') || 'ar';
+let lang = localStorage.getItem('lang') || 'en';
 function t(k) { return LANGS[lang][k] || k; }
 
 function applyLang() {

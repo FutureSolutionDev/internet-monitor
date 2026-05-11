@@ -1,94 +1,136 @@
-# مراقب الإنترنت — Internet Monitor
+# 🌐 Internet Monitor
 
-أداة مجانية بتشتغل في الخلفية وبتراقب اتصال النت عندك.
-كل ما النت بينقطع أو بيتعمل حاجة، بتسجّل الحدث تلقائي بالوقت والسبب والمدة، وفيه dashboard في المتصفح بالبيانات live.
+[![Build & Release](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml/badge.svg)](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev)
+[![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#-build-from-source)
 
----
+> [🇸🇦 اقرأ بالعربية](README.ar.md)
 
-## بتعمل إيه بالظبط؟
+**An open-source tool for real-time internet connectivity monitoring.**
 
-- بتفحص النت كل 5 ثواني (ممكن تعدّلها)
-- بتكتشف 3 حالات:
-  - 🟢 **متصل** — كل حاجة تمام
-  - 🟡 **ضعيف** — في فقدان حزم أو latency عالي
-  - 🔴 **منقطع** — النت وقع خالص
-- بتسجّل كل حدث في ملف يومي بصيغة JSONL
-- بتبعت إشعار Windows لما النت يوقع أو يرجع
-- ممكن تربطها بـ Discord / Slack / أي webhook
-- فيها dashboard في المتصفح فيه charts وإحصائيات live
+Runs silently in the background, logs every disconnection with its cause and duration, and displays a live visual dashboard in your browser with charts and instant notifications.
 
----
+## 💡 Concept & Purpose
 
-## التثبيت والتشغيل
+Users often complain about internet drops without any concrete evidence — no timestamps, no causes, no durations. **Internet Monitor** solves this practically:
 
-### الطريقة السريعة (للمستخدم العادي)
+- **End users** — Works automatically, sends instant notifications on every drop
+- **Support teams** — Full data dashboard with exportable logs
+- **Developers** — Detailed Discord/Slack webhook with complete per-check data
 
-1. حمّل ملف `internet-monitor-windows.exe`
-2. حطّه في مجلد ثابت — مثلاً: `C:\Tools\InternetMonitor\`
-3. حمّل `config.json` وحطّه جنبه في نفس المجلد
-4. دبّل كليك على `internet-monitor-windows.exe`
-5. هتلاقي أيقونة اتضافت في شريط المهام (System Tray)
-6. كليك يمين على الأيقونة ← **Open Dashboard** تفتح اللوحة في المتصفح
+## ✨ Features
 
-### عايز يشتغل تلقائي مع Windows؟
+| Feature | Details |
+| ------- | ------- |
+| 🔍 Multi-layer checking | TCP Ping + HTTP + DNS simultaneously, all configurable as arrays |
+| 📊 Live dashboard | Real-time latency chart + stats + event log with hover tooltips |
+| 🔔 Instant notifications | Windows Toast + Discord/Slack Webhook + custom alert sound |
+| 📋 Structured logs | Daily JSONL files, exportable as CSV from the dashboard |
+| 🔄 Auto-update | Checks GitHub Releases, one-click update with automatic restart |
+| 🌐 Bilingual UI | Arabic & English with full RTL support, toggle any time |
+| 🖥️ Two modes | System Tray (background) + Standalone native window |
+| 🔒 Single instance | Prevents running more than one copy at the same time |
+
+## 🚀 Quick Start
+
+Download a pre-built binary from [Releases](https://github.com/FutureSolutionDev/internet-monitor/releases/latest):
+
+| File | OS | Mode |
+| ---- | -- | ---- |
+| `internet-monitor-windows.exe` | Windows 10/11 | System Tray |
+| `internet-monitor-gui-windows.exe` | Windows 10/11 | Standalone window |
+| `internet-monitor-macos-arm64` | macOS M1/M2/M3 | System Tray |
+| `internet-monitor-macos-intel` | macOS Intel | System Tray |
+| `internet-monitor-linux` | Ubuntu/Debian | System Tray |
+
+**Windows — run once, then right-click tray icon → Open Dashboard:**
+
+```bat
+internet-monitor-windows.exe
+```
+
+**Windows — install to run automatically at startup:**
 
 ```bat
 scripts\install.cmd
 ```
 
-ده بيثبّت البرنامج ويضيفه في الـ startup عشان يشتغل كل ما تشغّل الجهاز.
+**macOS / Linux:**
 
----
+```bash
+chmod +x internet-monitor-*
+./internet-monitor-macos-arm64
+```
 
-## أيقونة الـ Tray معناها إيه؟
+Open the dashboard at **<http://localhost:8765>**
 
-| الأيقونة | يعني إيه |
-| -------- | -------- |
-| 🟢 خضرا | النت شغّال وكويس |
-| 🟡 صفرا | الاتصال ضعيف أو بطيء |
-| 🔴 حمرا | النت وقع |
+## 🛠️ Build from Source
 
----
+### Requirements
 
-## لوحة التحكم (Dashboard)
+| Tool | Version | Note |
+| ---- | ------- | ---- |
+| [Go](https://go.dev/dl/) | 1.21+ | Required |
+| GCC | any | Optional — native window version only |
 
-افتح المتصفح على: **<http://localhost:8765>**
+### Tray version — no CGO needed
 
-أو كليك يمين على الأيقونة في الـ Tray ← **Open Dashboard**
+```bash
+git clone https://github.com/FutureSolutionDev/internet-monitor.git
+cd internet-monitor
+go mod tidy
+go build -ldflags="-H=windowsgui -s -w" -o internet-monitor.exe .
+```
 
-### اللوحة فيها إيه؟
+### Native window version — requires GCC
 
-**تبويب لوحة التحكم:**
+**Windows** — install GCC once (auto-installed by the script):
 
-- بطاقة الحالة الكبيرة + زمن الاستجابة
-- درجة جودة الاتصال (A / B / C / D / F)
-- 5 بطاقات: وقت التشغيل، نسبة الاتصال، الانقطاعات، متوسط الاستجابة، عدد الفحوصات
-- رسم بياني live لزمن الاستجابة — لو وقفت الماوس عليه هيظهر tooltip
-- حالة فحوصات TCP / HTTP / DNS ونسبة فقدان الحزم
-- جدول آخر الأحداث
+```bat
+scripts\build-gui.cmd
+```
 
-**تبويب السجلات:**
+**macOS / Linux** — GCC is pre-installed:
 
-- اختار أي يوم تشوف سجله كامل
-- كل حدث فيه: الوقت، النوع، مدة الانقطاع، السبب، فقدان الحزم، زمن الاستجابة
-- زرار تصدير CSV
+```bash
+go build -ldflags="-s -w" -o internet-monitor-gui ./cmd/gui/
+```
 
-**تبويب الإعدادات:**
+### Available scripts
 
-- تعدّل كل الإعدادات من المتصفح مباشرةً
-- فيه زرار اختبار لكل عنوان قبل الحفظ
-- الحفظ فوري من غير ما تعيد التشغيل (ما عدا المنفذ)
+```text
+scripts\build.cmd        Build tray exe
+scripts\build-gui.cmd    Build native window (auto-installs GCC if missing)
+scripts\build-debug.cmd  Build with visible console (debugging)
+scripts\run.cmd          Build and run
+scripts\stop.cmd         Stop running instance
+scripts\install.cmd      Install to Windows Startup
+scripts\uninstall.cmd    Remove from Startup
+scripts\logs.cmd         Open logs folder
+```
 
----
+### CI/CD — GitHub Actions
 
-## ملف الإعدادات (config.json)
+Every push to `master` triggers automatic builds for all platforms:
+
+```text
+Windows Tray  →  cross-compiled on Linux (CGO disabled)
+Windows GUI   →  windows-latest runner
+macOS         →  macos-latest (arm64 native + intel cross-compile)
+Linux         →  ubuntu-22.04 (WebKitGTK 4.0)
+```
+
+## ⚙️ Configuration
+
+`config.json` is created automatically on first run. Edit it directly or use the **Settings tab** in the dashboard.
 
 ```json
 {
   "check_interval_sec": 5,
-  "ping_targets": ["8.8.8.8:53", "1.1.1.1:53"],
-  "http_target": "https://connectivitycheck.gstatic.com/generate_204",
-  "dns_target": "www.google.com",
+  "ping_targets":  ["8.8.8.8:53", "1.1.1.1:53"],
+  "http_targets":  ["https://connectivitycheck.gstatic.com/generate_204"],
+  "dns_targets":   ["www.google.com", "www.cloudflare.com"],
   "fail_threshold": 3,
   "packet_loss_threshold": 20.0,
   "latency_threshold_ms": 500,
@@ -98,22 +140,113 @@ scripts\install.cmd
 }
 ```
 
-| الإعداد | معناه | القيمة الافتراضية |
-| ------- | ----- | ----------------- |
-| `check_interval_sec` | كل كام ثانية بيتم الفحص | 5 |
-| `fail_threshold` | كام فشل متتالي قبل ما يعتبره "منقطع" | 3 |
-| `packet_loss_threshold` | نسبة فقدان الحزم اللي بيعتبرها "ضعيف" | 20% |
-| `latency_threshold_ms` | زمن استجابة بيعتبره "ضعيف" | 500ms |
-| `webhook_url` | رابط Discord/Slack للإشعارات | فاضي |
-| `dashboard_port` | بورت لوحة التحكم | 8765 |
+| Field | Description |
+| ----- | ----------- |
+| `ping_targets` | TCP Ping addresses — tries all, OK if any succeeds |
+| `http_targets` | HTTP URLs — tries in order until one returns 200/204 |
+| `dns_targets` | DNS domains — tries in order until one resolves |
+| `fail_threshold` | Consecutive failures before declaring disconnected |
+| `webhook_url` | Discord or Slack webhook URL (leave empty to disable) |
 
----
+## 📡 Webhook — Discord & Slack
 
-## Webhook — تبعت الإشعارات على Discord أو Slack
+Supports **Discord** and **Slack** only. Payloads are formatted per platform automatically.
 
-حط رابط الـ webhook في إعداد `webhook_url`.
+**Discord embed example:**
 
-عند كل انقطاع أو رجوع بيوصل payload زي ده:
+```json
+{
+  "username": "Internet Monitor",
+  "embeds": [{
+    "title": "❌ Internet Disconnected",
+    "color": 15681604,
+    "fields": [
+      {"name": "🔌 TCP Ping",    "value": "❌ Failed", "inline": true},
+      {"name": "🌐 HTTP",        "value": "❌ Failed", "inline": true},
+      {"name": "🔍 DNS",         "value": "✅ OK",     "inline": true},
+      {"name": "📉 Packet Loss", "value": "85.0%",    "inline": true},
+      {"name": "⏱️ Duration",    "value": "2m 15s",   "inline": true}
+    ],
+    "timestamp": "2026-05-11T14:30:00Z"
+  }]
+}
+```
+
+## 📂 Project Structure
+
+```text
+internet-monitor/
+├── main.go                  Entry point — Tray version
+├── singleton_*.go           Single-instance guard (per OS)
+├── cmd/gui/                 Native window version
+│   ├── main.go
+│   ├── tray_windows.go      Systray in background goroutine (done channel prevents zombie)
+│   ├── tray_stub.go         No-op for macOS/Linux
+│   ├── notify_windows.go    Windows Toast + MCI sound playback
+│   └── notify_unix.go       osascript / notify-send
+├── config/                  Config struct, loading, auto-migration
+├── monitor/                 Check engine — TCP / HTTP / DNS
+├── dashboard/               HTTP server, SSE stream, all REST APIs
+│   └── assets/              Embedded HTML / CSS / JS (Chart.js local)
+├── logger/                  JSONL logging + Discord/Slack webhook formatting
+├── tray/                    Icon generation (colored ring + favicon blend)
+├── updater/                 GitHub Releases API + minio/selfupdate
+├── .github/workflows/       build.yml — CI/CD for all platforms
+└── scripts/                 Windows build / install / run helpers
+```
+
+## 🤝 Contributing
+
+All contributions are welcome — bugs, features, translations, docs.
+
+### 1. Fork and clone
+
+```bash
+git clone https://github.com/YOUR_USERNAME/internet-monitor.git
+cd internet-monitor
+go mod tidy
+```
+
+### 2. Create a branch
+
+```bash
+git checkout -b feature/your-feature-name
+```
+
+### 3. Commit convention
+
+We use [Conventional Commits](https://www.conventionalcommits.org/) — commit type drives auto-versioning:
+
+| Prefix | Version bump | Example |
+| ------ | ------------ | ------- |
+| `feat:` | minor (v1.1.0) | `feat: add dark mode toggle` |
+| `fix:` | patch (v1.0.1) | `fix: resolve DNS timeout on macOS` |
+| `BREAKING CHANGE` | major (v2.0.0) | in commit body |
+| `docs:`, `refactor:` | patch | no functional change |
+
+### 4. Open a Pull Request
+
+- Describe the motivation clearly
+- Attach a screenshot if there is any visual change
+- Confirm `go build ./...` passes with no errors
+
+### Areas looking for help
+
+- Windows ARM64 build support
+- macOS native menu bar integration
+- Per-target latency history charts
+- Mobile-responsive dashboard improvements
+- Additional webhook providers (Telegram, Teams)
+
+## 📋 Log Format
+
+```text
+logs/
+  connectivity_2026-05-11.jsonl   One JSON event per line
+  app.log                          App errors and webhook send status
+```
+
+Each JSONL event:
 
 ```json
 {
@@ -130,102 +263,7 @@ scripts\install.cmd
 }
 ```
 
-لو عملت اختبار يدوي من تبويب الإعدادات، بيبعت كمان payload بنتيجة الاختبار.
+## 📄 License
 
----
-
-## ملفات السجل
-
-بتتحفظ في مجلد `logs/` — ملف لكل يوم:
-
-```text
-logs/
-  connectivity_2026-05-11.jsonl
-  connectivity_2026-05-12.jsonl
-  ...
-```
-
-كل سطر حدث لوحده — ممكن تفتحه بأي text editor.
-
----
-
-## درجة جودة الاتصال
-
-| الدرجة | يعني إيه |
-| ------ | -------- |
-| **A — ممتاز** | أكتر من 95% وقت متصل، latency أقل من 200ms |
-| **B — جيد** | أكتر من 95% لكن الاتصال شوية بطيء |
-| **C — متوسط** | نسبة الاتصال 80-95% |
-| **D — ضعيف** | نسبة الاتصال 50-80% |
-| **F — حرج** | أقل من 50% وقت متصل |
-
----
-
-## الأوامر (للمطورين)
-
-```bash
-scripts\build.cmd        # بناء tray exe
-scripts\build-gui.cmd    # بناء نافذة native (محتاج TDM-GCC)
-scripts\build-debug.cmd  # بناء بـ console ظاهر للتشخيص
-scripts\run.cmd          # تشغيل مباشر
-scripts\stop.cmd         # إيقاف
-scripts\install.cmd      # تثبيت مع Windows Startup
-scripts\uninstall.cmd    # إزالة التثبيت
-scripts\logs.cmd         # فتح مجلد السجلات
-```
-
-أو باستخدام `make`:
-
-```bash
-make build
-make build-gui
-make install
-make stop
-make logs
-```
-
----
-
-## البناء من المصدر
-
-**Tray version (بدون CGO):**
-
-```bash
-go build -ldflags="-H=windowsgui -s -w" -o internet-monitor.exe .
-```
-
-**GUI version (محتاج TDM-GCC على Windows):**
-
-```bash
-winget install TDMGcc.TDMGcc
-go build -ldflags="-H=windowsgui -s -w" -o internet-monitor-gui.exe ./cmd/gui/
-```
-
-**على macOS/Linux** — gcc موجود بالفعل:
-
-```bash
-go build -ldflags="-s -w" -o internet-monitor-gui ./cmd/gui/
-```
-
----
-
-## تحميل الإصدارات الجاهزة
-
-**[GitHub Releases](../../releases)** — فيها ملفات جاهزة لكل نظام:
-
-| الملف | النظام |
-| ----- | ------ |
-| `internet-monitor-windows.exe` | Windows 10/11 — Tray |
-| `internet-monitor-gui-windows.exe` | Windows 10/11 — نافذة |
-| `internet-monitor-macos-arm64` | macOS M1/M2/M3 — Tray |
-| `internet-monitor-macos-intel` | macOS Intel — Tray |
-| `internet-monitor-gui-macos-arm64` | macOS M1/M2/M3 — نافذة |
-| `internet-monitor-gui-macos-intel` | macOS Intel — نافذة |
-| `internet-monitor-linux` | Linux — Tray |
-| `internet-monitor-gui-linux` | Linux — نافذة |
-
----
-
-## الترخيص
-
-MIT — مجاني للاستخدام الشخصي والتجاري.
+MIT — Free for personal and commercial use.
+Built with ❤️ by [FutureSolutionDev](https://github.com/FutureSolutionDev)
