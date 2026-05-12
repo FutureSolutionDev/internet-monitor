@@ -865,6 +865,7 @@ async function loadSettings() {
   } catch (e) {}
 
   loadStartup();
+  loadSoundState();
 }
 
 // ── Startup toggle ─────────────────────────────────────────────
@@ -997,10 +998,59 @@ async function saveSettings() {
 
 function playAlert() {
   try {
-    const audio = new Audio("/assets/Ringtone.mp3");
+    const audio = new Audio("/notification-sound");
     audio.volume = 0.85;
-    audio.play().catch(() => {}); // ignore autoplay block
+    audio.play().catch(() => {});
   } catch (_) {}
+}
+
+async function loadSoundState() {
+  try {
+    const res = await fetch("/notification-sound", { method: "HEAD", cache: "no-store" });
+    const custom = res.headers.get("X-Custom-Sound") === "1";
+    const resetBtn = document.getElementById("sound-reset-btn");
+    const fileLabel = document.getElementById("sound-filename");
+    if (resetBtn) resetBtn.style.display = custom ? "" : "none";
+    if (fileLabel) fileLabel.textContent = custom ? t("sound_current") + " notification.mp3" : "";
+  } catch (_) {}
+}
+
+async function uploadSound(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById("sound-status");
+  const form = new FormData();
+  form.append("sound", file);
+  try {
+    const res = await fetch("/notification-sound", { method: "POST", body: form });
+    const data = await res.json();
+    if (data.ok) {
+      if (status) status.textContent = t("sound_ok");
+      const fileLabel = document.getElementById("sound-filename");
+      if (fileLabel) fileLabel.textContent = t("sound_current") + " " + file.name;
+      const resetBtn = document.getElementById("sound-reset-btn");
+      if (resetBtn) resetBtn.style.display = "";
+    } else {
+      if (status) status.textContent = t("sound_err");
+    }
+  } catch (_) {
+    if (status) status.textContent = t("sound_err");
+  }
+  input.value = "";
+}
+
+async function resetSound() {
+  const status = document.getElementById("sound-status");
+  try {
+    await fetch("/notification-sound", { method: "DELETE" });
+    if (status) status.textContent = t("sound_reset_ok");
+    const fileLabel = document.getElementById("sound-filename");
+    if (fileLabel) fileLabel.textContent = "";
+    const resetBtn = document.getElementById("sound-reset-btn");
+    if (resetBtn) resetBtn.style.display = "none";
+  } catch (_) {
+    if (status) status.textContent = t("sound_err");
+  }
 }
 
 function showBrowserNotification(title, body) {

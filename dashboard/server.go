@@ -256,6 +256,7 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/test-webhook", s.serveTestWebhook)
 	mux.HandleFunc("/api/update", s.serveUpdate)
 	mux.HandleFunc("/api/startup", s.serveStartup)
+	mux.HandleFunc("/notification-sound", s.serveNotificationSound)
 	mux.HandleFunc("/api/speed-test/start", s.serveSpeedTestStart)
 	mux.HandleFunc("/api/speed-test/cancel", s.serveSpeedTestCancel)
 	mux.HandleFunc("/api/speed-test/history", s.serveSpeedTestHistory)
@@ -994,4 +995,69 @@ func parseInt(s string) (int, error) {
 		n = n*10 + int(c-'0')
 	}
 	return n, nil
+}
+
+// ── Custom notification sound ─────────────────────────────────
+
+func (s *Server) customSoundPath() string {
+	return filepath.Join(filepath.Dir(s.configPath), "notification.mp3")
+}
+
+// serveNotificationSound handles GET (serve sound) and POST (upload) and DELETE (reset).
+func (s *Server) serveNotificationSound(w http.ResponseWriter, r *http.Request) {
+	customPath := s.customSoundPath()
+
+	customExists := false
+	if _, err := os.Stat(customPath); err == nil {
+		customExists = true
+	}
+
+	switch r.Method {
+	case http.MethodHead:
+		w.Header().Set("Content-Type", "audio/mpeg")
+		if customExists {
+			w.Header().Set("X-Custom-Sound", "1")
+		}
+		w.WriteHeader(http.StatusOK)
+
+	case http.MethodGet:
+		if customExists {
+			w.Header().Set("Content-Type", "audio/mpeg")
+			w.Header().Set("X-Custom-Sound", "1")
+			http.ServeFile(w, r, customPath)
+			return
+		}
+		// Fall back to embedded default
+		data := RingtoneMp3()
+		w.Header().Set("Content-Type", "audio/mpeg")
+		w.Write(data)
+
+	case http.MethodPost:
+		r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10 MB limit
+		file, _, err := r.FormFile("sound")
+		if err != nil {
+			http.Error(w, `{"error":"invalid file"}`, http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+		data, err := io.ReadAll(file)
+		if err != nil || len(data) == 0 {
+			http.Error(w, `{"error":"read failed"}`, http.StatusBadRequest)
+			return
+		}
+		if err := os.WriteFile(customPath, data, 0644); err != nil {
+			http.Error(w, `{"error":"save failed"}`, http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"ok":true}`))
+
+	case http.MethodDelete:
+		os.Remove(customPath)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"ok":true}`))
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }

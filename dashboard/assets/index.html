@@ -399,7 +399,26 @@
           </div>
 
           <div class="settings-group">
-            <div class="settings-group-title" data-i18n="grp_notif_test">اختبار الإشعارات والصوت</div>
+            <div class="settings-group-title" data-i18n="grp_sound">نغمة الإشعار</div>
+            <div class="settings-grid">
+              <div class="field full-width">
+                <label data-i18n="sound_custom_label">ملف صوتي مخصص (.mp3)</label>
+                <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
+                  <label class="btn btn-secondary" style="cursor:pointer">
+                    📁 <span data-i18n="sound_upload">اختر ملف</span>
+                    <input type="file" id="sound-file-input" accept=".mp3,audio/mpeg" style="display:none" onchange="uploadSound(this)">
+                  </label>
+                  <button class="btn btn-secondary" onclick="playAlert()">▶ <span data-i18n="sound_preview">معاينة</span></button>
+                  <button class="btn btn-secondary" onclick="resetSound()" id="sound-reset-btn" style="display:none">🗑 <span data-i18n="sound_reset">استعادة الافتراضي</span></button>
+                  <span class="test-result" id="sound-status"></span>
+                </div>
+                <div class="field-note" id="sound-filename" style="margin-top:6px"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-group-title" data-i18n="grp_notif_test">اختبار الإشعارات</div>
             <div class="settings-grid">
               <div class="field full-width">
                 <div class="field-note" data-i18n="notif_test_note">يشغّل النغمة ويعرض إشعار تجريبي على سطح المكتب</div>
