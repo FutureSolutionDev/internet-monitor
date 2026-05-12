@@ -14,6 +14,9 @@ if %errorlevel% equ 0 set FOUND=1
 taskkill /F /IM internet-monitor-gui-windows.exe >nul 2>&1
 if %errorlevel% equ 0 set FOUND=1
 
+taskkill /F /IM gui.exe >nul 2>&1
+if %errorlevel% equ 0 set FOUND=1
+
 if %FOUND% equ 1 (
     echo [OK] All Internet Monitor processes stopped.
 ) else (
