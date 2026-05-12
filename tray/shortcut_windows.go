@@ -46,6 +46,8 @@ func EnsureStartMenuShortcut(aumid string) {
 	// Inline C# compiled at runtime via Add-Type.
 	// IShellLinkW has exactly 18 vtable methods — all must be declared in order.
 	// IPropertyStore methods: GetCount, GetAt, GetValue, SetValue, Commit.
+	// All COM casts (QueryInterface) happen inside the C# static method — not in
+	// PowerShell, which can't cast COM objects to user-defined interfaces directly.
 	script := fmt.Sprintf(`
 $lnk = '%s'; $exe = '%s'; $id = '%s'
 
@@ -56,17 +58,17 @@ using System.Runtime.InteropServices.ComTypes;
 
 [ComImport, Guid("000214F9-0000-0000-C000-000000000046"),
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-public interface IShellLinkW {
+interface IShellLinkW {
     void GetPath(System.Text.StringBuilder f, int c, IntPtr d, int g);
-    void GetIDList(out IntPtr p);    void SetIDList(IntPtr p);
+    void GetIDList(out IntPtr p);   void SetIDList(IntPtr p);
     void GetDescription(System.Text.StringBuilder n, int c);
     void SetDescription(string n);
     void GetWorkingDirectory(System.Text.StringBuilder d, int c);
     void SetWorkingDirectory(string d);
     void GetArguments(System.Text.StringBuilder a, int c);
     void SetArguments(string a);
-    void GetHotkey(out short h);    void SetHotkey(short h);
-    void GetShowCmd(out int s);     void SetShowCmd(int s);
+    void GetHotkey(out short h);   void SetHotkey(short h);
+    void GetShowCmd(out int s);    void SetShowCmd(int s);
     void GetIconLocation(System.Text.StringBuilder p, int c, out int i);
     void SetIconLocation(string p, int i);
     void SetRelativePath(string p, int r);
@@ -74,11 +76,11 @@ public interface IShellLinkW {
     void SetPath(string p);
 }
 [ComImport, Guid("00021401-0000-0000-C000-000000000046")]
-public class ShellLink {}
+class ShellLink {}
 
 [ComImport, Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99"),
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-public interface IPropertyStore {
+interface IPropertyStore {
     int GetCount(out uint n);
     int GetAt(uint i, out PropKey k);
     int GetValue(ref PropKey k, out object v);
@@ -86,29 +88,36 @@ public interface IPropertyStore {
     [PreserveSig] int Commit();
 }
 [StructLayout(LayoutKind.Sequential, Pack=4)]
-public struct PropKey { public Guid fmtid; public uint pid; }
+struct PropKey { public Guid fmtid; public uint pid; }
 [StructLayout(LayoutKind.Explicit)]
-public struct PropVariant {
+struct PropVariant {
     [FieldOffset(0)] public ushort vt;
     [FieldOffset(8)] public IntPtr ptr;
+}
+
+public static class ShortcutHelper {
+    public static void Create(string lnk, string exe, string aumid) {
+        object sl  = new ShellLink();
+        var isl = (IShellLinkW)sl;
+        isl.SetPath(exe);
+
+        var ps = (IPropertyStore)sl;
+        PropKey pk;
+        pk.fmtid = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3");
+        pk.pid   = 5;
+        PropVariant pv = new PropVariant();
+        pv.vt  = 31; // VT_LPWSTR
+        pv.ptr = Marshal.StringToCoTaskMemUni(aumid);
+        try { ps.SetValue(ref pk, ref pv); ps.Commit(); }
+        finally { Marshal.FreeCoTaskMem(pv.ptr); }
+
+        ((IPersistFile)sl).Save(lnk, false);
+    }
 }
 "@ -ErrorAction SilentlyContinue
 
 try {
-    $sl  = New-Object ShellLink
-    $isl = [IShellLinkW]$sl
-    $isl.SetPath($exe)
-    $ps  = [IPropertyStore]$sl
-    $pk  = New-Object PropKey
-    $pk.fmtid = [Guid]"9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"
-    $pk.pid   = 5
-    $pv       = New-Object PropVariant
-    $pv.vt    = 31   # VT_LPWSTR
-    $pv.ptr   = [Runtime.InteropServices.Marshal]::StringToCoTaskMemUni($id)
-    $ps.SetValue([ref]$pk, [ref]$pv) | Out-Null
-    $ps.Commit() | Out-Null
-    [Runtime.InteropServices.Marshal]::FreeCoTaskMem($pv.ptr)
-    ([IPersistFile]$sl).Save($lnk, $false)
+    [ShortcutHelper]::Create($lnk, $exe, $id)
     Write-Host "[notify] Start Menu shortcut created: $lnk"
 } catch {
     Write-Host "[notify] shortcut creation failed: $_"
@@ -119,7 +128,10 @@ try {
 		"-WindowStyle", "Hidden",
 		"-NonInteractive",
 		"-Command", script)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: 0x00000008, // DETACHED_PROCESS
+	}
 
 	out, err := cmd.Output()
 	if err != nil {

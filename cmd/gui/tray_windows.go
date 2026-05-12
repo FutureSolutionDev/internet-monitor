@@ -51,7 +51,10 @@ func initTray(w webview.WebView, hwnd uintptr) func() {
 						restoreWindow(hwnd)
 					case <-mExit.ClickedCh:
 						systray.Quit()
-						w.Terminate()
+						// Dispatch Terminate to the main thread — PostQuitMessage(0)
+						// must run on the same thread as w.Run() or WM_QUIT goes
+						// to the wrong queue and the process becomes a zombie.
+						w.Dispatch(func() { w.Terminate() })
 					case <-quit:
 						systray.Quit()
 						return

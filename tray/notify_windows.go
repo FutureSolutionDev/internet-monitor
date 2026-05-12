@@ -17,7 +17,6 @@ import (
 const notifyAUMID = "InternetMonitor"
 
 func init() {
-	// 1. Register the AUMID DisplayName in the registry (Action Center label).
 	if k, _, err := registry.CreateKey(
 		registry.CURRENT_USER,
 		`SOFTWARE\Classes\AppUserModelId\`+notifyAUMID,
@@ -26,49 +25,45 @@ func init() {
 		k.SetStringValue("DisplayName", "Internet Monitor")
 		k.Close()
 	}
-
-	// 2. Create the Start Menu shortcut with AUMID property (runs once).
-	//    This is what makes Windows 10/11 show banner popups instead of
-	//    silently routing notifications to the Action Center only.
 	go func() {
 		log.Println("[notify] ensuring Start Menu shortcut…")
 		EnsureStartMenuShortcut(notifyAUMID)
 	}()
 }
 
-// Notify shows a system notification. Uses WinRT PowerShell toast (richer UI)
-// if the Start Menu shortcut exists; falls back to Shell_NotifyIcon balloon.
+// Notify shows a system notification with sound (tray binary).
 func Notify(title, message string) {
-	appdataDir := os.Getenv("APPDATA")
-	lnk := filepath.Join(appdataDir,
+	go playTraySound()
+	lnk := filepath.Join(os.Getenv("APPDATA"),
 		"Microsoft", "Windows", "Start Menu", "Programs",
 		"Internet Monitor.lnk")
-
 	if _, err := os.Stat(lnk); err == nil {
-		// Shortcut registered → WinRT toast shows as proper banner popup.
 		showWinRTToast(title, message)
 	} else {
-		// Shortcut not yet created → Shell_NotifyIcon balloon (Action Center).
 		ShowBalloon(title, message)
 	}
 }
 
 // ShowWinRTToast is exported so cmd/gui can call it directly.
-// showWinRTToast shows a Windows 10/11 toast notification via PowerShell + WinRT.
-// Requires the Start Menu shortcut to be already created (ensureStartMenuShortcut).
 func ShowWinRTToast(title, body string) {
 	showWinRTToast(title, body)
 }
 
+// showWinRTToast fires a Windows 10/11 WinRT toast via PowerShell.
+// Uses GetTemplateContent to avoid having to load Windows.Data.Xml.Dom
+// separately. AppendChild+CreateTextNode is more reliable than InnerText.
+// DETACHED_PROCESS prevents the notification from stealing console focus.
 func showWinRTToast(title, body string) {
 	t := strings.ReplaceAll(title, "'", "''")
 	b := strings.ReplaceAll(body, "'", "''")
 
 	script := fmt.Sprintf(`
 [Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]|Out-Null
-$xml = New-Object Windows.Data.Xml.Dom.XmlDocument
-$xml.LoadXml('<toast><visual><binding template="ToastText02"><text id="1">%s</text><text id="2">%s</text></binding></visual></toast>')
-$toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
+$tpl   = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
+$nodes = $tpl.GetElementsByTagName('text')
+$nodes.Item(0).AppendChild($tpl.CreateTextNode('%s')) | Out-Null
+$nodes.Item(1).AppendChild($tpl.CreateTextNode('%s')) | Out-Null
+$toast = [Windows.UI.Notifications.ToastNotification]::new($tpl)
 [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('%s').Show($toast)
 `, t, b, notifyAUMID)
 
@@ -76,8 +71,18 @@ $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
 		"-WindowStyle", "Hidden",
 		"-NonInteractive",
 		"-Command", script)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	cmd.Start()
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: 0x00000008, // DETACHED_PROCESS — no console focus steal
+	}
+	go func() {
+		out, err := cmd.CombinedOutput()
+		if err != nil || len(out) > 0 {
+			log.Printf("[notify] showWinRTToast: err=%v output=%s", err, out)
+		} else {
+			log.Println("[notify] showWinRTToast: OK")
+		}
+	}()
 }
 
 func OpenURL(url string) {
