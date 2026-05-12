@@ -28,13 +28,16 @@ func init() {
 }
 
 func registerToastApp() {
-	// 1. Register AUMID display name.
+	// 1. Register AUMID display name + icon (used by WinRT toast notifications).
 	if k, _, err := registry.CreateKey(
 		registry.CURRENT_USER,
 		`SOFTWARE\Classes\AppUserModelId\`+toastAppID,
 		registry.SET_VALUE,
 	); err == nil {
 		k.SetStringValue("DisplayName", "Internet Monitor")
+		if exe, err2 := os.Executable(); err2 == nil {
+			k.SetStringValue("IconUri", exe)
+		}
 		k.Close()
 	}
 

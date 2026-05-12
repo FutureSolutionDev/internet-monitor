@@ -8,6 +8,7 @@ import (
 	"internet-monitor/dashboard"
 	"internet-monitor/logger"
 	"internet-monitor/monitor"
+	"internet-monitor/tray"
 	"internet-monitor/updater"
 	"log"
 	"os"
@@ -66,10 +67,17 @@ func main() {
 	w := webview.New(false)
 	defer w.Destroy()
 	w.SetTitle("مراقب الإنترنت — Internet Monitor")
+	// HintNone: initial size only — no minimum or maximum constraints.
 	w.SetSize(1100, 750, webview.HintNone)
 
 	hwnd := uintptr(w.Window())
 	w.Bind("nativeMinimizeToTray", func() { hideWindow(hwnd) })
+
+	if png := dashboard.FaviconPNG(); len(png) > 0 {
+		tray.SetCustomIcon(png)
+	}
+	// Set window icon from the favicon (no go-winres .syso in dev environment).
+	setWindowIcon(hwnd)
 
 	stopTray := initTray(w, hwnd)
 	engine.Start()

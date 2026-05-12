@@ -17,13 +17,16 @@ import (
 const notifyAUMID = "InternetMonitor"
 
 func init() {
-	// 1. Register AUMID display name.
+	// 1. Register AUMID display name + icon (used by WinRT toast notifications).
 	if k, _, err := registry.CreateKey(
 		registry.CURRENT_USER,
 		`SOFTWARE\Classes\AppUserModelId\`+notifyAUMID,
 		registry.SET_VALUE,
 	); err == nil {
 		k.SetStringValue("DisplayName", "Internet Monitor")
+		if exe, err2 := os.Executable(); err2 == nil {
+			k.SetStringValue("IconUri", exe)
+		}
 		k.Close()
 	}
 
@@ -78,13 +81,17 @@ func showWinRTToast(title, body string) {
 
 	script := fmt.Sprintf(`
 [Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]|Out-Null
+$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('%s')
+Write-Host "notifier.Setting=$($notifier.Setting)"
+if ($notifier.Setting -ne 0) { Write-Host "BLOCKED setting=$($notifier.Setting)"; exit 0 }
 $tpl   = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
 $nodes = $tpl.GetElementsByTagName('text')
 $nodes.Item(0).AppendChild($tpl.CreateTextNode('%s')) | Out-Null
 $nodes.Item(1).AppendChild($tpl.CreateTextNode('%s')) | Out-Null
 $toast = [Windows.UI.Notifications.ToastNotification]::new($tpl)
-[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('%s').Show($toast)
-`, t, b, notifyAUMID)
+$notifier.Show($toast)
+Write-Host "SHOWN"
+`, notifyAUMID, t, b)
 
 	cmd := exec.Command("powershell",
 		"-WindowStyle", "Hidden",
