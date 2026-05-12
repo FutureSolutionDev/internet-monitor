@@ -66,11 +66,11 @@ func eventTypeToStatus(eventType string) types.Status {
 func titleForStatus(s types.Status) string {
 	switch s {
 	case types.StatusConnected:
-		return "Internet Restored"
+		return "✅ الإنترنت عاد / Restored"
 	case types.StatusDegraded:
-		return "Connection Degraded"
+		return "⚠️ الإنترنت ضعيف / Degraded"
 	default:
-		return "Internet Disconnected"
+		return "🔴 الإنترنت انقطع / Disconnected"
 	}
 }
 
@@ -81,13 +81,13 @@ func bodyForEvent(event types.Event) string {
 	switch s {
 	case types.StatusConnected:
 		if r.AvgLatencyMs > 0 {
-			return fmt.Sprintf("Latency: %dms", r.AvgLatencyMs)
+			return fmt.Sprintf("زمن الاستجابة: %dms", r.AvgLatencyMs)
 		}
-		return "All checks passing"
+		return "جميع الفحوصات ناجحة"
 	case types.StatusDegraded:
-		return fmt.Sprintf("Loss: %.0f%%  Latency: %dms", r.PacketLossPct, r.AvgLatencyMs)
+		return fmt.Sprintf("فقدان: %.0f%% — زمن: %dms", r.PacketLossPct, r.AvgLatencyMs)
 	default:
-		parts := []string{}
+		var parts []string
 		if r.TCPPingFailed {
 			parts = append(parts, "TCP")
 		}
@@ -98,8 +98,8 @@ func bodyForEvent(event types.Event) string {
 			parts = append(parts, "DNS")
 		}
 		if len(parts) == 0 {
-			return "Connection lost"
+			return "فقدان الاتصال"
 		}
-		return strings.Join(parts, " + ") + " failed"
+		return strings.Join(parts, " + ") + " فشل"
 	}
 }

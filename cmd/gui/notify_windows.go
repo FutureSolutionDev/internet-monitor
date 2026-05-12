@@ -3,10 +3,11 @@
 package main
 
 import (
-	"fmt"
 	"internet-monitor/monitor"
-	"os/exec"
-	"strings"
+	"internet-monitor/tray"
+	"log"
+	"os"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -19,6 +20,11 @@ const toastAppID = "InternetMonitor"
 
 func init() {
 	registerToastApp()
+	// Ensure Start Menu shortcut exists so Windows 10/11 shows banner popups.
+	go func() {
+		log.Println("[notify] ensuring Start Menu shortcut…")
+		tray.EnsureStartMenuShortcut(toastAppID)
+	}()
 }
 
 func registerToastApp() {
@@ -33,6 +39,8 @@ func registerToastApp() {
 	defer k.Close()
 	k.SetStringValue("DisplayName", "Internet Monitor")
 }
+
+// ── Audio (MCI) ────────────────────────────────────────────────
 
 var (
 	modWinmm       = syscall.NewLazyDLL("winmm.dll")
@@ -55,7 +63,6 @@ func playRingtone() {
 	go func() {
 		ringMu.Lock()
 		if ringPlaying {
-			// Stop whatever is playing before starting a new one.
 			mciCall("stop im_ring")
 			mciCall("close im_ring")
 		}
@@ -74,12 +81,31 @@ func playRingtone() {
 	}()
 }
 
+// ── Notifications ──────────────────────────────────────────────
+
 var (
 	notifyMu       sync.Mutex
 	lastNotifyTime time.Time
 )
 
 const guiNotifyCooldown = 4 * time.Second
+
+func showSystemNotification(title, body string) {
+	// Prefer WinRT toast (banner popup) if Start Menu shortcut already exists.
+	// Fall back to Shell_NotifyIcon balloon otherwise.
+	lnk := startMenuLnkPath()
+	if _, err := os.Stat(lnk); err == nil {
+		tray.ShowWinRTToast(title, body)
+	} else {
+		tray.ShowBalloon(title, body)
+	}
+}
+
+func startMenuLnkPath() string {
+	return filepath.Join(os.Getenv("APPDATA"),
+		"Microsoft", "Windows", "Start Menu", "Programs",
+		"Internet Monitor.lnk")
+}
 
 func sendNotification(status monitor.Status, result monitor.CheckResult) {
 	title, body := notifyText(status, result)
@@ -95,28 +121,15 @@ func sendNotification(status monitor.Status, result monitor.CheckResult) {
 	notifyMu.Unlock()
 
 	playRingtone()
-	showToast(title, body)
+	showSystemNotification(title, body)
 }
 
 func TestNotification() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[notify] TestNotification panic recovered: %v", r)
+		}
+	}()
 	playRingtone()
-	showToast("اختبار الإشعار / Test Notification", "🔔 الصوت والإشعار يعملان بشكل صحيح")
-}
-
-func showToast(title, body string) {
-	t := strings.ReplaceAll(title, "'", "''")
-	b := strings.ReplaceAll(body, "'", "''")
-	script := fmt.Sprintf(`
-$app='%s'
-[Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]|Out-Null
-$tpl=[Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
-$nodes=$tpl.GetElementsByTagName('text')
-$nodes[0].InnerText='%s'
-$nodes[1].InnerText='%s'
-$toast=[Windows.UI.Notifications.ToastNotification]::new($tpl)
-[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($app).Show($toast)
-`, toastAppID, t, b)
-	cmd := exec.Command("powershell", "-WindowStyle", "Hidden", "-NonInteractive", "-Command", script)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	cmd.Start()
+	showSystemNotification("🔔 اختبار الإشعار / Test", "الصوت والإشعار يعملان ✅")
 }

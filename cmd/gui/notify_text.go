@@ -9,11 +9,13 @@ import (
 func notifyText(status monitor.Status, result monitor.CheckResult) (title, body string) {
 	switch status {
 	case monitor.StatusConnected:
-		return "Internet Restored", fmt.Sprintf("Latency: %dms", result.LatencyMs)
+		return "✅ الإنترنت عاد / Restored",
+			fmt.Sprintf("زمن الاستجابة: %dms", result.LatencyMs)
+
 	case monitor.StatusDisconnected:
-		parts := []string{}
+		var parts []string
 		if !result.TCPPingOK {
-			parts = append(parts, "TCP ping")
+			parts = append(parts, "TCP")
 		}
 		if !result.HTTPOK {
 			parts = append(parts, "HTTP")
@@ -21,13 +23,16 @@ func notifyText(status monitor.Status, result monitor.CheckResult) (title, body 
 		if !result.DNSOK {
 			parts = append(parts, "DNS")
 		}
-		body = "Connection lost"
 		if len(parts) > 0 {
-			body = strings.Join(parts, ", ") + " failed"
+			body = strings.Join(parts, " + ") + " فشل"
+		} else {
+			body = "فقدان الاتصال"
 		}
-		return "Internet Disconnected", body
+		return "🔴 الإنترنت انقطع / Disconnected", body
+
 	case monitor.StatusDegraded:
-		return "Connection Degraded", fmt.Sprintf("Loss: %.0f%%  Latency: %dms", result.PacketLoss, result.LatencyMs)
+		return "⚠️ الإنترنت ضعيف / Degraded",
+			fmt.Sprintf("فقدان: %.0f%% — زمن: %dms", result.PacketLoss, result.LatencyMs)
 	}
 	return "", ""
 }

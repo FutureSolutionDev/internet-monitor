@@ -157,6 +157,7 @@ type Snapshot struct {
 	Events         []EventEntry `json:"events"`
 	Ticks          []TickEntry  `json:"ticks"`
 	UpdateInfo     *UpdateInfo  `json:"update_info,omitempty"`
+	SystemNotifs   bool         `json:"system_notifs"`
 }
 
 type testTargetResult struct {
@@ -737,6 +738,7 @@ func (s *Server) snapshot(msgType string) Snapshot {
 		Events:         evts,
 		Ticks:          ticks,
 		UpdateInfo:     updateInfo,
+		SystemNotifs:   s.OnTestNotification != nil,
 	}
 }
 

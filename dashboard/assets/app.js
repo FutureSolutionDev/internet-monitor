@@ -1066,6 +1066,9 @@ function showBrowserNotification(title, body) {
 }
 
 function _browserAlert(status, d) {
+  // Skip browser audio/notification when the Go backend handles it natively.
+  if (lastData?.system_notifs) return;
+
   const loss = (d.packet_loss || 0).toFixed(1);
   const lat = d.latency_ms || 0;
   switch (status) {
@@ -1113,11 +1116,8 @@ async function testNotification() {
     res.textContent = "...";
   }
 
-  // In native GUI, the server-side will play sound + OS toast — skip browser duplicate
-  const isNative = typeof window["nativeMinimizeToTray"] === "function";
-
-  if (!isNative) {
-    // Browser-only mode: play audio + show Web Notification
+  // Skip browser audio/notification when the Go backend handles it natively.
+  if (!lastData?.system_notifs) {
     if ("Notification" in window && Notification.permission === "default") {
       await Notification.requestPermission();
     }

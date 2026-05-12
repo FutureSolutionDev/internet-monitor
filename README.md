@@ -1,6 +1,6 @@
 # 🌐 Internet Monitor
 
-![Logo](docs/logo.svg)
+![Logo](dashboard/assets/favicon.png)
 
 [![Build & Release](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml/badge.svg)](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)

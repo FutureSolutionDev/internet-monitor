@@ -67,6 +67,11 @@ func main() {
 		tray.SetCustomIcon(png)
 	}
 	dash.OnTestNotification = func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("[notify] tray test notification panic recovered: %v", r)
+			}
+		}()
 		tray.Notify("اختبار الإشعار / Test Notification", "🔔 الإشعار يعمل بشكل صحيح")
 	}
 
