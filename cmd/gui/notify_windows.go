@@ -7,6 +7,7 @@ import (
 	"internet-monitor/monitor"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -36,7 +37,15 @@ func registerToastApp() {
 var (
 	modWinmm       = syscall.NewLazyDLL("winmm.dll")
 	procMciSendStr = modWinmm.NewProc("mciSendStringW")
+
+	ringMu      sync.Mutex
+	ringPlaying bool
 )
+
+func mciCall(cmd string) {
+	p, _ := syscall.UTF16PtrFromString(cmd)
+	procMciSendStr.Call(uintptr(unsafe.Pointer(p)), 0, 0, 0)
+}
 
 func playRingtone() {
 	path := getRingtonePath()
@@ -44,22 +53,47 @@ func playRingtone() {
 		return
 	}
 	go func() {
-		openCmd, _ := syscall.UTF16PtrFromString(`open "` + path + `" type mpegvideo alias im_ring`)
-		playCmd, _ := syscall.UTF16PtrFromString("play im_ring")
-		stopCmd, _ := syscall.UTF16PtrFromString("close im_ring")
+		ringMu.Lock()
+		if ringPlaying {
+			// Stop whatever is playing before starting a new one.
+			mciCall("stop im_ring")
+			mciCall("close im_ring")
+		}
+		ringPlaying = true
+		ringMu.Unlock()
 
-		procMciSendStr.Call(uintptr(unsafe.Pointer(openCmd)), 0, 0, 0)
-		procMciSendStr.Call(uintptr(unsafe.Pointer(playCmd)), 0, 0, 0)
+		mciCall(`open "` + path + `" type mpegvideo alias im_ring`)
+		mciCall("play im_ring")
 		time.Sleep(15 * time.Second)
-		procMciSendStr.Call(uintptr(unsafe.Pointer(stopCmd)), 0, 0, 0)
+		mciCall("stop im_ring")
+		mciCall("close im_ring")
+
+		ringMu.Lock()
+		ringPlaying = false
+		ringMu.Unlock()
 	}()
 }
+
+var (
+	notifyMu       sync.Mutex
+	lastNotifyTime time.Time
+)
+
+const guiNotifyCooldown = 4 * time.Second
 
 func sendNotification(status monitor.Status, result monitor.CheckResult) {
 	title, body := notifyText(status, result)
 	if title == "" {
 		return
 	}
+	notifyMu.Lock()
+	if time.Since(lastNotifyTime) < guiNotifyCooldown {
+		notifyMu.Unlock()
+		return
+	}
+	lastNotifyTime = time.Now()
+	notifyMu.Unlock()
+
 	playRingtone()
 	showToast(title, body)
 }
