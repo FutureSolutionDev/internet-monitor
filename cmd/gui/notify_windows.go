@@ -28,16 +28,35 @@ func init() {
 }
 
 func registerToastApp() {
-	k, _, err := registry.CreateKey(
+	// 1. Register AUMID display name.
+	if k, _, err := registry.CreateKey(
 		registry.CURRENT_USER,
 		`SOFTWARE\Classes\AppUserModelId\`+toastAppID,
 		registry.SET_VALUE,
-	)
-	if err != nil {
-		return
+	); err == nil {
+		k.SetStringValue("DisplayName", "Internet Monitor")
+		k.Close()
 	}
-	defer k.Close()
-	k.SetStringValue("DisplayName", "Internet Monitor")
+
+	// 2. Enable banner notifications in Windows notification settings.
+	//    Without Enabled=1 Windows 10 silently drops toasts for unknown AUMIDs.
+	//    We only set this on first run (key doesn't exist yet) to avoid
+	//    overriding a user's explicit preference.
+	const notifPath = `SOFTWARE\Microsoft\Windows\CurrentVersion\Notifications\Settings\` + toastAppID
+	if k, created, err := registry.CreateKey(
+		registry.CURRENT_USER, notifPath, registry.SET_VALUE,
+	); err == nil {
+		if !created { // key already existed — check if Enabled is set
+			if _, _, verr := k.GetIntegerValue("Enabled"); verr != nil {
+				k.SetDWordValue("Enabled", 1)
+				k.SetDWordValue("ShowInActionCenter", 1)
+			}
+		} else {
+			k.SetDWordValue("Enabled", 1)
+			k.SetDWordValue("ShowInActionCenter", 1)
+		}
+		k.Close()
+	}
 }
 
 // ── Audio (MCI) ────────────────────────────────────────────────

@@ -17,6 +17,7 @@ import (
 const notifyAUMID = "InternetMonitor"
 
 func init() {
+	// 1. Register AUMID display name.
 	if k, _, err := registry.CreateKey(
 		registry.CURRENT_USER,
 		`SOFTWARE\Classes\AppUserModelId\`+notifyAUMID,
@@ -25,6 +26,24 @@ func init() {
 		k.SetStringValue("DisplayName", "Internet Monitor")
 		k.Close()
 	}
+
+	// 2. Enable banner notifications. Only set Enabled=1 on first run.
+	const notifPath = `SOFTWARE\Microsoft\Windows\CurrentVersion\Notifications\Settings\` + notifyAUMID
+	if k, created, err := registry.CreateKey(
+		registry.CURRENT_USER, notifPath, registry.SET_VALUE,
+	); err == nil {
+		if !created {
+			if _, _, verr := k.GetIntegerValue("Enabled"); verr != nil {
+				k.SetDWordValue("Enabled", 1)
+				k.SetDWordValue("ShowInActionCenter", 1)
+			}
+		} else {
+			k.SetDWordValue("Enabled", 1)
+			k.SetDWordValue("ShowInActionCenter", 1)
+		}
+		k.Close()
+	}
+
 	go func() {
 		log.Println("[notify] ensuring Start Menu shortcut…")
 		EnsureStartMenuShortcut(notifyAUMID)
