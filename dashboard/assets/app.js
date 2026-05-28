@@ -1150,6 +1150,8 @@ async function testNotification() {
   }
 }
 
+// NOTE: client-side UX hint only. The authoritative webhook classification
+// lives in logger/webhook_format.go (IsDiscord/IsSlack); keep these in sync.
 function isDiscordURL(url) {
   return (
     url.includes("discord.com/api/webhooks") ||

@@ -5,10 +5,25 @@ import (
 	"internet-monitor/monitor"
 	"strings"
 	"time"
+	"unicode"
 )
+
+// capitalize upper-cases the first rune. Replaces the deprecated strings.Title
+// (event types are single ASCII words: connected/degraded/disconnected).
+func capitalize(s string) string {
+	if s == "" {
+		return s
+	}
+	r := []rune(s)
+	r[0] = unicode.ToUpper(r[0])
+	return string(r)
+}
 
 // ── URL Validation ────────────────────────────────────────────
 
+// IsDiscord/IsSlack/IsSupportedWebhook are the authoritative webhook
+// classification. The dashboard mirrors this in app.js (isDiscordURL/...) for a
+// UX hint only — keep the two in sync.
 func IsDiscord(url string) bool {
 	return strings.Contains(url, "discord.com/api/webhooks") ||
 		strings.Contains(url, "discordapp.com/api/webhooks")
@@ -100,7 +115,7 @@ func discordEventPayload(event monitor.Event) map[string]interface{} {
 	return map[string]interface{}{
 		"username": "Internet Monitor",
 		"embeds": []map[string]interface{}{{
-			"title":       fmt.Sprintf("%s Internet %s", emoji, strings.Title(event.EventType)),
+			"title":       fmt.Sprintf("%s Internet %s", emoji, capitalize(event.EventType)),
 			"color":       color,
 			"fields":      allFields,
 			"timestamp":   event.Timestamp.UTC().Format(time.RFC3339),
@@ -118,7 +133,7 @@ func slackEventPayload(event monitor.Event) map[string]interface{} {
 	emoji := emojis[event.EventType]
 
 	lines := []string{
-		fmt.Sprintf("%s *Internet %s*", emoji, strings.Title(event.EventType)),
+		fmt.Sprintf("%s *Internet %s*", emoji, capitalize(event.EventType)),
 		"",
 	}
 

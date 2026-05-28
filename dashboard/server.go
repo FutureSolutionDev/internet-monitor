@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -1041,7 +1042,7 @@ func (s *Server) serveSpeedTestHistory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	limit := 20
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := parseInt(v); err == nil && n > 0 {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			if n > 100 {
 				n = 100
 			}
@@ -1091,17 +1092,6 @@ func (s *Server) broadcastRaw(msg string) {
 		}
 	}
 	s.mu.Unlock()
-}
-
-func parseInt(s string) (int, error) {
-	n := 0
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return 0, fmt.Errorf("invalid")
-		}
-		n = n*10 + int(c-'0')
-	}
-	return n, nil
 }
 
 // ── Custom notification sound ─────────────────────────────────
