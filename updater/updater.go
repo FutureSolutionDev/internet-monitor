@@ -3,6 +3,7 @@ package updater
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,17 +20,17 @@ import (
 )
 
 const (
-	apiURL  = "https://api.github.com/repos/FutureSolutionDev/internet-monitor/releases/latest"
+	apiURL        = "https://api.github.com/repos/FutureSolutionDev/internet-monitor/releases/latest"
 	checkInterval = 6 * time.Hour
 )
 
 // Info holds the result of a version check.
 type Info struct {
-	HasUpdate    bool   `json:"has_update"`
-	LatestVersion string `json:"latest_version"`
+	HasUpdate      bool   `json:"has_update"`
+	LatestVersion  string `json:"latest_version"`
 	CurrentVersion string `json:"current_version"`
-	DownloadURL  string `json:"download_url"`
-	ReleaseNotes string `json:"release_notes"`
+	DownloadURL    string `json:"download_url"`
+	ReleaseNotes   string `json:"release_notes"`
 }
 
 type ghRelease struct {
@@ -70,10 +71,10 @@ func Check(currentVersion string) (*Info, error) {
 	}
 
 	info := &Info{
-		HasUpdate:     compareVersions(rel.TagName, currentVersion) > 0,
-		LatestVersion: rel.TagName,
+		HasUpdate:      compareVersions(rel.TagName, currentVersion) > 0,
+		LatestVersion:  rel.TagName,
 		CurrentVersion: currentVersion,
-		ReleaseNotes:  rel.Body,
+		ReleaseNotes:   rel.Body,
 	}
 
 	if info.HasUpdate {
@@ -114,8 +115,61 @@ func Apply(downloadURL string) error {
 		return fmt.Errorf("update size mismatch: got %d bytes, expected %d", len(data), resp.ContentLength)
 	}
 
-	log.Printf("updater: applying %d bytes, sha256=%x", len(data), sha256.Sum256(data))
+	sum := sha256.Sum256(data)
+	got := hex.EncodeToString(sum[:])
+	switch expected, cerr := fetchChecksum(downloadURL); {
+	case cerr != nil:
+		log.Printf("updater: SHA256SUMS unavailable (%v) — applying %d bytes sha256=%s unverified", cerr, len(data), got)
+	case expected == "":
+		log.Printf("updater: asset not listed in SHA256SUMS — applying %d bytes sha256=%s unverified", len(data), got)
+	case !strings.EqualFold(got, expected):
+		return fmt.Errorf("checksum mismatch: got %s, expected %s", got, expected)
+	default:
+		log.Printf("updater: checksum verified sha256=%s", got)
+	}
 	return selfupdate.Apply(bytes.NewReader(data), selfupdate.Options{})
+}
+
+// fetchChecksum downloads the sibling SHA256SUMS file (same release) and returns
+// the expected hash for the asset, "" if the asset isn't listed, or an error if
+// the file can't be fetched.
+func fetchChecksum(downloadURL string) (string, error) {
+	idx := strings.LastIndex(downloadURL, "/")
+	if idx < 0 {
+		return "", fmt.Errorf("malformed download URL")
+	}
+	checksumURL := downloadURL[:idx+1] + "SHA256SUMS"
+	asset := downloadURL[idx+1:]
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(checksumURL)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return "", err
+	}
+	return parseChecksums(data, asset), nil
+}
+
+// parseChecksums returns the hash for asset from a `sha256sum`-format file, or "".
+func parseChecksums(data []byte, asset string) string {
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		name := strings.TrimPrefix(fields[len(fields)-1], "*")
+		if name == asset {
+			return fields[0]
+		}
+	}
+	return ""
 }
 
 // Restart launches the updated binary and exits the current process.
@@ -144,7 +198,7 @@ func pickAsset(assets []ghAsset) string {
 	exe, _ := os.Executable()
 	isGUI := strings.Contains(strings.ToLower(filepath.Base(exe)), "gui")
 
-	var goos   = runtime.GOOS
+	var goos = runtime.GOOS
 	var goarch = runtime.GOARCH
 
 	// Build expected name fragments

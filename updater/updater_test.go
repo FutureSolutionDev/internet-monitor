@@ -2,6 +2,23 @@ package updater
 
 import "testing"
 
+func TestParseChecksums(t *testing.T) {
+	data := []byte(
+		"aaa111  internet-monitor-windows.exe\n" +
+			"bbb222 *internet-monitor-linux\n" +
+			"ccc333  internet-monitor-macos-arm64\n")
+
+	if got := parseChecksums(data, "internet-monitor-windows.exe"); got != "aaa111" {
+		t.Errorf("windows hash = %q, want aaa111", got)
+	}
+	if got := parseChecksums(data, "internet-monitor-linux"); got != "bbb222" {
+		t.Errorf("linux hash (binary marker) = %q, want bbb222", got)
+	}
+	if got := parseChecksums(data, "not-listed"); got != "" {
+		t.Errorf("missing asset = %q, want empty", got)
+	}
+}
+
 func TestCompareVersions(t *testing.T) {
 	cases := []struct {
 		a, b string
