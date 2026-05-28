@@ -67,8 +67,20 @@ func probe(layer string, targets []string, fn func(string) (bool, int64)) []type
 func (c *Checker) Check() CheckResult {
 	result := CheckResult{Timestamp: time.Now()}
 
-	// ── TCP Ping ── (latency = fastest successful target)
+	// ── Ping ── (latency = fastest successful target). When use_icmp is set,
+	// try a real ICMP echo first and fall back to a TCP dial on any failure, so
+	// ICMP only ever helps.
+	useICMP := c.cfg.UseICMP
 	tcp := probe("tcp", c.cfg.PingTargets, func(target string) (bool, int64) {
+		host := target
+		if h, _, err := net.SplitHostPort(target); err == nil {
+			host = h
+		}
+		if useICMP {
+			if lat, ok := icmpPing(host, 2*time.Second); ok {
+				return true, lat
+			}
+		}
 		start := time.Now()
 		conn, err := net.DialTimeout("tcp", target, 2*time.Second)
 		if err != nil {
@@ -138,6 +150,15 @@ func (c *Checker) Check() CheckResult {
 		}
 	}
 	result.Targets = append(result.Targets, dnsRes...)
+
+	// Gateway probe (LAN vs ISP). Only meaningful with ICMP, since gateways
+	// rarely answer TCP. Lets the dashboard tell "router/LAN down" from "ISP down".
+	if useICMP {
+		if gw, ok := defaultGatewayIPv4(); ok {
+			result.Gateway = gw
+			_, result.GatewayOK = icmpPing(gw, time.Second)
+		}
+	}
 
 	return result
 }

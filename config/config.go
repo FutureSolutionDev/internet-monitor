@@ -26,6 +26,7 @@ type Config struct {
 	LogDir              string          `json:"log_dir"`
 	WebhookURL          string          `json:"webhook_url"`
 	DashboardPort       int             `json:"dashboard_port"`
+	UseICMP             bool            `json:"use_icmp"` // use ICMP echo for ping (falls back to TCP)
 	SpeedTest           SpeedTestConfig `json:"speed_test,omitempty"`
 }
 

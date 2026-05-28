@@ -39,6 +39,8 @@ type CheckResult struct {
 	PacketLoss float64
 	Timestamp  time.Time
 	Targets    []TargetResult `json:"targets,omitempty"`
+	Gateway    string         `json:"gateway,omitempty"`
+	GatewayOK  bool           `json:"gateway_ok,omitempty"`
 }
 
 // Diagnose classifies a check result into a coarse failure type, helping

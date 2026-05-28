@@ -153,6 +153,7 @@ type Snapshot struct {
 	HTTPOK           bool                 `json:"http_ok"`
 	DNSOK            bool                 `json:"dns_ok"`
 	Diagnosis        string               `json:"diagnosis"`
+	Gateway          string               `json:"gateway,omitempty"`
 	TotalChecks      int                  `json:"total_checks"`
 	Disconnections   int                  `json:"disconnections"`
 	UptimeSeconds    float64              `json:"uptime_seconds"`
@@ -230,6 +231,8 @@ type Server struct {
 	events         []EventEntry
 	ticks          []TickEntry
 	targets        []types.TargetResult
+	gateway        string
+	gatewayOK      bool
 
 	// Speed test state
 	stRunning atomic.Bool
@@ -366,6 +369,8 @@ func (s *Server) UpdateTick(result types.CheckResult, status types.Status) {
 	s.httpOK = result.HTTPOK
 	s.dnsOK = result.DNSOK
 	s.targets = result.Targets
+	s.gateway = result.Gateway
+	s.gatewayOK = result.GatewayOK
 	s.totalChecks++
 	// "Up" = reachable, including degraded (slow but online). Only a full
 	// disconnection counts against uptime.
@@ -850,6 +855,16 @@ func (s *Server) snapshot(msgType string) Snapshot {
 		uptimePct = float64(s.upTicks) / float64(s.totalChecks) * 100
 	}
 
+	// Refine "down" into "isp" vs "lan" when a gateway reachability signal exists.
+	diag := types.Diagnose(types.CheckResult{TCPPingOK: s.tcpPingOK, HTTPOK: s.httpOK, DNSOK: s.dnsOK})
+	if diag == "down" && s.gateway != "" {
+		if s.gatewayOK {
+			diag = "isp" // LAN/gateway reachable but no internet
+		} else {
+			diag = "lan" // can't even reach the gateway
+		}
+	}
+
 	return Snapshot{
 		Type:             msgType,
 		Status:           s.status,
@@ -858,7 +873,8 @@ func (s *Server) snapshot(msgType string) Snapshot {
 		TCPPingOK:        s.tcpPingOK,
 		HTTPOK:           s.httpOK,
 		DNSOK:            s.dnsOK,
-		Diagnosis:        types.Diagnose(types.CheckResult{TCPPingOK: s.tcpPingOK, HTTPOK: s.httpOK, DNSOK: s.dnsOK}),
+		Diagnosis:        diag,
+		Gateway:          s.gateway,
 		TotalChecks:      s.totalChecks,
 		Disconnections:   s.disconnections,
 		UptimeSeconds:    time.Since(s.startTime).Seconds(),
