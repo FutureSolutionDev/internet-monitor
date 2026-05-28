@@ -46,6 +46,7 @@ func main() {
 	dash.OnTestWebhook = lgr.SendTestWebhook
 	dash.OnApplyUpdate = updater.Apply
 	dash.OnRestartApp = updater.Restart
+	dash.SetNativeNotifications(true) // GUI build shows native notifications
 	dash.Start()
 
 	checker := monitor.NewChecker(cfg)

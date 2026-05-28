@@ -161,12 +161,23 @@ func (e *Engine) Stop() {
 	}
 }
 
+// safeNotify runs a notifier callback, recovering from a panic so one bad
+// notifier can't take down the monitoring loop.
+func (e *Engine) safeNotify(fn func()) {
+	defer func() {
+		if r := recover(); r != nil && e.lgr != nil {
+			e.lgr.AppLog("PANIC recovered in notifier: %v", r)
+		}
+	}()
+	fn()
+}
+
 func (e *Engine) runCheck() {
 	result := e.checker.Check()
 	newStatus := DetermineStatus(result, &e.consecFails, e.cfg)
 
 	if e.Notifier != nil {
-		e.Notifier.OnTick(result, newStatus)
+		e.safeNotify(func() { e.Notifier.OnTick(result, newStatus) })
 	}
 
 	if e.currentStatus == nil || *e.currentStatus != newStatus {
@@ -197,7 +208,7 @@ func (e *Engine) runCheck() {
 			e.lgr.Log(event)
 		}
 		if !isFirst && e.Notifier != nil {
-			e.Notifier.OnEvent(event)
+			e.safeNotify(func() { e.Notifier.OnEvent(event) })
 		}
 
 		s := newStatus

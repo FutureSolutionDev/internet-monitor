@@ -147,6 +147,12 @@ func (l *Logger) SendSpeedTestResult(webhookURL string, event SpeedTestEvent, th
 // sendWebhook sends a payload to the configured webhook URL.
 // It logs success/failure to app.log (issue 9).
 func (l *Logger) sendWebhook(url string, payload interface{}) {
+	defer func() {
+		if r := recover(); r != nil {
+			l.AppLog("PANIC recovered in webhook send: %v", r)
+		}
+	}()
+
 	body, err := json.Marshal(payload)
 	if err != nil {
 		l.AppLog("WEBHOOK marshal error: %v", err)

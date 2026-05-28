@@ -159,6 +159,7 @@ type Snapshot struct {
 	Ticks          []TickEntry  `json:"ticks"`
 	UpdateInfo     *UpdateInfo  `json:"update_info,omitempty"`
 	SystemNotifs   bool         `json:"system_notifs"`
+	SpeedTestRunning bool       `json:"speed_test_running"`
 }
 
 type testTargetResult struct {
@@ -182,10 +183,17 @@ type testTargetsResponse struct {
 type Server struct {
 	port       int
 	configPath string
-	logDir     string
 	lgr        *logger.Logger
 	clients    map[chan string]struct{}
 	mu         sync.Mutex
+
+	// cfgMu guards logDir, which can change at runtime when the config is saved.
+	cfgMu  sync.RWMutex
+	logDir string
+
+	// nativeNotifs is set by each binary to indicate the host shows OS-native
+	// notifications (so the local dashboard suppresses duplicate browser ones).
+	nativeNotifs bool
 
 	version string
 
@@ -265,7 +273,7 @@ func (s *Server) Start() {
 
 	go func() {
 		addr := fmt.Sprintf("127.0.0.1:%d", s.port)
-		if err := http.ListenAndServe(addr, mux); err != nil {
+		if err := http.ListenAndServe(addr, s.csrfGuard(mux)); err != nil {
 			log.Printf("dashboard: failed to listen on %s: %v", addr, err)
 			if s.lgr != nil {
 				s.lgr.AppLog("FATAL dashboard ListenAndServe on %s: %v (port in use?)", addr, err)
@@ -276,6 +284,47 @@ func (s *Server) Start() {
 
 func (s *Server) URL() string {
 	return fmt.Sprintf("http://localhost:%d", s.port)
+}
+
+// SetNativeNotifications declares whether the host emits OS-native notifications.
+func (s *Server) SetNativeNotifications(v bool) {
+	s.cfgMu.Lock()
+	s.nativeNotifs = v
+	s.cfgMu.Unlock()
+}
+
+func (s *Server) getLogDir() string {
+	s.cfgMu.RLock()
+	defer s.cfgMu.RUnlock()
+	return s.logDir
+}
+
+func (s *Server) setLogDir(d string) {
+	s.cfgMu.Lock()
+	s.logDir = d
+	s.cfgMu.Unlock()
+}
+
+// csrfGuard rejects state-changing requests that carry a cross-origin Origin
+// header. The dashboard binds to loopback, so this blocks a malicious web page
+// from driving the local API (config writes, updates, speed tests) via the
+// browser. Requests with no Origin (non-browser clients) are allowed.
+func (s *Server) csrfGuard(next http.Handler) http.Handler {
+	allowed := map[string]bool{
+		fmt.Sprintf("http://localhost:%d", s.port): true,
+		fmt.Sprintf("http://127.0.0.1:%d", s.port): true,
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+		default:
+			if origin := r.Header.Get("Origin"); origin != "" && !allowed[origin] {
+				http.Error(w, "cross-origin request denied", http.StatusForbidden)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // ── Public update methods ─────────────────────────────────────
@@ -383,15 +432,27 @@ func (s *Server) serveConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		cfg.Sanitize()
+		if strings.Contains(cfg.LogDir, "..") {
+			http.Error(w, `{"error":"log_dir must not contain '..'"}`, http.StatusBadRequest)
+			return
+		}
 		pretty, _ := json.MarshalIndent(cfg, "", "  ")
 		if err := os.WriteFile(s.configPath, pretty, 0644); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		// Apply live where possible: log dir is read by this server's handlers,
+		// so keep it in sync with what the engine's logger now writes.
+		s.setLogDir(cfg.LogDir)
 		if s.OnConfigChange != nil {
 			s.OnConfigChange(&cfg)
 		}
-		w.Write([]byte(`{"ok":true}`))
+		// The HTTP listener is bound once at startup; a port change needs a restart.
+		restartRequired := cfg.DashboardPort != s.port
+		if restartRequired && s.lgr != nil {
+			s.lgr.AppLog("CONFIG dashboard_port changed to %d — restart required to take effect", cfg.DashboardPort)
+		}
+		fmt.Fprintf(w, `{"ok":true,"restart_required":%t}`, restartRequired)
 
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -404,7 +465,7 @@ func (s *Server) serveLogs(w http.ResponseWriter, r *http.Request) {
 	if date == "" {
 		date = time.Now().Format("2006-01-02")
 	}
-	filename := filepath.Join(s.logDir, fmt.Sprintf("connectivity_%s.jsonl", date))
+	filename := filepath.Join(s.getLogDir(), fmt.Sprintf("connectivity_%s.jsonl", date))
 	data, err := s.readDataFile(filename)
 	if os.IsNotExist(err) {
 		w.Write([]byte("[]"))
@@ -430,7 +491,7 @@ func (s *Server) serveLogs(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) serveLogDates(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	entries, err := os.ReadDir(s.logDir)
+	entries, err := os.ReadDir(s.getLogDir())
 	if err != nil {
 		w.Write([]byte("[]"))
 		return
@@ -737,6 +798,10 @@ func (s *Server) snapshot(msgType string) Snapshot {
 	updateInfo := s.updateInfo
 	s.updateMu.RUnlock()
 
+	s.cfgMu.RLock()
+	nativeNotifs := s.nativeNotifs
+	s.cfgMu.RUnlock()
+
 	s.stateMu.RLock()
 	defer s.stateMu.RUnlock()
 
@@ -767,8 +832,9 @@ func (s *Server) snapshot(msgType string) Snapshot {
 		LatencyHistory: hist,
 		Events:         evts,
 		Ticks:          ticks,
-		UpdateInfo:     updateInfo,
-		SystemNotifs:   s.OnTestNotification != nil,
+		UpdateInfo:       updateInfo,
+		SystemNotifs:     nativeNotifs,
+		SpeedTestRunning: s.stRunning.Load(),
 	}
 }
 
@@ -987,7 +1053,7 @@ func (s *Server) serveSpeedTestHistory(w http.ResponseWriter, r *http.Request) {
 		date = time.Now().Format("2006-01-02")
 	}
 
-	filename := filepath.Join(s.logDir, fmt.Sprintf("speedtest_%s.jsonl", date))
+	filename := filepath.Join(s.getLogDir(), fmt.Sprintf("speedtest_%s.jsonl", date))
 	data, err := s.readDataFile(filename)
 	if os.IsNotExist(err) {
 		w.Write([]byte("[]"))
