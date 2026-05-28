@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"internet-monitor/config"
 	"internet-monitor/core"
 	"internet-monitor/dashboard"
@@ -11,6 +12,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/getlantern/systray"
 )
@@ -82,5 +84,9 @@ func main() {
 	engine.Start()
 	systray.Run(t.OnReady, t.OnExit)
 	engine.Stop()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	dash.Shutdown(shutdownCtx)
+	cancel()
 	os.Exit(0)
 }

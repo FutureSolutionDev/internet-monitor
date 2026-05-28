@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"internet-monitor/config"
 	"internet-monitor/core"
 	"internet-monitor/dashboard"
@@ -92,6 +93,9 @@ func main() {
 
 	engine.Stop()
 	stopTray()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	dash.Shutdown(shutdownCtx)
+	cancel()
 	w.Destroy()
 	os.Exit(0)
 }

@@ -189,6 +189,10 @@ type Server struct {
 	clients    map[chan string]struct{}
 	mu         sync.Mutex
 
+	srv          *http.Server
+	shutdownCh   chan struct{}
+	shutdownOnce sync.Once
+
 	// cfgMu guards logDir, which can change at runtime when the config is saved.
 	cfgMu  sync.RWMutex
 	logDir string
@@ -237,6 +241,7 @@ func NewServer(port int, configPath, logDir, version string, lgr *logger.Logger)
 		lgr:        lgr,
 		version:    version,
 		clients:    make(map[chan string]struct{}),
+		shutdownCh: make(chan struct{}),
 		startTime:  time.Now(),
 		status:     "checking",
 	}
@@ -275,15 +280,29 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/report", s.serveReport)
 	mux.HandleFunc("/report", s.serveReportPage)
 
+	s.srv = &http.Server{
+		Addr:    fmt.Sprintf("127.0.0.1:%d", s.port),
+		Handler: s.csrfGuard(mux),
+	}
 	go func() {
-		addr := fmt.Sprintf("127.0.0.1:%d", s.port)
-		if err := http.ListenAndServe(addr, s.csrfGuard(mux)); err != nil {
-			log.Printf("dashboard: failed to listen on %s: %v", addr, err)
+		if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("dashboard: failed to listen on %s: %v", s.srv.Addr, err)
 			if s.lgr != nil {
-				s.lgr.AppLog("FATAL dashboard ListenAndServe on %s: %v (port in use?)", addr, err)
+				s.lgr.AppLog("FATAL dashboard ListenAndServe on %s: %v (port in use?)", s.srv.Addr, err)
 			}
 		}
 	}()
+}
+
+// Shutdown gracefully stops the HTTP server: it signals SSE handlers to exit
+// (so long-lived streams don't block the drain) and then shuts down the server
+// within the given context's deadline. Safe to call once.
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.shutdownOnce.Do(func() { close(s.shutdownCh) })
+	if s.srv != nil {
+		return s.srv.Shutdown(ctx)
+	}
+	return nil
 }
 
 func (s *Server) URL() string {
@@ -781,6 +800,8 @@ func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "data: %s\n\n", msg)
 			flusher.Flush()
 		case <-r.Context().Done():
+			return
+		case <-s.shutdownCh:
 			return
 		}
 	}
