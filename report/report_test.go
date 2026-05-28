@@ -44,6 +44,10 @@ func TestSummarizeOutages(t *testing.T) {
 	if s.Causes["tcp"].DowntimeSecs != 180 {
 		t.Errorf("tcp downtime = %v, want 180", s.Causes["tcp"].DowntimeSecs)
 	}
+	// tcp+dns failed (http ok) -> no L4 reachability -> "down"
+	if s.OutageTypes["down"] != 1 {
+		t.Errorf("OutageTypes = %+v, want one 'down'", s.OutageTypes)
+	}
 }
 
 func TestSummarizeOngoingOutage(t *testing.T) {

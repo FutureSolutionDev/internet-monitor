@@ -306,7 +306,9 @@ function process(d) {
   document.getElementById("status-sub").textContent =
     d.tcp_ping_ok && d.http_ok && d.dns_ok
       ? t("status_sub_ok")
-      : t("loss_label") + ": " + (d.packet_loss || 0).toFixed(1) + "%";
+      : d.diagnosis && d.diagnosis !== "ok"
+        ? t("diag_" + d.diagnosis)
+        : t("loss_label") + ": " + (d.packet_loss || 0).toFixed(1) + "%";
 
   // Quality badge
   if (d.total_checks > 0) {

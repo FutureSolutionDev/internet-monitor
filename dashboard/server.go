@@ -152,6 +152,7 @@ type Snapshot struct {
 	TCPPingOK        bool         `json:"tcp_ping_ok"`
 	HTTPOK           bool         `json:"http_ok"`
 	DNSOK            bool         `json:"dns_ok"`
+	Diagnosis        string       `json:"diagnosis"`
 	TotalChecks      int          `json:"total_checks"`
 	Disconnections   int          `json:"disconnections"`
 	UptimeSeconds    float64      `json:"uptime_seconds"`
@@ -852,6 +853,7 @@ func (s *Server) snapshot(msgType string) Snapshot {
 		TCPPingOK:        s.tcpPingOK,
 		HTTPOK:           s.httpOK,
 		DNSOK:            s.dnsOK,
+		Diagnosis:        types.Diagnose(types.CheckResult{TCPPingOK: s.tcpPingOK, HTTPOK: s.httpOK, DNSOK: s.dnsOK}),
 		TotalChecks:      s.totalChecks,
 		Disconnections:   s.disconnections,
 		UptimeSeconds:    time.Since(s.startTime).Seconds(),

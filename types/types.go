@@ -32,6 +32,24 @@ type CheckResult struct {
 	Timestamp  time.Time
 }
 
+// Diagnose classifies a check result into a coarse failure type, helping
+// distinguish a DNS problem from HTTP filtering from a full outage.
+// Returns one of: "ok", "down", "dns", "http", "partial".
+func Diagnose(r CheckResult) string {
+	switch {
+	case r.TCPPingOK && r.HTTPOK && r.DNSOK:
+		return "ok"
+	case !r.TCPPingOK:
+		return "down" // no L4 reachability — likely router/ISP
+	case !r.DNSOK:
+		return "dns" // reachable but name resolution failing
+	case !r.HTTPOK:
+		return "http" // reachable, DNS ok, but HTTP blocked/captive portal
+	default:
+		return "partial"
+	}
+}
+
 // EventReason contains per-layer failure details for a connectivity event.
 type EventReason struct {
 	TCPPingFailed bool    `json:"tcp_ping_failed"`

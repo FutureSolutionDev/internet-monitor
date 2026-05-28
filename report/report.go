@@ -53,6 +53,7 @@ type MonthlySummary struct {
 	MTTRSecs          float64              `json:"mttr_seconds"`
 	AvgJitterMs       int64                `json:"avg_jitter_ms"`
 	Causes            map[string]CauseStat `json:"causes"`
+	OutageTypes       map[string]int       `json:"outage_types"`
 	Days              []DayStat            `json:"days"`
 	Trend             []TrendPoint         `json:"trend"`
 }
@@ -78,6 +79,7 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 		Month:       month,
 		GeneratedAt: now.Format(time.RFC3339),
 		Causes:      map[string]CauseStat{"tcp": {}, "http": {}, "dns": {}},
+		OutageTypes: map[string]int{},
 	}
 
 	days := map[string]*dayAcc{}
@@ -117,6 +119,13 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 			if ev.Reason.DNSFailed {
 				addCause("dns", dur)
 			}
+			// Classify the outage by type (reason booleans are failures, so the
+			// ok flags are their negation).
+			sum.OutageTypes[types.Diagnose(types.CheckResult{
+				TCPPingOK: !ev.Reason.TCPPingFailed,
+				HTTPOK:    !ev.Reason.HTTPFailed,
+				DNSOK:     !ev.Reason.DNSFailed,
+			})]++
 			a := getDay(ev.Timestamp)
 			a.downtime += dur
 			a.outages++
