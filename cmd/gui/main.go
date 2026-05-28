@@ -50,6 +50,7 @@ func main() {
 
 	checker := monitor.NewChecker(cfg)
 	engine := core.New(cfg, checker, lgr, Version)
+	dash.OnConfigChange = engine.ApplyConfig
 	engine.Notifier = core.MultiNotifier{
 		dashboard.NewNotifier(dash),
 		&guiNotifier{},

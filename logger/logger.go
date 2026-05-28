@@ -38,6 +38,14 @@ func New(cfg *config.Config) (*Logger, error) {
 	return &Logger{cfg: cfg, appLog: appLog}, nil
 }
 
+// SetConfig swaps the logger's configuration under the same mutex that guards
+// all reads of l.cfg (Log / LogSpeedTest), so a live config change is race-free.
+func (l *Logger) SetConfig(cfg *config.Config) {
+	l.mu.Lock()
+	l.cfg = cfg
+	l.mu.Unlock()
+}
+
 // AppLog writes an application-level error/info to logs/app.log
 func (l *Logger) AppLog(format string, args ...interface{}) {
 	if l.appLog != nil {

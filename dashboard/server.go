@@ -14,6 +14,7 @@ import (
 	"internet-monitor/types"
 	"sync/atomic"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -262,7 +263,15 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/speed-test/cancel", s.serveSpeedTestCancel)
 	mux.HandleFunc("/api/speed-test/history", s.serveSpeedTestHistory)
 
-	go http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", s.port), mux)
+	go func() {
+		addr := fmt.Sprintf("127.0.0.1:%d", s.port)
+		if err := http.ListenAndServe(addr, mux); err != nil {
+			log.Printf("dashboard: failed to listen on %s: %v", addr, err)
+			if s.lgr != nil {
+				s.lgr.AppLog("FATAL dashboard ListenAndServe on %s: %v (port in use?)", addr, err)
+			}
+		}
+	}()
 }
 
 func (s *Server) URL() string {
@@ -371,6 +380,7 @@ func (s *Server) serveConfig(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 			return
 		}
+		cfg.Sanitize()
 		pretty, _ := json.MarshalIndent(cfg, "", "  ")
 		if err := os.WriteFile(s.configPath, pretty, 0644); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -598,9 +608,8 @@ func (s *Server) serveTestWebhook(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		URL string `json:"url"`
 	}
-	body := make([]byte, 2048)
-	n, _ := r.Body.Read(body)
-	json.Unmarshal(body[:n], &req)
+	body, _ := io.ReadAll(http.MaxBytesReader(w, r.Body, 4096))
+	json.Unmarshal(body, &req)
 
 	url := req.URL
 	if url == "" {

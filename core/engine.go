@@ -69,9 +69,10 @@ type Engine struct {
 	statusSince   time.Time
 	consecFails   int
 
-	stop chan struct{}
-	done chan struct{}
-	once sync.Once
+	reload chan *config.Config
+	stop   chan struct{}
+	done   chan struct{}
+	once   sync.Once
 }
 
 // New creates a monitoring engine. Call Start() to begin monitoring.
@@ -81,8 +82,27 @@ func New(cfg *config.Config, checker *monitor.Checker, lgr *logger.Logger, versi
 		checker: checker,
 		lgr:     lgr,
 		version: version,
+		reload:  make(chan *config.Config, 1),
 		stop:    make(chan struct{}),
 		done:    make(chan struct{}),
+	}
+}
+
+// ApplyConfig hot-applies a new configuration to the running engine. The change
+// is handed to the run goroutine, which owns all config reads, so it takes
+// effect (new targets/thresholds/interval/webhook) without a restart and without
+// data races. Non-blocking: a stale pending reload is replaced by the latest.
+func (e *Engine) ApplyConfig(cfg *config.Config) {
+	if cfg == nil {
+		return
+	}
+	select {
+	case <-e.reload:
+	default:
+	}
+	select {
+	case e.reload <- cfg:
+	default:
 	}
 }
 
@@ -97,6 +117,13 @@ func (e *Engine) Start() {
 			select {
 			case <-ticker.C:
 				e.runCheck()
+			case cfg := <-e.reload:
+				e.cfg = cfg
+				e.checker.SetConfig(cfg)
+				e.lgr.SetConfig(cfg)
+				ticker.Reset(cfg.CheckInterval())
+				e.lgr.AppLog("CONFIG reloaded: interval=%ds targets(ping=%d http=%d dns=%d)",
+					cfg.CheckIntervalSec, len(cfg.PingTargets), len(cfg.HTTPTargets), len(cfg.DNSTargets))
 			case <-e.stop:
 				return
 			}

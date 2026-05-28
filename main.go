@@ -49,6 +49,7 @@ func main() {
 	t := tray.New(cfg.LogDir, dash.URL())
 
 	engine := core.New(cfg, checker, lgr, Version)
+	dash.OnConfigChange = engine.ApplyConfig
 	engine.Notifier = core.MultiNotifier{
 		tray.NewNotifier(t),
 		dashboard.NewNotifier(dash),

@@ -88,7 +88,41 @@ func Load(path string) (*Config, error) {
 		cfg.SpeedTest.TimeoutSeconds = Default.SpeedTest.TimeoutSeconds
 	}
 
+	cfg.Sanitize()
 	return &cfg, nil
+}
+
+// Sanitize clamps out-of-range values to safe defaults so a malformed config
+// (e.g. check_interval_sec=0, which would panic time.NewTicker) can never crash
+// the process or be persisted from the dashboard.
+func (c *Config) Sanitize() {
+	if c.CheckIntervalSec < 1 {
+		c.CheckIntervalSec = Default.CheckIntervalSec
+	}
+	if c.FailThreshold < 1 {
+		c.FailThreshold = Default.FailThreshold
+	}
+	if c.PacketLossThreshold < 0 {
+		c.PacketLossThreshold = Default.PacketLossThreshold
+	}
+	if c.LatencyThreshold < 0 {
+		c.LatencyThreshold = Default.LatencyThreshold
+	}
+	if c.DashboardPort < 1 || c.DashboardPort > 65535 {
+		c.DashboardPort = Default.DashboardPort
+	}
+	if c.LogDir == "" {
+		c.LogDir = Default.LogDir
+	}
+	if c.SpeedTest.ParallelConnections < 1 {
+		c.SpeedTest.ParallelConnections = Default.SpeedTest.ParallelConnections
+	}
+	if c.SpeedTest.TimeoutSeconds < 1 {
+		c.SpeedTest.TimeoutSeconds = Default.SpeedTest.TimeoutSeconds
+	}
+	if len(c.SpeedTest.DownloadTargets) == 0 {
+		c.SpeedTest.DownloadTargets = Default.SpeedTest.DownloadTargets
+	}
 }
 
 func writeDefault(path string, cfg Config) {
@@ -100,5 +134,8 @@ func writeDefault(path string, cfg Config) {
 }
 
 func (c *Config) CheckInterval() time.Duration {
+	if c.CheckIntervalSec < 1 {
+		return time.Second
+	}
 	return time.Duration(c.CheckIntervalSec) * time.Second
 }

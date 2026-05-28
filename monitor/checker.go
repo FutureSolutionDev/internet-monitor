@@ -32,6 +32,12 @@ func NewChecker(cfg *config.Config) *Checker {
 	}
 }
 
+// SetConfig swaps the checker's configuration. Only called from the engine's
+// run goroutine (the same goroutine that calls Check), so no lock is needed.
+func (c *Checker) SetConfig(cfg *config.Config) {
+	c.cfg = cfg
+}
+
 func (c *Checker) Check() CheckResult {
 	result := CheckResult{Timestamp: time.Now()}
 
