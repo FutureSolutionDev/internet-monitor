@@ -4,11 +4,13 @@ package tray
 
 import (
 	"fmt"
+	"internet-monitor/notifytext"
 	"os/exec"
 )
 
 func Notify(title, message string) {
-	script := fmt.Sprintf(`display notification "%s" with title "%s"`, message, title)
+	script := fmt.Sprintf(`display notification "%s" with title "%s"`,
+		notifytext.EscapeAppleScript(message), notifytext.EscapeAppleScript(title))
 	exec.Command("osascript", "-e", script).Start()
 }
 

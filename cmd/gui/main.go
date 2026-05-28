@@ -27,7 +27,9 @@ func main() {
 		if resolved, err2 := filepath.EvalSymlinks(exePath); err2 == nil {
 			exePath = resolved
 		}
-		os.Chdir(filepath.Dir(exePath))
+		if err := os.Chdir(filepath.Dir(exePath)); err != nil {
+			log.Printf("warning: could not chdir to exe dir: %v — config/logs will use the current working directory", err)
+		}
 	}
 
 	cfg, err := config.Load("config.json")

@@ -4,14 +4,13 @@ package main
 
 import (
 	"internet-monitor/monitor"
+	"internet-monitor/sound"
 	"internet-monitor/tray"
 	"log"
 	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
 	"time"
-	"unsafe"
 
 	"golang.org/x/sys/windows/registry"
 )
@@ -62,46 +61,11 @@ func registerToastApp() {
 	}
 }
 
-// ── Audio (MCI) ────────────────────────────────────────────────
+// ── Audio ──────────────────────────────────────────────────────
 
-var (
-	modWinmm       = syscall.NewLazyDLL("winmm.dll")
-	procMciSendStr = modWinmm.NewProc("mciSendStringW")
-
-	ringMu      sync.Mutex
-	ringPlaying bool
-)
-
-func mciCall(cmd string) {
-	p, _ := syscall.UTF16PtrFromString(cmd)
-	procMciSendStr.Call(uintptr(unsafe.Pointer(p)), 0, 0, 0)
-}
-
-func playRingtone() {
-	path := getRingtonePath()
-	if path == "" {
-		return
-	}
-	go func() {
-		ringMu.Lock()
-		if ringPlaying {
-			mciCall("stop im_ring")
-			mciCall("close im_ring")
-		}
-		ringPlaying = true
-		ringMu.Unlock()
-
-		mciCall(`open "` + path + `" type mpegvideo alias im_ring`)
-		mciCall("play im_ring")
-		time.Sleep(15 * time.Second)
-		mciCall("stop im_ring")
-		mciCall("close im_ring")
-
-		ringMu.Lock()
-		ringPlaying = false
-		ringMu.Unlock()
-	}()
-}
+// playRingtone plays the ringtone without blocking (the shared player sleeps
+// for the clip duration, so run it in a goroutine).
+func playRingtone() { go sound.Play() }
 
 // ── Notifications ──────────────────────────────────────────────
 

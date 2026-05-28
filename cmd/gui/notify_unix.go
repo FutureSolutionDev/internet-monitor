@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"internet-monitor/monitor"
+	"internet-monitor/notifytext"
 	"os/exec"
 	"runtime"
 )
@@ -33,7 +34,8 @@ func sendNotification(status monitor.Status, result monitor.CheckResult) {
 	playRingtone()
 	switch runtime.GOOS {
 	case "darwin":
-		script := fmt.Sprintf(`display notification "%s" with title "%s"`, body, title)
+		script := fmt.Sprintf(`display notification "%s" with title "%s"`,
+			notifytext.EscapeAppleScript(body), notifytext.EscapeAppleScript(title))
 		exec.Command("osascript", "-e", script).Start()
 	default:
 		exec.Command("notify-send", "-a", "Internet Monitor", title, body).Start()

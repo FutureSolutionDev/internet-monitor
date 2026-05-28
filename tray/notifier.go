@@ -1,9 +1,8 @@
 package tray
 
 import (
-	"fmt"
+	"internet-monitor/notifytext"
 	"internet-monitor/types"
-	"strings"
 	"sync"
 	"time"
 )
@@ -28,17 +27,17 @@ func (n *TrayNotifier) OnTick(result types.CheckResult, status types.Status) {
 
 // OnEvent updates icon + menu label + tooltip only when status changes.
 func (n *TrayNotifier) OnEvent(event types.Event) {
-	s := eventTypeToStatus(event.EventType)
-	n.t.applyStatus(s, types.CheckResult{
+	s := notifytext.StatusFromEventType(event.EventType)
+	r := types.CheckResult{
 		TCPPingOK:  !event.Reason.TCPPingFailed,
 		HTTPOK:     !event.Reason.HTTPFailed,
 		DNSOK:      !event.Reason.DNSFailed,
 		LatencyMs:  event.Reason.AvgLatencyMs,
 		PacketLoss: event.Reason.PacketLossPct,
-	})
+	}
+	n.t.applyStatus(s, r)
 
-	title := titleForStatus(s)
-	body := bodyForEvent(event)
+	title, body := notifytext.Build(s, r)
 
 	// Debounce: skip if a notification was sent within the cooldown window.
 	n.mu.Lock()
@@ -50,56 +49,4 @@ func (n *TrayNotifier) OnEvent(event types.Event) {
 	n.mu.Unlock()
 
 	go Notify(title, body)
-}
-
-func eventTypeToStatus(eventType string) types.Status {
-	switch eventType {
-	case "connected":
-		return types.StatusConnected
-	case "degraded":
-		return types.StatusDegraded
-	default:
-		return types.StatusDisconnected
-	}
-}
-
-func titleForStatus(s types.Status) string {
-	switch s {
-	case types.StatusConnected:
-		return "✅ الإنترنت عاد / Restored"
-	case types.StatusDegraded:
-		return "⚠️ الإنترنت ضعيف / Degraded"
-	default:
-		return "🔴 الإنترنت انقطع / Disconnected"
-	}
-}
-
-func bodyForEvent(event types.Event) string {
-	r := event.Reason
-	s := eventTypeToStatus(event.EventType)
-
-	switch s {
-	case types.StatusConnected:
-		if r.AvgLatencyMs > 0 {
-			return fmt.Sprintf("زمن الاستجابة: %dms", r.AvgLatencyMs)
-		}
-		return "جميع الفحوصات ناجحة"
-	case types.StatusDegraded:
-		return fmt.Sprintf("فقدان: %.0f%% — زمن: %dms", r.PacketLossPct, r.AvgLatencyMs)
-	default:
-		var parts []string
-		if r.TCPPingFailed {
-			parts = append(parts, "TCP")
-		}
-		if r.HTTPFailed {
-			parts = append(parts, "HTTP")
-		}
-		if r.DNSFailed {
-			parts = append(parts, "DNS")
-		}
-		if len(parts) == 0 {
-			return "فقدان الاتصال"
-		}
-		return strings.Join(parts, " + ") + " فشل"
-	}
 }
