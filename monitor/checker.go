@@ -23,6 +23,12 @@ func NewChecker(cfg *config.Config) *Checker {
 		history:  make([]bool, 0, 10),
 		httpClient: &http.Client{
 			Timeout: 5 * time.Second,
+			// Don't follow redirects: a captive portal that 302-redirects the
+			// generate_204 probe to a login page must count as "not connected",
+			// not as a success.
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
 			Transport: &http.Transport{
 				DisableKeepAlives:   true,
 				DisableCompression:  true,
@@ -42,8 +48,8 @@ func (c *Checker) Check() CheckResult {
 	result := CheckResult{Timestamp: time.Now()}
 
 	// ── TCP Ping: try each target, succeed on first success ──────
-	start := time.Now()
 	for _, target := range c.cfg.PingTargets {
+		start := time.Now()
 		conn, err := net.DialTimeout("tcp", target, 2*time.Second)
 		if err == nil {
 			conn.Close()

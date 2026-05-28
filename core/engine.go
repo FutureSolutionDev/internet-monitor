@@ -189,9 +189,14 @@ func (e *Engine) runCheck() {
 			},
 		}
 
-		e.lgr.Log(event)
-
-		if e.currentStatus != nil && e.Notifier != nil {
+		// First observation is a baseline, not a transition: only persist it if
+		// the link starts unhealthy (so a "started while down" is recorded), and
+		// never fire a notification for it.
+		isFirst := e.currentStatus == nil
+		if !isFirst || newStatus != types.StatusConnected {
+			e.lgr.Log(event)
+		}
+		if !isFirst && e.Notifier != nil {
 			e.Notifier.OnEvent(event)
 		}
 

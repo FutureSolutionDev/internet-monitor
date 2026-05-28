@@ -207,7 +207,7 @@ type Server struct {
 	dnsOK          bool
 	totalChecks    int
 	disconnections int
-	connectedTicks int
+	upTicks        int
 	startTime      time.Time
 	latencyHistory []int64
 	events         []EventEntry
@@ -289,8 +289,10 @@ func (s *Server) UpdateTick(result types.CheckResult, status types.Status) {
 	s.httpOK = result.HTTPOK
 	s.dnsOK = result.DNSOK
 	s.totalChecks++
-	if status == types.StatusConnected {
-		s.connectedTicks++
+	// "Up" = reachable, including degraded (slow but online). Only a full
+	// disconnection counts against uptime.
+	if status != types.StatusDisconnected {
+		s.upTicks++
 	}
 	s.latencyHistory = append(s.latencyHistory, result.LatencyMs)
 	if len(s.latencyHistory) > maxHistory {
@@ -472,7 +474,11 @@ func (s *Server) serveTestTargets(w http.ResponseWriter, r *http.Request) {
 		req.DNSTargets = []string{req.DNSTarget}
 	}
 
-	httpClient := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{DisableKeepAlives: true}}
+	httpClient := &http.Client{
+		Timeout:       5 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+		Transport:     &http.Transport{DisableKeepAlives: true},
+	}
 	resp := testTargetsResponse{PingTargets: make([]testTargetResult, 0)}
 
 	for _, target := range req.PingTargets {
@@ -505,8 +511,14 @@ func (s *Server) serveTestTargets(w http.ResponseWriter, r *http.Request) {
 		rt := testTargetResult{Target: target}
 		if err == nil {
 			httpResp.Body.Close()
-			rt.OK = true
-			rt.LatencyMs = lat
+			// Mirror the live monitor: only 200/204 count as reachable, so the
+			// test doesn't give a false green for a 3xx/4xx/5xx endpoint.
+			if httpResp.StatusCode == 200 || httpResp.StatusCode == 204 {
+				rt.OK = true
+				rt.LatencyMs = lat
+			} else {
+				rt.Error = fmt.Sprintf("http_%d", httpResp.StatusCode)
+			}
 		} else {
 			rt.Error = simplifyError(err.Error())
 		}
@@ -728,7 +740,7 @@ func (s *Server) snapshot(msgType string) Snapshot {
 
 	uptimePct := 0.0
 	if s.totalChecks > 0 {
-		uptimePct = float64(s.connectedTicks) / float64(s.totalChecks) * 100
+		uptimePct = float64(s.upTicks) / float64(s.totalChecks) * 100
 	}
 
 	return Snapshot{
