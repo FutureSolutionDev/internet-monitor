@@ -8,7 +8,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-const runKey  = `SOFTWARE\Microsoft\Windows\CurrentVersion\Run`
+const runKey = `SOFTWARE\Microsoft\Windows\CurrentVersion\Run`
 const appName = "InternetMonitor"
 
 func Supported() bool { return true }

@@ -115,11 +115,11 @@ func discordEventPayload(event monitor.Event) map[string]interface{} {
 	return map[string]interface{}{
 		"username": "Internet Monitor",
 		"embeds": []map[string]interface{}{{
-			"title":       fmt.Sprintf("%s Internet %s", emoji, capitalize(event.EventType)),
-			"color":       color,
-			"fields":      allFields,
-			"timestamp":   event.Timestamp.UTC().Format(time.RFC3339),
-			"footer":      map[string]string{"text": "Internet Monitor • Event Log"},
+			"title":     fmt.Sprintf("%s Internet %s", emoji, capitalize(event.EventType)),
+			"color":     color,
+			"fields":    allFields,
+			"timestamp": event.Timestamp.UTC().Format(time.RFC3339),
+			"footer":    map[string]string{"text": "Internet Monitor • Event Log"},
 		}},
 	}
 }

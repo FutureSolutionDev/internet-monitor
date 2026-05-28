@@ -11,7 +11,7 @@ type SpeedTestConfig struct {
 	DownloadTargets     []string `json:"download_targets"`
 	ParallelConnections int      `json:"parallel_connections"`
 	TimeoutSeconds      int      `json:"timeout_seconds"`
-	UploadTarget        string   `json:"upload_target"`       // reserved, ignored in v1
+	UploadTarget        string   `json:"upload_target"` // reserved, ignored in v1
 	AlertThresholdMbps  float64  `json:"alert_threshold_mbps"`
 }
 

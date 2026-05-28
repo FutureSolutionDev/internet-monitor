@@ -4,8 +4,8 @@ package dashboard
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"internet-monitor/config"
 	"internet-monitor/logger"
@@ -13,7 +13,6 @@ import (
 	"internet-monitor/speedtest"
 	"internet-monitor/startup"
 	"internet-monitor/types"
-	"sync/atomic"
 	"io"
 	"log"
 	"net"
@@ -24,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -115,8 +115,8 @@ func RingtoneMp3() []byte {
 }
 
 const maxHistory = 60
-const maxEvents  = 100
-const maxTicks   = 20
+const maxEvents = 100
+const maxTicks = 20
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -134,34 +134,34 @@ type TickEntry struct {
 // EventEntry is the in-memory / SSE representation of a connectivity event.
 // Reason is sent as structured booleans so the client can translate it.
 type EventEntry struct {
-	Time          string  `json:"time"`
-	EventType     string  `json:"event_type"`
-	Duration      float64 `json:"duration_seconds"`
-	TCPFailed     bool    `json:"tcp_failed"`
-	HTTPFailed    bool    `json:"http_failed"`
-	DNSFailed     bool    `json:"dns_failed"`
-	PacketLoss    float64 `json:"packet_loss_pct"`
-	LatencyMs     int64   `json:"latency_ms"`
+	Time       string  `json:"time"`
+	EventType  string  `json:"event_type"`
+	Duration   float64 `json:"duration_seconds"`
+	TCPFailed  bool    `json:"tcp_failed"`
+	HTTPFailed bool    `json:"http_failed"`
+	DNSFailed  bool    `json:"dns_failed"`
+	PacketLoss float64 `json:"packet_loss_pct"`
+	LatencyMs  int64   `json:"latency_ms"`
 }
 
 type Snapshot struct {
-	Type           string       `json:"type"`
-	Status         string       `json:"status"`
-	LatencyMs      int64        `json:"latency_ms"`
-	PacketLoss     float64      `json:"packet_loss"`
-	TCPPingOK      bool         `json:"tcp_ping_ok"`
-	HTTPOK         bool         `json:"http_ok"`
-	DNSOK          bool         `json:"dns_ok"`
-	TotalChecks    int          `json:"total_checks"`
-	Disconnections int          `json:"disconnections"`
-	UptimeSeconds  float64      `json:"uptime_seconds"`
-	UptimePct      float64      `json:"uptime_pct"`
-	LatencyHistory []int64      `json:"latency_history"`
-	Events         []EventEntry `json:"events"`
-	Ticks          []TickEntry  `json:"ticks"`
-	UpdateInfo     *UpdateInfo  `json:"update_info,omitempty"`
-	SystemNotifs   bool         `json:"system_notifs"`
-	SpeedTestRunning bool       `json:"speed_test_running"`
+	Type             string       `json:"type"`
+	Status           string       `json:"status"`
+	LatencyMs        int64        `json:"latency_ms"`
+	PacketLoss       float64      `json:"packet_loss"`
+	TCPPingOK        bool         `json:"tcp_ping_ok"`
+	HTTPOK           bool         `json:"http_ok"`
+	DNSOK            bool         `json:"dns_ok"`
+	TotalChecks      int          `json:"total_checks"`
+	Disconnections   int          `json:"disconnections"`
+	UptimeSeconds    float64      `json:"uptime_seconds"`
+	UptimePct        float64      `json:"uptime_pct"`
+	LatencyHistory   []int64      `json:"latency_history"`
+	Events           []EventEntry `json:"events"`
+	Ticks            []TickEntry  `json:"ticks"`
+	UpdateInfo       *UpdateInfo  `json:"update_info,omitempty"`
+	SystemNotifs     bool         `json:"system_notifs"`
+	SpeedTestRunning bool         `json:"speed_test_running"`
 }
 
 type testTargetResult struct {
@@ -203,11 +203,11 @@ type Server struct {
 
 	version string
 
-	OnConfigChange      func(*config.Config)
-	OnTestNotification  func()
-	OnTestWebhook       func(url string) string
-	OnApplyUpdate       func(downloadURL string) error
-	OnRestartApp        func()
+	OnConfigChange     func(*config.Config)
+	OnTestNotification func()
+	OnTestWebhook      func(url string) string
+	OnApplyUpdate      func(downloadURL string) error
+	OnRestartApp       func()
 
 	updateMu   sync.RWMutex
 	updateInfo *updateSnapshot
@@ -843,20 +843,20 @@ func (s *Server) snapshot(msgType string) Snapshot {
 	}
 
 	return Snapshot{
-		Type:           msgType,
-		Status:         s.status,
-		LatencyMs:      s.latencyMs,
-		PacketLoss:     s.packetLoss,
-		TCPPingOK:      s.tcpPingOK,
-		HTTPOK:         s.httpOK,
-		DNSOK:          s.dnsOK,
-		TotalChecks:    s.totalChecks,
-		Disconnections: s.disconnections,
-		UptimeSeconds:  time.Since(s.startTime).Seconds(),
-		UptimePct:      uptimePct,
-		LatencyHistory: hist,
-		Events:         evts,
-		Ticks:          ticks,
+		Type:             msgType,
+		Status:           s.status,
+		LatencyMs:        s.latencyMs,
+		PacketLoss:       s.packetLoss,
+		TCPPingOK:        s.tcpPingOK,
+		HTTPOK:           s.httpOK,
+		DNSOK:            s.dnsOK,
+		TotalChecks:      s.totalChecks,
+		Disconnections:   s.disconnections,
+		UptimeSeconds:    time.Since(s.startTime).Seconds(),
+		UptimePct:        uptimePct,
+		LatencyHistory:   hist,
+		Events:           evts,
+		Ticks:            ticks,
 		UpdateInfo:       updateInfo,
 		SystemNotifs:     nativeNotifs,
 		SpeedTestRunning: s.stRunning.Load(),
@@ -1031,12 +1031,12 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 		s.stateMu.Unlock()
 
 		done, _ := json.Marshal(map[string]interface{}{
-			"type":  "speed_test_progress",
-			"phase": "download",
-			"current_mbps": result.DownloadMbps,
+			"type":            "speed_test_progress",
+			"phase":           "download",
+			"current_mbps":    result.DownloadMbps,
 			"elapsed_seconds": result.DurationSeconds,
-			"done":   true,
-			"result": event,
+			"done":            true,
+			"result":          event,
 		})
 		s.broadcastRaw(string(done))
 	}()
