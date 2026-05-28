@@ -405,7 +405,7 @@ func (s *Server) serveLogs(w http.ResponseWriter, r *http.Request) {
 		date = time.Now().Format("2006-01-02")
 	}
 	filename := filepath.Join(s.logDir, fmt.Sprintf("connectivity_%s.jsonl", date))
-	data, err := os.ReadFile(filename)
+	data, err := s.readDataFile(filename)
 	if os.IsNotExist(err) {
 		w.Write([]byte("[]"))
 		return
@@ -721,6 +721,15 @@ func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// readDataFile reads a log/history file under the logger's write lock when a
+// logger is present, so reads don't interleave with concurrent appends.
+func (s *Server) readDataFile(path string) ([]byte, error) {
+	if s.lgr != nil {
+		return s.lgr.ReadFile(path)
+	}
+	return os.ReadFile(path)
+}
+
 // ── Internal ──────────────────────────────────────────────────
 
 func (s *Server) snapshot(msgType string) Snapshot {
@@ -830,23 +839,26 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if s.stRunning.Load() {
+	// Atomic check-and-set: two concurrent starts can't both pass.
+	if !s.stRunning.CompareAndSwap(false, true) {
 		w.WriteHeader(http.StatusConflict)
 		w.Write([]byte(`{"error":"test_already_running"}`))
 		return
 	}
-	s.stRunning.Store(true)
 
 	data, _ := os.ReadFile(s.configPath)
 	var cfg config.Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		cfg = config.Default
 	}
+	cfg.Sanitize() // clamp parallel_connections etc. even for hand-edited files
 	if len(cfg.SpeedTest.DownloadTargets) == 0 {
 		cfg.SpeedTest = config.Default.SpeedTest
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	// Store the cancel func before anyone can observe stRunning via a cancel
+	// request, so a running test is always cancelable.
 	s.stateMu.Lock()
 	s.stCancel = cancel
 	s.stateMu.Unlock()
@@ -863,8 +875,16 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 
 	go func() {
 		defer func() {
-			s.stRunning.Store(false)
+			if rec := recover(); rec != nil && s.lgr != nil {
+				s.lgr.AppLog("PANIC recovered in speed test goroutine: %v", rec)
+			}
 			cancel()
+			s.stateMu.Lock()
+			s.stCancel = nil
+			s.stateMu.Unlock()
+			// Release the run lock last, so a new test can only start once this
+			// goroutine has fully torn down.
+			s.stRunning.Store(false)
 		}()
 
 		totalSecs := stCfg.Timeout.Seconds()
@@ -894,15 +914,11 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		s.stateMu.RLock()
-		latency := s.latencyMs
-		s.stateMu.RUnlock()
-
 		event := logger.SpeedTestEvent{
 			Timestamp:       time.Now().UTC(),
 			Event:           "speed_test",
 			DownloadMbps:    result.DownloadMbps,
-			LatencyMs:       latency,
+			LatencyMs:       result.LatencyMs,
 			DurationSeconds: result.DurationSeconds,
 			Endpoints:       result.Endpoints,
 			ParallelConns:   result.ParallelConns,
@@ -943,13 +959,15 @@ func (s *Server) serveSpeedTestCancel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	// Only trigger cancellation; the run goroutine's defer clears stCancel and
+	// releases stRunning once it has actually torn down. Flipping them here
+	// would let a second test start while the first is still winding down.
 	s.stateMu.Lock()
-	if s.stCancel != nil {
-		s.stCancel()
-		s.stCancel = nil
-	}
+	cancel := s.stCancel
 	s.stateMu.Unlock()
-	s.stRunning.Store(false)
+	if cancel != nil {
+		cancel()
+	}
 	w.Write([]byte(`{"ok":true}`))
 }
 
@@ -970,7 +988,7 @@ func (s *Server) serveSpeedTestHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filename := filepath.Join(s.logDir, fmt.Sprintf("speedtest_%s.jsonl", date))
-	data, err := os.ReadFile(filename)
+	data, err := s.readDataFile(filename)
 	if os.IsNotExist(err) {
 		w.Write([]byte("[]"))
 		return

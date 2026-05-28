@@ -38,6 +38,14 @@ func New(cfg *config.Config) (*Logger, error) {
 	return &Logger{cfg: cfg, appLog: appLog}, nil
 }
 
+// ReadFile reads a log file under the same mutex that guards writes, so a
+// reader never observes a torn line from a concurrent append.
+func (l *Logger) ReadFile(path string) ([]byte, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return os.ReadFile(path)
+}
+
 // SetConfig swaps the logger's configuration under the same mutex that guards
 // all reads of l.cfg (Log / LogSpeedTest), so a live config change is race-free.
 func (l *Logger) SetConfig(cfg *config.Config) {

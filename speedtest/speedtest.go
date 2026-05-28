@@ -4,11 +4,17 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"net/http"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 )
+
+// maxParallel caps worker fan-out so a malformed config can't spawn an
+// unbounded number of goroutines/connections.
+const maxParallel = 64
 
 // Result holds the outcome of a completed speed test.
 type Result struct {
@@ -45,6 +51,9 @@ func Run(ctx context.Context, cfg Config, progress func(float64, time.Duration))
 	if cfg.Parallel < 1 {
 		cfg.Parallel = 1
 	}
+	if cfg.Parallel > maxParallel {
+		cfg.Parallel = maxParallel
+	}
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = 10 * time.Second
 	}
@@ -54,75 +63,72 @@ func Run(ctx context.Context, cfg Config, progress func(float64, time.Duration))
 
 	var totalBytes atomic.Int64
 	var errCount atomic.Int64
-	chunkIdx := 0
+	var chunkIdx atomic.Int64
 	start := time.Now()
 
-	var wg sync.WaitGroup
 	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: false}}
 
-	fetchChunk := func(endpoint string, chunkBytes int64) {
-		defer wg.Done()
-		url := endpoint
-		if chunkBytes > 0 {
-			url = endpoint + "?bytes=" + itoa(chunkBytes)
-		}
-		req, err := http.NewRequestWithContext(tctx, "GET", url, nil)
-		if err != nil {
-			errCount.Add(1)
-			return
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			errCount.Add(1)
-			return
-		}
-		defer resp.Body.Close()
-		n, _ := io.Copy(io.Discard, resp.Body)
-		totalBytes.Add(n)
-	}
+	// Latency to the download endpoint itself (headers only), measured before
+	// saturating the link — this is the speed test's own RTT, not the
+	// connectivity monitor's ping latency.
+	latencyMs := measureLatency(tctx, client, cfg.Endpoints[0])
 
-	// Launch initial parallel workers
+	// Fixed worker pool: each worker fetches chunks in a loop until the context
+	// ends. Every wg.Add happens here, before wg.Wait — so Add never races with
+	// Wait (the previous design grew the WaitGroup from the ticker goroutine).
+	var wg sync.WaitGroup
+	worker := func(id int) {
+		defer wg.Done()
+		for tctx.Err() == nil {
+			endpoint := cfg.Endpoints[id%len(cfg.Endpoints)]
+			url := endpoint + "?bytes=" + strconv.FormatInt(chunkSizes[chunkIdx.Load()], 10)
+			req, err := http.NewRequestWithContext(tctx, "GET", url, nil)
+			if err != nil {
+				errCount.Add(1)
+				return
+			}
+			resp, err := client.Do(req)
+			if err != nil {
+				errCount.Add(1)
+				continue
+			}
+			n, _ := io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+			totalBytes.Add(n)
+		}
+	}
 	for i := 0; i < cfg.Parallel; i++ {
 		wg.Add(1)
-		endpoint := cfg.Endpoints[i%len(cfg.Endpoints)]
-		go fetchChunk(endpoint, chunkSizes[chunkIdx])
+		go worker(i)
 	}
 
-	// Progress ticker + adaptive chunk advancement
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
+	// Progress reporter + adaptive chunk advancement. Single goroutine, reads
+	// shared counters atomically, never touches the WaitGroup.
 	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-tctx.Done():
 				return
 			case <-ticker.C:
 				elapsed := time.Since(start)
-				bytes := totalBytes.Load()
-				if elapsed.Seconds() > 0 {
-					mbps := float64(bytes*8) / elapsed.Seconds() / 1_000_000
-					if progress != nil {
-						progress(mbps, elapsed)
-					}
-					// Advance chunk size if on a fast link
-					if elapsed.Seconds() < 3 && mbps > 200 && chunkIdx < len(chunkSizes)-1 {
-						chunkIdx++
-					}
-					// Launch another wave of workers to keep saturation
-					if elapsed < cfg.Timeout-1*time.Second {
-						for i := 0; i < cfg.Parallel; i++ {
-							wg.Add(1)
-							endpoint := cfg.Endpoints[i%len(cfg.Endpoints)]
-							go fetchChunk(endpoint, chunkSizes[chunkIdx])
-						}
+				if elapsed.Seconds() <= 0 {
+					continue
+				}
+				mbps := float64(totalBytes.Load()*8) / elapsed.Seconds() / 1_000_000
+				if progress != nil {
+					progress(mbps, elapsed)
+				}
+				if elapsed.Seconds() < 3 && mbps > 200 {
+					if i := chunkIdx.Load(); i < int64(len(chunkSizes))-1 {
+						chunkIdx.Store(i + 1)
 					}
 				}
 			}
 		}
 	}()
 
-	// Wait for timeout or cancellation
 	<-tctx.Done()
 	wg.Wait()
 
@@ -132,7 +138,6 @@ func Run(ctx context.Context, cfg Config, progress func(float64, time.Duration))
 	if ctx.Err() != nil && bytes == 0 {
 		return nil, ctx.Err()
 	}
-
 	if errCount.Load() > 0 && bytes == 0 {
 		return nil, errors.New("all_endpoints_failed")
 	}
@@ -141,27 +146,32 @@ func Run(ctx context.Context, cfg Config, progress func(float64, time.Duration))
 	if elapsed.Seconds() > 0 {
 		downloadMbps = float64(bytes*8) / elapsed.Seconds() / 1_000_000
 	}
-	// Round to 1 decimal
-	downloadMbps = float64(int(downloadMbps*10+0.5)) / 10
+	downloadMbps = math.Round(downloadMbps*10) / 10
 
 	return &Result{
 		DownloadMbps:    downloadMbps,
+		LatencyMs:       latencyMs,
 		DurationSeconds: elapsed.Seconds(),
 		Endpoints:       cfg.Endpoints,
 		ParallelConns:   cfg.Parallel,
 	}, nil
 }
 
-func itoa(n int64) string {
-	if n == 0 {
-		return "0"
+// measureLatency does a single small request to the endpoint and returns the
+// round-trip in ms, or 0 if it fails.
+func measureLatency(ctx context.Context, client *http.Client, endpoint string) int64 {
+	lctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(lctx, "GET", endpoint+"?bytes=0", nil)
+	if err != nil {
+		return 0
 	}
-	buf := [20]byte{}
-	pos := len(buf)
-	for n > 0 {
-		pos--
-		buf[pos] = byte('0' + n%10)
-		n /= 10
+	t0 := time.Now()
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0
 	}
-	return string(buf[pos:])
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	return time.Since(t0).Milliseconds()
 }
