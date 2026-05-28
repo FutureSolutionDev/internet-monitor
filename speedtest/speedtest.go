@@ -1,6 +1,7 @@
 package speedtest
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -16,6 +17,9 @@ import (
 // unbounded number of goroutines/connections.
 const maxParallel = 64
 
+// uploadChunk is the size of each POST body during the upload test.
+const uploadChunk = 1_000_000
+
 // Result holds the outcome of a completed speed test.
 type Result struct {
 	DownloadMbps    float64
@@ -27,9 +31,10 @@ type Result struct {
 
 // Config holds the parameters for a single test run.
 type Config struct {
-	Endpoints []string
-	Parallel  int
-	Timeout   time.Duration
+	Endpoints    []string
+	Parallel     int
+	Timeout      time.Duration
+	UploadTarget string // optional; empty disables the upload phase
 }
 
 var chunkSizes = []int64{
@@ -155,6 +160,77 @@ func Run(ctx context.Context, cfg Config, progress func(float64, time.Duration))
 		Endpoints:       cfg.Endpoints,
 		ParallelConns:   cfg.Parallel,
 	}, nil
+}
+
+// MeasureUpload saturates the upload link by POSTing fixed-size chunks with a
+// pool of workers until the timeout, returning the measured Mbps. Returns
+// (0, err) if cancelled before any bytes were sent or all requests failed.
+func MeasureUpload(ctx context.Context, cfg Config) (float64, error) {
+	if cfg.UploadTarget == "" {
+		return 0, errors.New("no upload target configured")
+	}
+	if cfg.Parallel < 1 {
+		cfg.Parallel = 1
+	}
+	if cfg.Parallel > maxParallel {
+		cfg.Parallel = maxParallel
+	}
+	if cfg.Timeout <= 0 {
+		cfg.Timeout = 10 * time.Second
+	}
+
+	tctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+	defer cancel()
+
+	var totalBytes atomic.Int64
+	var errCount atomic.Int64
+	start := time.Now()
+
+	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: false}}
+
+	var wg sync.WaitGroup
+	worker := func() {
+		defer wg.Done()
+		payload := make([]byte, uploadChunk)
+		for tctx.Err() == nil {
+			req, err := http.NewRequestWithContext(tctx, "POST", cfg.UploadTarget, bytes.NewReader(payload))
+			if err != nil {
+				errCount.Add(1)
+				return
+			}
+			req.Header.Set("Content-Type", "application/octet-stream")
+			resp, err := client.Do(req)
+			if err != nil {
+				errCount.Add(1)
+				continue
+			}
+			io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+			totalBytes.Add(int64(len(payload)))
+		}
+	}
+	for i := 0; i < cfg.Parallel; i++ {
+		wg.Add(1)
+		go worker()
+	}
+
+	<-tctx.Done()
+	wg.Wait()
+
+	elapsed := time.Since(start)
+	sent := totalBytes.Load()
+	if ctx.Err() != nil && sent == 0 {
+		return 0, ctx.Err()
+	}
+	if errCount.Load() > 0 && sent == 0 {
+		return 0, errors.New("upload_failed")
+	}
+
+	mbps := 0.0
+	if elapsed.Seconds() > 0 {
+		mbps = float64(sent*8) / elapsed.Seconds() / 1_000_000
+	}
+	return math.Round(mbps*10) / 10, nil
 }
 
 // measureLatency does a single small request to the endpoint and returns the

@@ -2,12 +2,36 @@ package speedtest
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
 )
+
+func TestMeasureUpload(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.Copy(io.Discard, r.Body)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	mbps, err := MeasureUpload(context.Background(),
+		Config{UploadTarget: srv.URL + "/__up", Parallel: 2, Timeout: time.Second})
+	if err != nil {
+		t.Fatalf("MeasureUpload error: %v", err)
+	}
+	if mbps <= 0 {
+		t.Fatalf("upload mbps = %v, want > 0", mbps)
+	}
+}
+
+func TestMeasureUploadNoTarget(t *testing.T) {
+	if _, err := MeasureUpload(context.Background(), Config{Timeout: time.Second}); err == nil {
+		t.Error("expected error when upload target is empty")
+	}
+}
 
 func sizedServer() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

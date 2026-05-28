@@ -211,9 +211,16 @@ func BuildSpeedResultPayload(event SpeedTestEvent, thresholdMbps float64, belowT
 
 	fields := []map[string]interface{}{
 		{"name": "📥 Download", "value": fmt.Sprintf("%.1f Mbps", event.DownloadMbps), "inline": true},
-		{"name": "⏱️ Duration", "value": fmt.Sprintf("%.1fs", event.DurationSeconds), "inline": true},
-		{"name": "📡 Latency", "value": fmt.Sprintf("%dms", event.LatencyMs), "inline": true},
 	}
+	if event.UploadMbps != nil {
+		fields = append(fields, map[string]interface{}{
+			"name": "📤 Upload", "value": fmt.Sprintf("%.1f Mbps", *event.UploadMbps), "inline": true,
+		})
+	}
+	fields = append(fields,
+		map[string]interface{}{"name": "⏱️ Duration", "value": fmt.Sprintf("%.1fs", event.DurationSeconds), "inline": true},
+		map[string]interface{}{"name": "📡 Latency", "value": fmt.Sprintf("%dms", event.LatencyMs), "inline": true},
+	)
 	if belowThreshold && thresholdMbps > 0 {
 		fields = append(fields, map[string]interface{}{
 			"name": "⚠️ Threshold", "value": fmt.Sprintf("%.1f Mbps", thresholdMbps), "inline": true,
@@ -236,8 +243,12 @@ func BuildSpeedResultPayload(event SpeedTestEvent, thresholdMbps float64, belowT
 	if belowThreshold {
 		statusIcon = "⚠️"
 	}
-	text := fmt.Sprintf("*%s %s*\n📥 Download: *%.1f Mbps* | ⏱️ %.1fs | 📡 %dms",
-		statusIcon, title, event.DownloadMbps, event.DurationSeconds, event.LatencyMs)
+	upStr := ""
+	if event.UploadMbps != nil {
+		upStr = fmt.Sprintf(" | 📤 %.1f Mbps", *event.UploadMbps)
+	}
+	text := fmt.Sprintf("*%s %s*\n📥 Download: *%.1f Mbps*%s | ⏱️ %.1fs | 📡 %dms",
+		statusIcon, title, event.DownloadMbps, upStr, event.DurationSeconds, event.LatencyMs)
 	if belowThreshold && thresholdMbps > 0 {
 		text += fmt.Sprintf("\n⚠️ Below threshold: %.1f Mbps", thresholdMbps)
 	}

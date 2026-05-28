@@ -960,9 +960,10 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 		timeout = 10 * time.Second
 	}
 	stCfg := speedtest.Config{
-		Endpoints: cfg.SpeedTest.DownloadTargets,
-		Parallel:  cfg.SpeedTest.ParallelConnections,
-		Timeout:   timeout,
+		Endpoints:    cfg.SpeedTest.DownloadTargets,
+		Parallel:     cfg.SpeedTest.ParallelConnections,
+		Timeout:      timeout,
+		UploadTarget: cfg.SpeedTest.UploadTarget,
 	}
 
 	go func() {
@@ -1006,10 +1007,24 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Upload phase (optional). Reuses the run's cancel context so a cancel
+		// request stops it too.
+		var uploadMbps *float64
+		if stCfg.UploadTarget != "" {
+			up, _ := json.Marshal(map[string]interface{}{
+				"type": "speed_test_progress", "phase": "upload", "done": false,
+			})
+			s.broadcastRaw(string(up))
+			if mbps, uerr := speedtest.MeasureUpload(ctx, stCfg); uerr == nil {
+				uploadMbps = &mbps
+			}
+		}
+
 		event := logger.SpeedTestEvent{
 			Timestamp:       time.Now().UTC(),
 			Event:           "speed_test",
 			DownloadMbps:    result.DownloadMbps,
+			UploadMbps:      uploadMbps,
 			LatencyMs:       result.LatencyMs,
 			DurationSeconds: result.DurationSeconds,
 			Endpoints:       result.Endpoints,
@@ -1215,6 +1230,9 @@ func (s *Server) serveMetrics(w http.ResponseWriter, r *http.Request) {
 	if stLast != nil {
 		metric("internet_monitor_speedtest_download_mbps", "gauge", "Download speed (Mbps) from the last speed test.", stLast.DownloadMbps)
 		metric("internet_monitor_speedtest_latency_ms", "gauge", "Latency (ms) from the last speed test.", stLast.LatencyMs)
+		if stLast.UploadMbps != nil {
+			metric("internet_monitor_speedtest_upload_mbps", "gauge", "Upload speed (Mbps) from the last speed test.", *stLast.UploadMbps)
+		}
 	}
 
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")

@@ -1376,8 +1376,15 @@ function handleSpeedProgress(d) {
     _speedReset();
     return;
   }
+  if (d.phase === "upload" && !d.done) {
+    if (status) status.textContent = t("speed_uploading");
+    return;
+  }
   if (d.done) {
     if (dl) dl.textContent = (d.current_mbps || 0).toFixed(1);
+    const ul = document.getElementById("speed-ul-result");
+    if (ul && d.result && d.result.upload_mbps != null)
+      ul.textContent = d.result.upload_mbps.toFixed(1);
     if (status) status.textContent = t("speed_done");
     if (fill) fill.style.width = "100%";
     _speedReset();
@@ -1439,7 +1446,7 @@ async function loadSpeedHistory() {
     const tbody = document.getElementById("speed-history-tbody");
     if (!tbody) return;
     if (!rows || rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="4" class="empty">${t("no_events")}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" class="empty">${t("no_events")}</td></tr>`;
       return;
     }
     tbody.innerHTML = rows
@@ -1447,6 +1454,7 @@ async function loadSpeedHistory() {
         (r) => `<tr>
       <td class="mono">${(r.timestamp || "").slice(11, 19)}</td>
       <td class="mono">${(r.download_mbps || 0).toFixed(1)}</td>
+      <td class="mono">${r.upload_mbps != null ? r.upload_mbps.toFixed(1) : "—"}</td>
       <td class="mono">${(r.duration_seconds || 0).toFixed(1)}</td>
       <td>${r.triggered_by === "user" ? t("speed_user") : t("speed_schedule")}</td>
     </tr>`,

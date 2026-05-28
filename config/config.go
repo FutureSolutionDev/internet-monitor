@@ -11,7 +11,7 @@ type SpeedTestConfig struct {
 	DownloadTargets     []string `json:"download_targets"`
 	ParallelConnections int      `json:"parallel_connections"`
 	TimeoutSeconds      int      `json:"timeout_seconds"`
-	UploadTarget        string   `json:"upload_target"` // reserved, ignored in v1
+	UploadTarget        string   `json:"upload_target"` // POST endpoint for the upload test; empty disables it
 	AlertThresholdMbps  float64  `json:"alert_threshold_mbps"`
 }
 
@@ -44,6 +44,7 @@ var Default = Config{
 		DownloadTargets:     []string{"https://speed.cloudflare.com/__down"},
 		ParallelConnections: 4,
 		TimeoutSeconds:      10,
+		UploadTarget:        "https://speed.cloudflare.com/__up",
 	},
 }
 
@@ -122,6 +123,9 @@ func (c *Config) Sanitize() {
 	}
 	if len(c.SpeedTest.DownloadTargets) == 0 {
 		c.SpeedTest.DownloadTargets = Default.SpeedTest.DownloadTargets
+	}
+	if c.SpeedTest.UploadTarget == "" {
+		c.SpeedTest.UploadTarget = Default.SpeedTest.UploadTarget
 	}
 }
 
