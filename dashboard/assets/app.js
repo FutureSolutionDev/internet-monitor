@@ -349,6 +349,9 @@ function process(d) {
   setChk("chk-dns", d.dns_ok, "DNS");
   document.getElementById("loss-val").textContent =
     t("loss_label") + ": " + (d.packet_loss || 0).toFixed(1) + "%";
+  const jv = document.getElementById("jitter-val");
+  if (jv) jv.textContent = t("jitter_label") + ": " + (d.jitter_ms || 0) + "ms";
+  renderTargets(d.targets || []);
 
   // Chart
   if (d.latency_history && d.latency_history.length) {
@@ -395,6 +398,23 @@ function process(d) {
       })
       .join("");
   }
+}
+
+// Renders per-target check status (target strings are user-controlled -> escHtml).
+function renderTargets(targets) {
+  const el = document.getElementById("targets-list");
+  if (!el) return;
+  if (!targets.length) {
+    el.innerHTML = "";
+    return;
+  }
+  el.innerHTML = targets
+    .map((tr) => {
+      const mark = tr.ok ? "✓" : "✗";
+      const lat = tr.ok && tr.latency_ms ? " " + tr.latency_ms + "ms" : "";
+      return `<span class="chk-badge ${tr.ok ? "ok" : "fail"}" title="${tr.layer.toUpperCase()}">${tr.layer.toUpperCase()}: ${escHtml(tr.target)} ${mark}${lat}</span>`;
+    })
+    .join("");
 }
 
 // ── SSE ────────────────────────────────────────────────────────

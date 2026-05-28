@@ -145,25 +145,26 @@ type EventEntry struct {
 }
 
 type Snapshot struct {
-	Type             string       `json:"type"`
-	Status           string       `json:"status"`
-	LatencyMs        int64        `json:"latency_ms"`
-	PacketLoss       float64      `json:"packet_loss"`
-	TCPPingOK        bool         `json:"tcp_ping_ok"`
-	HTTPOK           bool         `json:"http_ok"`
-	DNSOK            bool         `json:"dns_ok"`
-	Diagnosis        string       `json:"diagnosis"`
-	TotalChecks      int          `json:"total_checks"`
-	Disconnections   int          `json:"disconnections"`
-	UptimeSeconds    float64      `json:"uptime_seconds"`
-	UptimePct        float64      `json:"uptime_pct"`
-	JitterMs         int64        `json:"jitter_ms"`
-	LatencyHistory   []int64      `json:"latency_history"`
-	Events           []EventEntry `json:"events"`
-	Ticks            []TickEntry  `json:"ticks"`
-	UpdateInfo       *UpdateInfo  `json:"update_info,omitempty"`
-	SystemNotifs     bool         `json:"system_notifs"`
-	SpeedTestRunning bool         `json:"speed_test_running"`
+	Type             string               `json:"type"`
+	Status           string               `json:"status"`
+	LatencyMs        int64                `json:"latency_ms"`
+	PacketLoss       float64              `json:"packet_loss"`
+	TCPPingOK        bool                 `json:"tcp_ping_ok"`
+	HTTPOK           bool                 `json:"http_ok"`
+	DNSOK            bool                 `json:"dns_ok"`
+	Diagnosis        string               `json:"diagnosis"`
+	TotalChecks      int                  `json:"total_checks"`
+	Disconnections   int                  `json:"disconnections"`
+	UptimeSeconds    float64              `json:"uptime_seconds"`
+	UptimePct        float64              `json:"uptime_pct"`
+	JitterMs         int64                `json:"jitter_ms"`
+	LatencyHistory   []int64              `json:"latency_history"`
+	Targets          []types.TargetResult `json:"targets"`
+	Events           []EventEntry         `json:"events"`
+	Ticks            []TickEntry          `json:"ticks"`
+	UpdateInfo       *UpdateInfo          `json:"update_info,omitempty"`
+	SystemNotifs     bool                 `json:"system_notifs"`
+	SpeedTestRunning bool                 `json:"speed_test_running"`
 }
 
 type testTargetResult struct {
@@ -228,6 +229,7 @@ type Server struct {
 	latencyHistory []int64
 	events         []EventEntry
 	ticks          []TickEntry
+	targets        []types.TargetResult
 
 	// Speed test state
 	stRunning atomic.Bool
@@ -363,6 +365,7 @@ func (s *Server) UpdateTick(result types.CheckResult, status types.Status) {
 	s.tcpPingOK = result.TCPPingOK
 	s.httpOK = result.HTTPOK
 	s.dnsOK = result.DNSOK
+	s.targets = result.Targets
 	s.totalChecks++
 	// "Up" = reachable, including degraded (slow but online). Only a full
 	// disconnection counts against uptime.
@@ -839,6 +842,8 @@ func (s *Server) snapshot(msgType string) Snapshot {
 	copy(evts, s.events)
 	ticks := make([]TickEntry, len(s.ticks))
 	copy(ticks, s.ticks)
+	tgts := make([]types.TargetResult, len(s.targets))
+	copy(tgts, s.targets)
 
 	uptimePct := 0.0
 	if s.totalChecks > 0 {
@@ -860,6 +865,7 @@ func (s *Server) snapshot(msgType string) Snapshot {
 		UptimePct:        uptimePct,
 		JitterMs:         jitterOf(hist),
 		LatencyHistory:   hist,
+		Targets:          tgts,
 		Events:           evts,
 		Ticks:            ticks,
 		UpdateInfo:       updateInfo,

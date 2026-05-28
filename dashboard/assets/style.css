@@ -880,3 +880,5 @@ input:focus {
 .btn-secondary:hover {
   background: var(--bg3);
 }
+.targets-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.targets-list .chk-badge { font-size: 12px; }

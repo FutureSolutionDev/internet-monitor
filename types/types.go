@@ -22,6 +22,14 @@ func (s Status) String() string {
 	}
 }
 
+// TargetResult is the per-target outcome within a check layer.
+type TargetResult struct {
+	Layer     string `json:"layer"` // "tcp" | "http" | "dns"
+	Target    string `json:"target"`
+	OK        bool   `json:"ok"`
+	LatencyMs int64  `json:"latency_ms"`
+}
+
 // CheckResult holds the outcome of a single check cycle.
 type CheckResult struct {
 	TCPPingOK  bool
@@ -30,6 +38,7 @@ type CheckResult struct {
 	LatencyMs  int64
 	PacketLoss float64
 	Timestamp  time.Time
+	Targets    []TargetResult `json:"targets,omitempty"`
 }
 
 // Diagnose classifies a check result into a coarse failure type, helping
