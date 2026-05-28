@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"internet-monitor/config"
 	"internet-monitor/monitor"
+	"internet-monitor/types"
 	"io"
 	"log"
 	"net/http"
@@ -131,6 +132,64 @@ func (l *Logger) LogSpeedTest(event SpeedTestEvent) {
 		f.Close()
 	} else {
 		l.AppLog("ERROR open speedtest log: %v", err)
+	}
+}
+
+// LogSample appends a one-minute metric aggregate to metrics_YYYY-MM-DD.jsonl.
+func (l *Logger) LogSample(s types.MetricSample) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	filename := filepath.Join(
+		l.cfg.LogDir,
+		fmt.Sprintf("metrics_%s.jsonl", time.Now().Format("2006-01-02")),
+	)
+	data, err := json.Marshal(s)
+	if err != nil {
+		l.AppLog("ERROR marshal metric sample: %v", err)
+		return
+	}
+	data = append(data, '\n')
+
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err == nil {
+		f.Write(data)
+		f.Close()
+	} else {
+		l.AppLog("ERROR open metrics log: %v", err)
+	}
+}
+
+// CleanupOldLogs deletes connectivity/speedtest/metrics log files older than
+// maxAge (by file modification time). Best-effort; errors are logged only.
+func (l *Logger) CleanupOldLogs(maxAge time.Duration) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	entries, err := os.ReadDir(l.cfg.LogDir)
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().Add(-maxAge)
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".jsonl") {
+			continue
+		}
+		if !(strings.HasPrefix(name, "connectivity_") ||
+			strings.HasPrefix(name, "speedtest_") ||
+			strings.HasPrefix(name, "metrics_")) {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().Before(cutoff) {
+			if err := os.Remove(filepath.Join(l.cfg.LogDir, name)); err != nil {
+				l.AppLog("ERROR removing old log %s: %v", name, err)
+			}
+		}
 	}
 }
 

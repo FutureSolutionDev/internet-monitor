@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"internet-monitor/config"
 	"internet-monitor/logger"
+	"internet-monitor/report"
 	"internet-monitor/speedtest"
 	"internet-monitor/startup"
 	"internet-monitor/types"
@@ -271,6 +272,8 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/speed-test/start", s.serveSpeedTestStart)
 	mux.HandleFunc("/api/speed-test/cancel", s.serveSpeedTestCancel)
 	mux.HandleFunc("/api/speed-test/history", s.serveSpeedTestHistory)
+	mux.HandleFunc("/api/report", s.serveReport)
+	mux.HandleFunc("/report", s.serveReportPage)
 
 	go func() {
 		addr := fmt.Sprintf("127.0.0.1:%d", s.port)
@@ -1081,6 +1084,77 @@ func (s *Server) serveSpeedTestHistory(w http.ResponseWriter, r *http.Request) {
 		entries = entries[:limit]
 	}
 	json.NewEncoder(w).Encode(entries)
+}
+
+// ── Monthly report ────────────────────────────────────────────
+
+func validMonth(m string) bool {
+	if len(m) != 7 || m[4] != '-' {
+		return false
+	}
+	for i, c := range m {
+		if i == 4 {
+			continue
+		}
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// readMonthlyJSONL reads every "<prefix><month>-*.jsonl" file in the log dir
+// (under the logger lock) and unmarshals each valid line into T.
+func readMonthlyJSONL[T any](s *Server, prefix, month string) []T {
+	dir := s.getLogDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	want := prefix + month
+	var out []T
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasPrefix(name, want) || !strings.HasSuffix(name, ".jsonl") {
+			continue
+		}
+		data, err := s.readDataFile(filepath.Join(dir, name))
+		if err != nil {
+			continue
+		}
+		for _, line := range bytes.Split(bytes.TrimSpace(data), []byte{'\n'}) {
+			line = bytes.TrimSpace(line)
+			if len(line) == 0 || !json.Valid(line) {
+				continue
+			}
+			var v T
+			if json.Unmarshal(line, &v) == nil {
+				out = append(out, v)
+			}
+		}
+	}
+	return out
+}
+
+func (s *Server) serveReport(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	month := r.URL.Query().Get("month")
+	if !validMonth(month) {
+		month = time.Now().Format("2006-01")
+	}
+	events := readMonthlyJSONL[types.Event](s, "connectivity_", month)
+	samples := readMonthlyJSONL[types.MetricSample](s, "metrics_", month)
+	json.NewEncoder(w).Encode(report.Summarize(events, samples, month, time.Now()))
+}
+
+func (s *Server) serveReportPage(w http.ResponseWriter, r *http.Request) {
+	data, err := staticFiles.ReadFile("assets/report.html")
+	if err != nil {
+		http.Error(w, "report.html not found", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(data)
 }
 
 func (s *Server) broadcastRaw(msg string) {

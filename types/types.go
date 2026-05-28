@@ -48,3 +48,17 @@ type Event struct {
 	DurationSeconds float64     `json:"duration_seconds,omitempty"`
 	Reason          EventReason `json:"reason"`
 }
+
+// MetricSample is a one-minute aggregate of check results, persisted to
+// metrics_YYYY-MM-DD.jsonl and used to build rich monthly reports.
+type MetricSample struct {
+	Timestamp    time.Time `json:"timestamp"`      // start of the minute bucket
+	Samples      int       `json:"samples"`        // checks in this minute
+	UpSamples    int       `json:"up_samples"`     // checks that were not disconnected
+	AvgLatencyMs int64     `json:"avg_latency_ms"`
+	MaxLatencyMs int64     `json:"max_latency_ms"`
+	AvgLossPct   float64   `json:"avg_loss_pct"`
+	TCPFails     int       `json:"tcp_fails"`
+	HTTPFails    int       `json:"http_fails"`
+	DNSFails     int       `json:"dns_fails"`
+}

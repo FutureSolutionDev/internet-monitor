@@ -69,10 +69,28 @@ type Engine struct {
 	statusSince   time.Time
 	consecFails   int
 
+	agg minuteAgg
+
 	reload chan *config.Config
 	stop   chan struct{}
 	done   chan struct{}
 	once   sync.Once
+}
+
+const logRetention = 90 * 24 * time.Hour
+
+// minuteAgg accumulates check results within a one-minute bucket. Accessed only
+// from the run goroutine, so it needs no locking.
+type minuteAgg struct {
+	bucket    time.Time
+	samples   int
+	up        int
+	latSum    int64
+	latMax    int64
+	lossSum   float64
+	tcpFails  int
+	httpFails int
+	dnsFails  int
 }
 
 // New creates a monitoring engine. Call Start() to begin monitoring.
@@ -125,6 +143,19 @@ func (e *Engine) Start() {
 				e.lgr.AppLog("CONFIG reloaded: interval=%ds targets(ping=%d http=%d dns=%d)",
 					cfg.CheckIntervalSec, len(cfg.PingTargets), len(cfg.HTTPTargets), len(cfg.DNSTargets))
 			case <-e.stop:
+				e.flushAgg() // persist the partial minute before exiting
+				return
+			}
+		}
+	}()
+
+	// Daily retention cleanup of old log files.
+	go func() {
+		for {
+			e.lgr.CleanupOldLogs(logRetention)
+			select {
+			case <-time.After(24 * time.Hour):
+			case <-e.stop:
 				return
 			}
 		}
@@ -161,6 +192,55 @@ func (e *Engine) Stop() {
 	}
 }
 
+// accumulate folds a check result into the current minute bucket, flushing a
+// completed minute to the metrics log. Runs only in the engine goroutine.
+func (e *Engine) accumulate(r types.CheckResult, status types.Status) {
+	min := r.Timestamp.Truncate(time.Minute)
+	if e.agg.bucket.IsZero() {
+		e.agg.bucket = min
+	}
+	if !min.Equal(e.agg.bucket) {
+		e.flushAgg()
+		e.agg = minuteAgg{bucket: min}
+	}
+	e.agg.samples++
+	if status != types.StatusDisconnected {
+		e.agg.up++
+	}
+	e.agg.latSum += r.LatencyMs
+	if r.LatencyMs > e.agg.latMax {
+		e.agg.latMax = r.LatencyMs
+	}
+	e.agg.lossSum += r.PacketLoss
+	if !r.TCPPingOK {
+		e.agg.tcpFails++
+	}
+	if !r.HTTPOK {
+		e.agg.httpFails++
+	}
+	if !r.DNSOK {
+		e.agg.dnsFails++
+	}
+}
+
+// flushAgg writes the current minute bucket (if non-empty) to the metrics log.
+func (e *Engine) flushAgg() {
+	if e.agg.samples == 0 || e.lgr == nil {
+		return
+	}
+	e.lgr.LogSample(types.MetricSample{
+		Timestamp:    e.agg.bucket,
+		Samples:      e.agg.samples,
+		UpSamples:    e.agg.up,
+		AvgLatencyMs: e.agg.latSum / int64(e.agg.samples),
+		MaxLatencyMs: e.agg.latMax,
+		AvgLossPct:   e.agg.lossSum / float64(e.agg.samples),
+		TCPFails:     e.agg.tcpFails,
+		HTTPFails:    e.agg.httpFails,
+		DNSFails:     e.agg.dnsFails,
+	})
+}
+
 // safeNotify runs a notifier callback, recovering from a panic so one bad
 // notifier can't take down the monitoring loop.
 func (e *Engine) safeNotify(fn func()) {
@@ -175,6 +255,8 @@ func (e *Engine) safeNotify(fn func()) {
 func (e *Engine) runCheck() {
 	result := e.checker.Check()
 	newStatus := DetermineStatus(result, &e.consecFails, e.cfg)
+
+	e.accumulate(result, newStatus)
 
 	if e.Notifier != nil {
 		e.safeNotify(func() { e.Notifier.OnTick(result, newStatus) })
