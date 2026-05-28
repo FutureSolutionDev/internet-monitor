@@ -48,6 +48,12 @@ func TestSummarizeOutages(t *testing.T) {
 	if s.OutageTypes["down"] != 1 {
 		t.Errorf("OutageTypes = %+v, want one 'down'", s.OutageTypes)
 	}
+	if len(s.Events) != 1 || s.Events[0].Type != "disconnected" || s.Events[0].Cause != "tcp+dns" {
+		t.Errorf("Events = %+v, want one disconnected with cause tcp+dns", s.Events)
+	}
+	if s.Causes["tcp"].Pct != 100 {
+		t.Errorf("tcp Pct = %v, want 100", s.Causes["tcp"].Pct)
+	}
 }
 
 func TestSummarizeOngoingOutage(t *testing.T) {

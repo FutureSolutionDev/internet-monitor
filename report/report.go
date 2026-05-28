@@ -6,6 +6,7 @@ package report
 import (
 	"internet-monitor/types"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -13,6 +14,15 @@ import (
 type CauseStat struct {
 	Outages      int     `json:"outages"`
 	DowntimeSecs float64 `json:"downtime_seconds"`
+	Pct          float64 `json:"pct"` // share of disconnections this layer was involved in
+}
+
+// EventRow is one incident (disconnected/degraded) in the chronological log.
+type EventRow struct {
+	Time         string  `json:"time"` // RFC3339
+	Type         string  `json:"type"` // degraded | disconnected
+	DurationSecs float64 `json:"duration_seconds"`
+	Cause        string  `json:"cause"` // failed layers, e.g. "tcp+dns"
 }
 
 // DayStat is the per-day row of the report table.
@@ -54,6 +64,7 @@ type MonthlySummary struct {
 	AvgJitterMs       int64                `json:"avg_jitter_ms"`
 	Causes            map[string]CauseStat `json:"causes"`
 	OutageTypes       map[string]int       `json:"outage_types"`
+	Events            []EventRow           `json:"events"`
 	Days              []DayStat            `json:"days"`
 	Trend             []TrendPoint         `json:"trend"`
 }
@@ -126,6 +137,12 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 				HTTPOK:    !ev.Reason.HTTPFailed,
 				DNSOK:     !ev.Reason.DNSFailed,
 			})]++
+			sum.Events = append(sum.Events, EventRow{
+				Time:         ev.Timestamp.Format(time.RFC3339),
+				Type:         "disconnected",
+				DurationSecs: dur,
+				Cause:        failedLayers(ev.Reason),
+			})
 			a := getDay(ev.Timestamp)
 			a.downtime += dur
 			a.outages++
@@ -134,11 +151,26 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 			}
 		case "degraded":
 			sum.DegradedEpisodes++
-			sum.TotalDegradedSecs += segmentDuration(events, k, now)
+			ddur := segmentDuration(events, k, now)
+			sum.TotalDegradedSecs += ddur
+			cause := failedLayers(ev.Reason)
+			if cause == "" {
+				cause = "latency/loss"
+			}
+			sum.Events = append(sum.Events, EventRow{
+				Time:         ev.Timestamp.Format(time.RFC3339),
+				Type:         "degraded",
+				DurationSecs: ddur,
+				Cause:        cause,
+			})
 		}
 	}
 	if sum.Disconnections > 0 {
 		sum.MTTRSecs = sum.TotalDowntimeSecs / float64(sum.Disconnections)
+		for layer, c := range sum.Causes {
+			c.Pct = float64(c.Outages) / float64(sum.Disconnections) * 100
+			sum.Causes[layer] = c
+		}
 	}
 
 	// Trend, uptime and per-day metrics from one-minute samples.
@@ -191,6 +223,21 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 	}
 
 	return sum
+}
+
+// failedLayers joins the failed check layers of an event reason, e.g. "tcp+dns".
+func failedLayers(r types.EventReason) string {
+	var p []string
+	if r.TCPPingFailed {
+		p = append(p, "tcp")
+	}
+	if r.HTTPFailed {
+		p = append(p, "http")
+	}
+	if r.DNSFailed {
+		p = append(p, "dns")
+	}
+	return strings.Join(p, "+")
 }
 
 // segmentDuration returns how long events[k]'s state lasted: the next event's
