@@ -279,6 +279,7 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/speed-test/history", s.serveSpeedTestHistory)
 	mux.HandleFunc("/api/report", s.serveReport)
 	mux.HandleFunc("/report", s.serveReportPage)
+	mux.HandleFunc("/metrics", s.serveMetrics)
 
 	s.srv = &http.Server{
 		Addr:    fmt.Sprintf("127.0.0.1:%d", s.port),
@@ -1166,6 +1167,58 @@ func (s *Server) serveReport(w http.ResponseWriter, r *http.Request) {
 	events := readMonthlyJSONL[types.Event](s, "connectivity_", month)
 	samples := readMonthlyJSONL[types.MetricSample](s, "metrics_", month)
 	json.NewEncoder(w).Encode(report.Summarize(events, samples, month, time.Now()))
+}
+
+// serveMetrics exposes the live monitoring state in Prometheus text exposition
+// format. Hand-written to avoid pulling in the prometheus client dependency.
+func (s *Server) serveMetrics(w http.ResponseWriter, r *http.Request) {
+	s.stateMu.RLock()
+	status := s.status
+	latency := s.latencyMs
+	loss := s.packetLoss
+	tcp, httpOK, dns := s.tcpPingOK, s.httpOK, s.dnsOK
+	total, disc, up := s.totalChecks, s.disconnections, s.upTicks
+	stLast := s.stLast
+	s.stateMu.RUnlock()
+
+	b01 := func(ok bool) int {
+		if ok {
+			return 1
+		}
+		return 0
+	}
+	upVal := 0
+	if status == "connected" || status == "degraded" {
+		upVal = 1
+	}
+	uptimeRatio := 0.0
+	if total > 0 {
+		uptimeRatio = float64(up) / float64(total)
+	}
+
+	var b strings.Builder
+	metric := func(name, typ, help string, val interface{}) {
+		fmt.Fprintf(&b, "# HELP %s %s\n# TYPE %s %s\n%s %v\n", name, help, name, typ, name, val)
+	}
+
+	fmt.Fprintf(&b, "# HELP internet_monitor_build_info Build information.\n# TYPE internet_monitor_build_info gauge\ninternet_monitor_build_info{version=%q} 1\n", s.version)
+	metric("internet_monitor_up", "gauge", "1 if the internet is reachable (connected or degraded), else 0.", upVal)
+	metric("internet_monitor_latency_ms", "gauge", "Most recent connectivity latency in milliseconds.", latency)
+	metric("internet_monitor_packet_loss_ratio", "gauge", "Most recent packet loss ratio (0-1).", loss/100)
+	metric("internet_monitor_tcp_ok", "gauge", "1 if the last TCP ping succeeded.", b01(tcp))
+	metric("internet_monitor_http_ok", "gauge", "1 if the last HTTP check succeeded.", b01(httpOK))
+	metric("internet_monitor_dns_ok", "gauge", "1 if the last DNS lookup succeeded.", b01(dns))
+	metric("internet_monitor_checks_total", "counter", "Total checks performed since start.", total)
+	metric("internet_monitor_up_checks_total", "counter", "Checks where the link was up since start.", up)
+	metric("internet_monitor_disconnections_total", "counter", "Disconnection events since start.", disc)
+	metric("internet_monitor_uptime_ratio", "gauge", "Up checks divided by total checks (0-1).", uptimeRatio)
+	if stLast != nil {
+		metric("internet_monitor_speedtest_download_mbps", "gauge", "Download speed (Mbps) from the last speed test.", stLast.DownloadMbps)
+		metric("internet_monitor_speedtest_latency_ms", "gauge", "Latency (ms) from the last speed test.", stLast.LatencyMs)
+	}
+
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	w.Write([]byte(b.String()))
 }
 
 func (s *Server) serveReportPage(w http.ResponseWriter, r *http.Request) {

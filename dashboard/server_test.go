@@ -2,9 +2,35 @@ package dashboard
 
 import (
 	"context"
+	"internet-monitor/types"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestServeMetrics(t *testing.T) {
+	s := NewServer(0, "config.json", "logs", "v1.2.3", nil)
+	s.UpdateTick(types.CheckResult{TCPPingOK: true, HTTPOK: true, DNSOK: true, LatencyMs: 42}, types.StatusConnected)
+
+	rec := httptest.NewRecorder()
+	s.serveMetrics(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+
+	body := rec.Body.String()
+	for _, want := range []string{
+		`internet_monitor_build_info{version="v1.2.3"} 1`,
+		"internet_monitor_up 1",
+		"internet_monitor_latency_ms 42",
+		"internet_monitor_checks_total 1",
+		"internet_monitor_up_checks_total 1",
+		"# TYPE internet_monitor_up gauge",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("metrics output missing %q\n---\n%s", want, body)
+		}
+	}
+}
 
 func TestGracefulShutdown(t *testing.T) {
 	// port 0 lets the OS pick a free port; we only care that Shutdown returns.
