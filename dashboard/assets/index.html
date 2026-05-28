@@ -160,6 +160,8 @@
             <option value="" data-i18n="logs_select">اختر تاريخاً...</option>
           </select>
           <button class="btn btn-secondary" onclick="exportCSV()" data-i18n="export_csv">تصدير CSV</button>
+          <input type="month" id="report-month" class="report-month" />
+          <button class="btn btn-secondary" onclick="openReport()" data-i18n="report_btn">تقرير شهري (PDF)</button>
           <span id="log-count"></span>
         </div>
         <table>

@@ -417,6 +417,17 @@ function connect() {
 // ══════════════════════════════════════════════════════════════
 let logsData = [];
 
+// Opens the printable monthly outage report for the selected month (or the
+// current month) in a new tab; the report page offers Print / Save as PDF.
+function openReport() {
+  let m = document.getElementById("report-month")?.value;
+  if (!m) {
+    const n = new Date();
+    m = n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0");
+  }
+  window.open("/report?month=" + encodeURIComponent(m), "_blank");
+}
+
 async function loadLogDates() {
   const sel = document.getElementById("log-date-select");
   if (sel.options.length > 1) return; // already populated
