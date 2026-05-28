@@ -25,6 +25,10 @@ function toggleLang() {
   renderPingTargets();
 }
 
+// Effective monitor thresholds, kept in sync with the backend config so the
+// reason text matches the connected/degraded decision the server actually made.
+let monitorThresholds = { loss: 20, lat: 500 };
+
 // Builds a translated reason string from structured event data (EventEntry or JSONL reason object)
 function formatEventReason(e) {
   const parts = [];
@@ -39,9 +43,11 @@ function formatEventReason(e) {
   if (dns) parts.push(t("reason_dns"));
 
   if (!parts.length) {
-    if (loss > 20) parts.push(t("reason_loss") + " " + loss.toFixed(0) + "%");
-    else if (lat > 500) parts.push(t("reason_latency") + " (" + lat + "ms)");
-  } else if (loss > 20) {
+    if (loss > monitorThresholds.loss)
+      parts.push(t("reason_loss") + " " + loss.toFixed(0) + "%");
+    else if (lat > monitorThresholds.lat)
+      parts.push(t("reason_latency") + " (" + lat + "ms)");
+  } else if (loss > monitorThresholds.loss) {
     parts.push(t("reason_loss") + " " + loss.toFixed(0) + "%");
   }
 
@@ -254,7 +260,8 @@ function escHtml(str) {
 // ── Dashboard: process SSE data ────────────────────────────────
 let avgSum = 0,
   avgCnt = 0,
-  lastData = null;
+  lastData = null,
+  speedObservedRunning = false;
 
 function process(d) {
   if (d.update_info && d.update_info.has_update)
@@ -265,6 +272,19 @@ function process(d) {
   }
   const prevStatus = lastData ? lastData.status : null;
   lastData = d;
+
+  // Self-heal: if a speed test was running and the snapshot now reports it
+  // finished, recover the UI in case the one-shot "done" message was dropped.
+  if (d.speed_test_running === true) {
+    speedObservedRunning = true;
+  } else if (speedObservedRunning) {
+    speedObservedRunning = false;
+    const run = document.getElementById("speed-run-btn");
+    if (run && run.disabled) {
+      _speedReset();
+      loadSpeedHistory();
+    }
+  }
   const st = d.status || "checking";
 
   // Browser notification on status change
@@ -829,6 +849,10 @@ async function loadSettings() {
       cfg.packet_loss_threshold || 20;
     document.getElementById("cfg-latency-threshold").value =
       cfg.latency_threshold_ms || 500;
+    monitorThresholds = {
+      loss: cfg.packet_loss_threshold || 20,
+      lat: cfg.latency_threshold_ms || 500,
+    };
     document.getElementById("cfg-webhook").value = cfg.webhook_url || "";
     validateWebhookURL(cfg.webhook_url || "");
     document.getElementById("cfg-log-dir").value = cfg.log_dir || "logs";
@@ -1249,6 +1273,19 @@ api
   .then((d) => {
     const el = document.getElementById("app-version");
     if (el && d.version) el.textContent = d.version;
+  })
+  .catch(() => {});
+
+// Load effective thresholds once so event-reason text matches the backend
+// before the settings tab is opened.
+api
+  .get("/api/config")
+  .then((r) => r.json())
+  .then((cfg) => {
+    monitorThresholds = {
+      loss: cfg.packet_loss_threshold || 20,
+      lat: cfg.latency_threshold_ms || 500,
+    };
   })
   .catch(() => {});
 
