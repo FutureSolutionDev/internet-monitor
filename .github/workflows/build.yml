@@ -48,11 +48,13 @@ jobs:
       - name: go test
         run: go test ./...
 
-      - name: golangci-lint (advisory)
-        uses: golangci/golangci-lint-action@v6
-        continue-on-error: true
-        with:
-          version: latest
+      # Blocking lint, pinned, scoped to the portable (non-CGO) packages — the
+      # bulk of the logic. The CGO/platform packages (tray, cmd/gui, root main)
+      # are still covered by `go vet ./...` and the per-OS build jobs.
+      - name: golangci-lint
+        run: |
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.5.0
+          golangci-lint run ./config/... ./core/... ./dashboard/... ./logger/... ./monitor/... ./report/... ./speedtest/... ./types/... ./updater/... ./notifytext/... ./sound/...
 
   # ══════════════════════════════════════════════════════════════
   # VERSION — generates the semver tag first (push only)

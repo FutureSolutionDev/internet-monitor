@@ -176,9 +176,9 @@ func (l *Logger) CleanupOldLogs(maxAge time.Duration) {
 		if e.IsDir() || !strings.HasSuffix(name, ".jsonl") {
 			continue
 		}
-		if !(strings.HasPrefix(name, "connectivity_") ||
-			strings.HasPrefix(name, "speedtest_") ||
-			strings.HasPrefix(name, "metrics_")) {
+		if !strings.HasPrefix(name, "connectivity_") &&
+			!strings.HasPrefix(name, "speedtest_") &&
+			!strings.HasPrefix(name, "metrics_") {
 			continue
 		}
 		info, err := e.Info()
