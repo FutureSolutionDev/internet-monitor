@@ -57,6 +57,7 @@ type MetricSample struct {
 	UpSamples    int       `json:"up_samples"` // checks that were not disconnected
 	AvgLatencyMs int64     `json:"avg_latency_ms"`
 	MaxLatencyMs int64     `json:"max_latency_ms"`
+	JitterMs     int64     `json:"jitter_ms"`
 	AvgLossPct   float64   `json:"avg_loss_pct"`
 	TCPFails     int       `json:"tcp_fails"`
 	HTTPFails    int       `json:"http_fails"`

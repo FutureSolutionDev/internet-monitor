@@ -156,6 +156,7 @@ type Snapshot struct {
 	Disconnections   int          `json:"disconnections"`
 	UptimeSeconds    float64      `json:"uptime_seconds"`
 	UptimePct        float64      `json:"uptime_pct"`
+	JitterMs         int64        `json:"jitter_ms"`
 	LatencyHistory   []int64      `json:"latency_history"`
 	Events           []EventEntry `json:"events"`
 	Ticks            []TickEntry  `json:"ticks"`
@@ -855,6 +856,7 @@ func (s *Server) snapshot(msgType string) Snapshot {
 		Disconnections:   s.disconnections,
 		UptimeSeconds:    time.Since(s.startTime).Seconds(),
 		UptimePct:        uptimePct,
+		JitterMs:         jitterOf(hist),
 		LatencyHistory:   hist,
 		Events:           evts,
 		Ticks:            ticks,
@@ -862,6 +864,24 @@ func (s *Server) snapshot(msgType string) Snapshot {
 		SystemNotifs:     nativeNotifs,
 		SpeedTestRunning: s.stRunning.Load(),
 	}
+}
+
+// jitterOf returns the mean absolute difference between consecutive latency
+// samples — a simple jitter estimate over the recent history window.
+func jitterOf(hist []int64) int64 {
+	if len(hist) < 2 {
+		return 0
+	}
+	var sum, n int64
+	for i := 1; i < len(hist); i++ {
+		d := hist[i] - hist[i-1]
+		if d < 0 {
+			d = -d
+		}
+		sum += d
+		n++
+	}
+	return sum / n
 }
 
 func (s *Server) broadcast(msgType string) {
@@ -1194,6 +1214,8 @@ func (s *Server) serveMetrics(w http.ResponseWriter, r *http.Request) {
 	tcp, httpOK, dns := s.tcpPingOK, s.httpOK, s.dnsOK
 	total, disc, up := s.totalChecks, s.disconnections, s.upTicks
 	stLast := s.stLast
+	hist := make([]int64, len(s.latencyHistory))
+	copy(hist, s.latencyHistory)
 	s.stateMu.RUnlock()
 
 	b01 := func(ok bool) int {
@@ -1219,6 +1241,7 @@ func (s *Server) serveMetrics(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(&b, "# HELP internet_monitor_build_info Build information.\n# TYPE internet_monitor_build_info gauge\ninternet_monitor_build_info{version=%q} 1\n", s.version)
 	metric("internet_monitor_up", "gauge", "1 if the internet is reachable (connected or degraded), else 0.", upVal)
 	metric("internet_monitor_latency_ms", "gauge", "Most recent connectivity latency in milliseconds.", latency)
+	metric("internet_monitor_jitter_ms", "gauge", "Mean latency jitter over the recent history window.", jitterOf(hist))
 	metric("internet_monitor_packet_loss_ratio", "gauge", "Most recent packet loss ratio (0-1).", loss/100)
 	metric("internet_monitor_tcp_ok", "gauge", "1 if the last TCP ping succeeded.", b01(tcp))
 	metric("internet_monitor_http_ok", "gauge", "1 if the last HTTP check succeeded.", b01(httpOK))

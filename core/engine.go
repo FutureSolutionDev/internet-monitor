@@ -91,6 +91,11 @@ type minuteAgg struct {
 	tcpFails  int
 	httpFails int
 	dnsFails  int
+
+	prevLat   int64
+	havePrev  bool
+	jitterSum int64
+	jitterN   int
 }
 
 // New creates a monitoring engine. Call Start() to begin monitoring.
@@ -211,6 +216,16 @@ func (e *Engine) accumulate(r types.CheckResult, status types.Status) {
 	if r.LatencyMs > e.agg.latMax {
 		e.agg.latMax = r.LatencyMs
 	}
+	if e.agg.havePrev {
+		d := r.LatencyMs - e.agg.prevLat
+		if d < 0 {
+			d = -d
+		}
+		e.agg.jitterSum += d
+		e.agg.jitterN++
+	}
+	e.agg.prevLat = r.LatencyMs
+	e.agg.havePrev = true
 	e.agg.lossSum += r.PacketLoss
 	if !r.TCPPingOK {
 		e.agg.tcpFails++
@@ -228,12 +243,17 @@ func (e *Engine) flushAgg() {
 	if e.agg.samples == 0 || e.lgr == nil {
 		return
 	}
+	jitter := int64(0)
+	if e.agg.jitterN > 0 {
+		jitter = e.agg.jitterSum / int64(e.agg.jitterN)
+	}
 	e.lgr.LogSample(types.MetricSample{
 		Timestamp:    e.agg.bucket,
 		Samples:      e.agg.samples,
 		UpSamples:    e.agg.up,
 		AvgLatencyMs: e.agg.latSum / int64(e.agg.samples),
 		MaxLatencyMs: e.agg.latMax,
+		JitterMs:     jitter,
 		AvgLossPct:   e.agg.lossSum / float64(e.agg.samples),
 		TCPFails:     e.agg.tcpFails,
 		HTTPFails:    e.agg.httpFails,

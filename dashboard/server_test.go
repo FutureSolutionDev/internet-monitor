@@ -32,6 +32,19 @@ func TestServeMetrics(t *testing.T) {
 	}
 }
 
+func TestJitterOf(t *testing.T) {
+	if got := jitterOf([]int64{10}); got != 0 {
+		t.Errorf("single sample jitter = %d, want 0", got)
+	}
+	// diffs: 10,10,10 -> mean 10
+	if got := jitterOf([]int64{10, 20, 10, 20}); got != 10 {
+		t.Errorf("jitter = %d, want 10", got)
+	}
+	if got := jitterOf([]int64{50, 50, 50}); got != 0 {
+		t.Errorf("steady jitter = %d, want 0", got)
+	}
+}
+
 func TestGracefulShutdown(t *testing.T) {
 	// port 0 lets the OS pick a free port; we only care that Shutdown returns.
 	s := NewServer(0, "config.json", "logs", "test", nil)

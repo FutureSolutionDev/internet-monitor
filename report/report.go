@@ -22,6 +22,7 @@ type DayStat struct {
 	Outages         int     `json:"outages"`
 	WorstOutageSecs float64 `json:"worst_outage_seconds"`
 	AvgLatencyMs    int64   `json:"avg_latency_ms"`
+	AvgJitterMs     int64   `json:"avg_jitter_ms"`
 	AvgLossPct      float64 `json:"avg_loss_pct"`
 	UptimePct       float64 `json:"uptime_pct"`
 }
@@ -31,6 +32,7 @@ type TrendPoint struct {
 	Date         string  `json:"date"`
 	AvgLatencyMs int64   `json:"avg_latency_ms"`
 	MaxLatencyMs int64   `json:"max_latency_ms"`
+	AvgJitterMs  int64   `json:"avg_jitter_ms"`
 	AvgLossPct   float64 `json:"avg_loss_pct"`
 	UptimePct    float64 `json:"uptime_pct"`
 	DowntimeSecs float64 `json:"downtime_seconds"`
@@ -49,20 +51,22 @@ type MonthlySummary struct {
 	LongestOutageSecs float64              `json:"longest_outage_seconds"`
 	LongestOutageAt   string               `json:"longest_outage_at"`
 	MTTRSecs          float64              `json:"mttr_seconds"`
+	AvgJitterMs       int64                `json:"avg_jitter_ms"`
 	Causes            map[string]CauseStat `json:"causes"`
 	Days              []DayStat            `json:"days"`
 	Trend             []TrendPoint         `json:"trend"`
 }
 
 type dayAcc struct {
-	downtime     float64
-	outages      int
-	worst        float64
-	latWeighted  int64
-	lossWeighted float64
-	samples      int
-	up           int
-	maxLat       int64
+	downtime       float64
+	outages        int
+	worst          float64
+	latWeighted    int64
+	jitterWeighted int64
+	lossWeighted   float64
+	samples        int
+	up             int
+	maxLat         int64
 }
 
 // Summarize builds a monthly report from connectivity events and metric samples.
@@ -130,11 +134,14 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 
 	// Trend, uptime and per-day metrics from one-minute samples.
 	var totalSamples, upSamples int
+	var jitterWeighted int64
 	for _, s := range samples {
 		totalSamples += s.Samples
 		upSamples += s.UpSamples
+		jitterWeighted += s.JitterMs * int64(s.Samples)
 		a := getDay(s.Timestamp)
 		a.latWeighted += s.AvgLatencyMs * int64(s.Samples)
+		a.jitterWeighted += s.JitterMs * int64(s.Samples)
 		a.lossWeighted += s.AvgLossPct * float64(s.Samples)
 		a.samples += s.Samples
 		a.up += s.UpSamples
@@ -145,6 +152,7 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 	sum.MonitoredSeconds = float64(len(samples)) * 60
 	if totalSamples > 0 {
 		sum.UptimePct = float64(upSamples) / float64(totalSamples) * 100
+		sum.AvgJitterMs = jitterWeighted / int64(totalSamples)
 	}
 
 	dates := make([]string, 0, len(days))
@@ -157,6 +165,7 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 		ds := DayStat{Date: d, DowntimeSecs: a.downtime, Outages: a.outages, WorstOutageSecs: a.worst}
 		if a.samples > 0 {
 			ds.AvgLatencyMs = a.latWeighted / int64(a.samples)
+			ds.AvgJitterMs = a.jitterWeighted / int64(a.samples)
 			ds.AvgLossPct = a.lossWeighted / float64(a.samples)
 			ds.UptimePct = float64(a.up) / float64(a.samples) * 100
 		}
@@ -165,6 +174,7 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 			Date:         d,
 			AvgLatencyMs: ds.AvgLatencyMs,
 			MaxLatencyMs: a.maxLat,
+			AvgJitterMs:  ds.AvgJitterMs,
 			AvgLossPct:   ds.AvgLossPct,
 			UptimePct:    ds.UptimePct,
 			DowntimeSecs: a.downtime,
