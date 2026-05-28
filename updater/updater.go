@@ -1,8 +1,12 @@
 package updater
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -81,7 +85,16 @@ func Check(currentVersion string) (*Info, error) {
 
 // Apply downloads the binary at downloadURL and atomically replaces the current exe.
 // Returns nil on success; the caller should restart the process.
+//
+// Security: the URL must be HTTPS, and the downloaded length is checked against
+// Content-Length to reject truncated transfers; the SHA-256 of the payload is
+// logged. NOTE: release assets are not yet signed by this project — publishing
+// and verifying a signature/checksum here is tracked as follow-up work.
 func Apply(downloadURL string) error {
+	if !strings.HasPrefix(strings.ToLower(downloadURL), "https://") {
+		return fmt.Errorf("refusing non-HTTPS update URL")
+	}
+
 	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Get(downloadURL)
 	if err != nil {
@@ -93,7 +106,16 @@ func Apply(downloadURL string) error {
 		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
 	}
 
-	return selfupdate.Apply(resp.Body, selfupdate.Options{})
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read update body: %w", err)
+	}
+	if resp.ContentLength > 0 && int64(len(data)) != resp.ContentLength {
+		return fmt.Errorf("update size mismatch: got %d bytes, expected %d", len(data), resp.ContentLength)
+	}
+
+	log.Printf("updater: applying %d bytes, sha256=%x", len(data), sha256.Sum256(data))
+	return selfupdate.Apply(bytes.NewReader(data), selfupdate.Options{})
 }
 
 // Restart launches the updated binary and exits the current process.
@@ -110,7 +132,9 @@ func Restart() {
 	cmd.Dir = filepath.Dir(exe)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Start()
+	if err := cmd.Start(); err != nil {
+		log.Printf("updater: failed to relaunch %s: %v", exe, err)
+	}
 	os.Exit(0)
 }
 
