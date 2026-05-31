@@ -1245,6 +1245,17 @@ func validMonth(m string) bool {
 	return true
 }
 
+// adjacentMonths returns the "YYYY-MM" strings for the months before and after
+// the given "YYYY-MM" (empty strings if it can't be parsed).
+func adjacentMonths(month string) (prev, next string) {
+	var y, mo int
+	if _, err := fmt.Sscanf(month, "%d-%d", &y, &mo); err != nil || mo < 1 || mo > 12 {
+		return "", ""
+	}
+	t := time.Date(y, time.Month(mo), 1, 0, 0, 0, 0, time.UTC)
+	return t.AddDate(0, -1, 0).Format("2006-01"), t.AddDate(0, 1, 0).Format("2006-01")
+}
+
 // readMonthlyJSONL reads every "<prefix><month>-*.jsonl" file in the log dir
 // (under the logger lock) and unmarshals each valid line into T.
 func readMonthlyJSONL[T any](s *Server, prefix, month string) []T {
@@ -1284,7 +1295,12 @@ func (s *Server) serveReport(w http.ResponseWriter, r *http.Request) {
 	if !validMonth(month) {
 		month = time.Now().Format("2006-01")
 	}
+	// Read neighbor months too so an outage that crosses a month boundary has
+	// its full duration available; report.Summarize clips it to this month.
+	prev, next := adjacentMonths(month)
 	events := readMonthlyJSONL[types.Event](s, "connectivity_", month)
+	events = append(events, readMonthlyJSONL[types.Event](s, "connectivity_", prev)...)
+	events = append(events, readMonthlyJSONL[types.Event](s, "connectivity_", next)...)
 	samples := readMonthlyJSONL[types.MetricSample](s, "metrics_", month)
 	json.NewEncoder(w).Encode(report.Summarize(events, samples, month, time.Now()))
 }

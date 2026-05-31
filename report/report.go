@@ -4,6 +4,7 @@
 package report
 
 import (
+	"fmt"
 	"internet-monitor/types"
 	"sort"
 	"strings"
@@ -86,14 +87,11 @@ type dayAcc struct {
 // Inputs are filtered to events/samples whose timestamps fall in `month`
 // (format "YYYY-MM"), so callers can safely pass broader history.
 func Summarize(events []types.Event, samples []types.MetricSample, month string, now time.Time) MonthlySummary {
+	// Samples are filtered to the month (trend/uptime are month-scoped). Events
+	// are NOT filtered: an outage may start in the previous month or end in the
+	// next, and the caller passes neighbor-month events so durations are exact.
+	// Outage time is clipped to [monthStart, monthEnd) below.
 	if month != "" {
-		fe := make([]types.Event, 0, len(events))
-		for _, ev := range events {
-			if ev.Timestamp.Format("2006-01") == month {
-				fe = append(fe, ev)
-			}
-		}
-		events = fe
 		fs := make([]types.MetricSample, 0, len(samples))
 		for _, s := range samples {
 			if s.Timestamp.Format("2006-01") == month {
@@ -103,6 +101,39 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 		samples = fs
 	}
 	sort.SliceStable(events, func(i, j int) bool { return events[i].Timestamp.Before(events[j].Timestamp) })
+
+	// Month window, in now's location to match locally-stamped event times.
+	var monthStart, monthEnd time.Time
+	hasWindow := false
+	if month != "" {
+		var y, mo int
+		if _, err := fmt.Sscanf(month, "%d-%d", &y, &mo); err == nil && mo >= 1 && mo <= 12 {
+			monthStart = time.Date(y, time.Month(mo), 1, 0, 0, 0, 0, now.Location())
+			monthEnd = monthStart.AddDate(0, 1, 0)
+			hasWindow = true
+		}
+	}
+	// clip intersects [start,end] with the month window; ok=false if disjoint.
+	clip := func(start, end time.Time) (time.Time, time.Time, bool) {
+		if hasWindow {
+			if start.Before(monthStart) {
+				start = monthStart
+			}
+			if end.After(monthEnd) {
+				end = monthEnd
+			}
+			if !start.Before(monthEnd) || !end.After(monthStart) {
+				return start, end, false
+			}
+		}
+		if !start.Before(end) {
+			return start, end, false
+		}
+		return start, end, true
+	}
+	inWindow := func(t time.Time) bool {
+		return !hasWindow || (!t.Before(monthStart) && t.Before(monthEnd))
+	}
 
 	sum := MonthlySummary{
 		Month:       month,
@@ -132,47 +163,20 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 	for k, ev := range events {
 		switch ev.EventType {
 		case "disconnected":
-			sum.Disconnections++
 			dur := segmentDuration(events, k, now)
-			sum.TotalDowntimeSecs += dur
-			if dur > sum.LongestOutageSecs {
-				sum.LongestOutageSecs = dur
-				sum.LongestOutageAt = ev.Timestamp.Format(time.RFC3339)
-			}
-			if ev.Reason.TCPPingFailed {
-				addCause("tcp", dur)
-			}
-			if ev.Reason.HTTPFailed {
-				addCause("http", dur)
-			}
-			if ev.Reason.DNSFailed {
-				addCause("dns", dur)
-			}
-			// Classify the outage by type (reason booleans are failures, so the
-			// ok flags are their negation).
-			sum.OutageTypes[types.Diagnose(types.CheckResult{
-				TCPPingOK: !ev.Reason.TCPPingFailed,
-				HTTPOK:    !ev.Reason.HTTPFailed,
-				DNSOK:     !ev.Reason.DNSFailed,
-			})]++
-			sum.Events = append(sum.Events, EventRow{
-				Time:         ev.Timestamp.Format(time.RFC3339),
-				Type:         "disconnected",
-				DurationSecs: dur,
-				Cause:        failedLayers(ev.Reason),
-			})
-			// Split the outage across day boundaries so per-day downtime
-			// reflects what actually happened on each day. The outage count
-			// and worst-outage stay attributed to the start day.
 			start := ev.Timestamp
-			a := getDay(start)
-			a.outages++
-			if dur > a.worst {
-				a.worst = dur
+			cStart, cEnd, ok := clip(start, start.Add(time.Duration(dur*float64(time.Second))))
+			if !ok {
+				continue // outage doesn't overlap this month
 			}
-			remaining := dur
-			cursor := start
-			for remaining > 0 {
+			clipped := cEnd.Sub(cStart).Seconds()
+			sum.TotalDowntimeSecs += clipped
+
+			// Split the clipped interval across day boundaries so per-day
+			// downtime reflects what actually happened on each day.
+			remaining := clipped
+			cursor := cStart
+			for remaining > 1e-6 {
 				dayEnd := time.Date(cursor.Year(), cursor.Month(), cursor.Day(), 0, 0, 0, 0, cursor.Location()).Add(24 * time.Hour)
 				slice := dayEnd.Sub(cursor).Seconds()
 				if slice > remaining {
@@ -182,20 +186,62 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 				remaining -= slice
 				cursor = dayEnd
 			}
-		case "degraded":
-			sum.DegradedEpisodes++
-			ddur := segmentDuration(events, k, now)
-			sum.TotalDegradedSecs += ddur
-			cause := failedLayers(ev.Reason)
-			if cause == "" {
-				cause = "latency/loss"
+
+			// Count / attribute / log only for outages that STARTED this month,
+			// so a cross-month outage isn't double-counted across two reports.
+			if inWindow(start) {
+				sum.Disconnections++
+				if dur > sum.LongestOutageSecs {
+					sum.LongestOutageSecs = dur
+					sum.LongestOutageAt = start.Format(time.RFC3339)
+				}
+				if ev.Reason.TCPPingFailed {
+					addCause("tcp", clipped)
+				}
+				if ev.Reason.HTTPFailed {
+					addCause("http", clipped)
+				}
+				if ev.Reason.DNSFailed {
+					addCause("dns", clipped)
+				}
+				sum.OutageTypes[types.Diagnose(types.CheckResult{
+					TCPPingOK: !ev.Reason.TCPPingFailed,
+					HTTPOK:    !ev.Reason.HTTPFailed,
+					DNSOK:     !ev.Reason.DNSFailed,
+				})]++
+				sum.Events = append(sum.Events, EventRow{
+					Time:         start.Format(time.RFC3339),
+					Type:         "disconnected",
+					DurationSecs: dur,
+					Cause:        failedLayers(ev.Reason),
+				})
+				a := getDay(start)
+				a.outages++
+				if dur > a.worst {
+					a.worst = dur
+				}
 			}
-			sum.Events = append(sum.Events, EventRow{
-				Time:         ev.Timestamp.Format(time.RFC3339),
-				Type:         "degraded",
-				DurationSecs: ddur,
-				Cause:        cause,
-			})
+		case "degraded":
+			ddur := segmentDuration(events, k, now)
+			start := ev.Timestamp
+			cStart, cEnd, ok := clip(start, start.Add(time.Duration(ddur*float64(time.Second))))
+			if !ok {
+				continue
+			}
+			sum.TotalDegradedSecs += cEnd.Sub(cStart).Seconds()
+			if inWindow(start) {
+				sum.DegradedEpisodes++
+				cause := failedLayers(ev.Reason)
+				if cause == "" {
+					cause = "latency/loss"
+				}
+				sum.Events = append(sum.Events, EventRow{
+					Time:         start.Format(time.RFC3339),
+					Type:         "degraded",
+					DurationSecs: ddur,
+					Cause:        cause,
+				})
+			}
 		}
 	}
 	if sum.Disconnections > 0 {

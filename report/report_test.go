@@ -119,6 +119,32 @@ func TestSummarizeSplitsOutageAcrossDays(t *testing.T) {
 	}
 }
 
+func TestSummarizeClipsCrossMonthOutage(t *testing.T) {
+	// Outage starts 2026-05-31 23:00 UTC, lasts 2h (ends 2026-06-01 01:00).
+	start := time.Date(2026, 5, 31, 23, 0, 0, 0, time.UTC)
+	events := []types.Event{
+		ev(start, "disconnected", 0, true, false, false),
+		ev(start.Add(2*time.Hour), "connected", 7200, false, false, false),
+	}
+	now := start.Add(3 * time.Hour)
+
+	may := Summarize(events, nil, "2026-05", now)
+	if may.Disconnections != 1 {
+		t.Errorf("May disconnections = %d, want 1 (outage started in May)", may.Disconnections)
+	}
+	if may.TotalDowntimeSecs != 3600 { // only 23:00–24:00 falls in May
+		t.Errorf("May downtime = %v, want 3600", may.TotalDowntimeSecs)
+	}
+
+	jun := Summarize(events, nil, "2026-06", now)
+	if jun.Disconnections != 0 { // started in May, must not be counted again
+		t.Errorf("June disconnections = %d, want 0", jun.Disconnections)
+	}
+	if jun.TotalDowntimeSecs != 3600 { // 00:00–01:00 falls in June
+		t.Errorf("June downtime = %v, want 3600", jun.TotalDowntimeSecs)
+	}
+}
+
 func TestSummarizeSamples(t *testing.T) {
 	base := time.Date(2026, 5, 3, 0, 0, 0, 0, time.UTC)
 	samples := []types.MetricSample{
