@@ -13,6 +13,7 @@ type SpeedTestConfig struct {
 	TimeoutSeconds      int      `json:"timeout_seconds"`
 	UploadTarget        string   `json:"upload_target"` // POST endpoint for the upload test; empty disables it
 	AlertThresholdMbps  float64  `json:"alert_threshold_mbps"`
+	ScheduleMinutes     int      `json:"schedule_minutes"` // 0 = disabled; otherwise run an automatic speed test every N minutes
 }
 
 type Config struct {

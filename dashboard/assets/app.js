@@ -905,6 +905,8 @@ async function loadSettings() {
     if (timeoutEl) timeoutEl.value = st.timeout_seconds || 10;
     const alertEl = document.getElementById("cfg-speed-alert");
     if (alertEl) alertEl.value = st.alert_threshold_mbps || 0;
+    const schedEl = document.getElementById("cfg-speed-schedule");
+    if (schedEl) schedEl.value = st.schedule_minutes || 0;
 
     pingTargets = Array.isArray(cfg.ping_targets)
       ? [...cfg.ping_targets]
@@ -1035,6 +1037,8 @@ async function saveSettings() {
       upload_target: cfg.speed_test?.upload_target || "",
       alert_threshold_mbps:
         parseFloat(document.getElementById("cfg-speed-alert")?.value) || 0,
+      schedule_minutes:
+        parseInt(document.getElementById("cfg-speed-schedule")?.value) || 0,
     };
 
     const res = await api.post("/api/config", cfg);

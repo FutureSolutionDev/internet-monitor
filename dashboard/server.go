@@ -300,6 +300,41 @@ func (s *Server) Start() {
 			}
 		}
 	}()
+
+	go s.scheduleSpeedTests()
+}
+
+// scheduleSpeedTests runs an automatic speed test every speed_test.schedule_minutes
+// (0 = disabled). It wakes once a minute, re-reading the config so the interval
+// can change at runtime, and skips a tick if a test is already running.
+func (s *Server) scheduleSpeedTests() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	var lastRun time.Time
+	for {
+		select {
+		case <-s.shutdownCh:
+			return
+		case <-ticker.C:
+			data, err := os.ReadFile(s.configPath)
+			if err != nil {
+				continue
+			}
+			var cfg config.Config
+			if json.Unmarshal(data, &cfg) != nil {
+				continue
+			}
+			every := cfg.SpeedTest.ScheduleMinutes
+			if every <= 0 {
+				continue
+			}
+			if time.Since(lastRun) >= time.Duration(every)*time.Minute {
+				if s.startSpeedTest("schedule") {
+					lastRun = time.Now()
+				}
+			}
+		}
+	}
 }
 
 // Shutdown gracefully stops the HTTP server: it signals SSE handlers to exit
@@ -981,11 +1016,21 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	// Atomic check-and-set: two concurrent starts can't both pass.
-	if !s.stRunning.CompareAndSwap(false, true) {
+	if !s.startSpeedTest("user") {
 		w.WriteHeader(http.StatusConflict)
 		w.Write([]byte(`{"error":"test_already_running"}`))
 		return
+	}
+	w.Write([]byte(`{"ok":true}`))
+}
+
+// startSpeedTest launches a speed test (download + optional upload) in the
+// background, logging and notifying on completion. triggeredBy is "user" or
+// "schedule". Returns false if a test is already running.
+func (s *Server) startSpeedTest(triggeredBy string) bool {
+	// Atomic check-and-set: two concurrent starts can't both pass.
+	if !s.stRunning.CompareAndSwap(false, true) {
+		return false
 	}
 
 	data, _ := os.ReadFile(s.configPath)
@@ -1079,7 +1124,7 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 			DurationSeconds: result.DurationSeconds,
 			Endpoints:       result.Endpoints,
 			ParallelConns:   result.ParallelConns,
-			TriggeredBy:     "user",
+			TriggeredBy:     triggeredBy,
 		}
 
 		if s.lgr != nil {
@@ -1107,7 +1152,7 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 		s.broadcastRaw(string(done))
 	}()
 
-	w.Write([]byte(`{"ok":true}`))
+	return true
 }
 
 func (s *Server) serveSpeedTestCancel(w http.ResponseWriter, r *http.Request) {
