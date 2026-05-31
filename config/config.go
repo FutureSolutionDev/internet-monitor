@@ -25,6 +25,8 @@ type Config struct {
 	LatencyThreshold    int             `json:"latency_threshold_ms"`
 	LogDir              string          `json:"log_dir"`
 	WebhookURL          string          `json:"webhook_url"`
+	TelegramBotToken    string          `json:"telegram_bot_token"`
+	TelegramChatID      string          `json:"telegram_chat_id"`
 	DashboardPort       int             `json:"dashboard_port"`
 	UseICMP             bool            `json:"use_icmp"` // use ICMP echo for ping (falls back to TCP)
 	SpeedTest           SpeedTestConfig `json:"speed_test,omitempty"`

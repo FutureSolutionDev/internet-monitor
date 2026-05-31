@@ -47,6 +47,52 @@ func BuildEventPayload(event monitor.Event, url string) interface{} {
 	return slackEventPayload(event)
 }
 
+// ── Telegram (Bot API) ────────────────────────────────────────
+
+func tgMark(ok bool) string {
+	if ok {
+		return "✅"
+	}
+	return "❌"
+}
+
+// TelegramEventText builds a Markdown message for a connectivity event.
+func TelegramEventText(event monitor.Event) string {
+	emoji := map[string]string{"connected": "✅", "degraded": "⚠️", "disconnected": "❌"}[event.EventType]
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s *Internet %s*\n", emoji, capitalize(event.EventType))
+	fmt.Fprintf(&b, "TCP: %s  HTTP: %s  DNS: %s",
+		tgMark(!event.Reason.TCPPingFailed), tgMark(!event.Reason.HTTPFailed), tgMark(!event.Reason.DNSFailed))
+	if event.Reason.PacketLossPct > 0 {
+		fmt.Fprintf(&b, "\nPacket Loss: %.1f%%", event.Reason.PacketLossPct)
+	}
+	if event.Reason.AvgLatencyMs > 0 {
+		fmt.Fprintf(&b, "\nLatency: %dms", event.Reason.AvgLatencyMs)
+	}
+	if event.DurationSeconds > 0 {
+		fmt.Fprintf(&b, "\nDuration: %.0fs", event.DurationSeconds)
+	}
+	return b.String()
+}
+
+// TelegramSpeedText builds a Markdown message for a completed speed test.
+func TelegramSpeedText(event SpeedTestEvent, thresholdMbps float64, belowThreshold bool) string {
+	icon := "🚀"
+	if belowThreshold {
+		icon = "⚠️"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s *Speed Test*\n📥 Download: *%.1f Mbps*", icon, event.DownloadMbps)
+	if event.UploadMbps != nil {
+		fmt.Fprintf(&b, "\n📤 Upload: *%.1f Mbps*", *event.UploadMbps)
+	}
+	fmt.Fprintf(&b, "\n📡 Latency: %dms", event.LatencyMs)
+	if belowThreshold && thresholdMbps > 0 {
+		fmt.Fprintf(&b, "\n⚠️ Below threshold: %.1f Mbps", thresholdMbps)
+	}
+	return b.String()
+}
+
 func discordEventPayload(event monitor.Event) map[string]interface{} {
 	colors := map[string]int{
 		"connected":    0x22C55E,

@@ -93,6 +93,9 @@ func (l *Logger) Log(event monitor.Event) {
 			go l.sendWebhook(l.cfg.WebhookURL, BuildEventPayload(event, l.cfg.WebhookURL))
 		}
 	}
+	if l.cfg.TelegramBotToken != "" && l.cfg.TelegramChatID != "" {
+		go l.sendTelegram(l.cfg.TelegramBotToken, l.cfg.TelegramChatID, TelegramEventText(event))
+	}
 }
 
 // SpeedTestEvent is a completed speed test result written to speedtest_DATE.jsonl.
@@ -193,13 +196,43 @@ func (l *Logger) CleanupOldLogs(maxAge time.Duration) {
 	}
 }
 
-// SendSpeedTestResult sends the speed test result to the webhook.
+// SendSpeedTestResult sends the speed test result to the webhook and/or Telegram.
 // If belowThreshold is true, the payload is styled as a warning alert.
 func (l *Logger) SendSpeedTestResult(webhookURL string, event SpeedTestEvent, thresholdMbps float64, belowThreshold bool) {
-	if webhookURL == "" || !IsSupportedWebhook(webhookURL) {
+	if webhookURL != "" && IsSupportedWebhook(webhookURL) {
+		go l.sendWebhook(webhookURL, BuildSpeedResultPayload(event, thresholdMbps, belowThreshold, webhookURL))
+	}
+	l.mu.Lock()
+	tgToken, tgChat := l.cfg.TelegramBotToken, l.cfg.TelegramChatID
+	l.mu.Unlock()
+	if tgToken != "" && tgChat != "" {
+		go l.sendTelegram(tgToken, tgChat, TelegramSpeedText(event, thresholdMbps, belowThreshold))
+	}
+}
+
+// sendTelegram posts a Markdown message to a chat via the Telegram Bot API.
+func (l *Logger) sendTelegram(token, chatID, text string) {
+	defer func() {
+		if r := recover(); r != nil {
+			l.AppLog("PANIC recovered in telegram send: %v", r)
+		}
+	}()
+	if token == "" || chatID == "" {
 		return
 	}
-	go l.sendWebhook(webhookURL, BuildSpeedResultPayload(event, thresholdMbps, belowThreshold, webhookURL))
+	body, _ := json.Marshal(map[string]string{
+		"chat_id":    chatID,
+		"text":       text,
+		"parse_mode": "Markdown",
+	})
+	url := "https://api.telegram.org/bot" + token + "/sendMessage"
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Post(url, "application/json", bytes.NewReader(body))
+	if err != nil {
+		l.AppLog("TELEGRAM send error: %v", err)
+		return
+	}
+	resp.Body.Close()
 }
 
 // buildEventPayload creates a Discord+generic compatible payload for a connectivity event.

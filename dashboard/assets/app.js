@@ -888,6 +888,10 @@ async function loadSettings() {
     };
     document.getElementById("cfg-webhook").value = cfg.webhook_url || "";
     validateWebhookURL(cfg.webhook_url || "");
+    const tgT = document.getElementById("cfg-tg-token");
+    const tgC = document.getElementById("cfg-tg-chat");
+    if (tgT) tgT.value = cfg.telegram_bot_token || "";
+    if (tgC) tgC.value = cfg.telegram_chat_id || "";
     document.getElementById("cfg-log-dir").value = cfg.log_dir || "logs";
     document.getElementById("cfg-port").value = cfg.dashboard_port || 8765;
     const st = cfg.speed_test || {};
@@ -1006,6 +1010,12 @@ async function saveSettings() {
     cfg.latency_threshold_ms =
       parseInt(document.getElementById("cfg-latency-threshold").value) || 500;
     cfg.webhook_url = document.getElementById("cfg-webhook").value.trim();
+    cfg.telegram_bot_token = (
+      document.getElementById("cfg-tg-token")?.value || ""
+    ).trim();
+    cfg.telegram_chat_id = (
+      document.getElementById("cfg-tg-chat")?.value || ""
+    ).trim();
     cfg.log_dir = document.getElementById("cfg-log-dir").value.trim() || "logs";
     cfg.dashboard_port =
       parseInt(document.getElementById("cfg-port").value) || 8765;

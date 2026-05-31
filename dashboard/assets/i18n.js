@@ -118,6 +118,10 @@ const LANGS = {
     stab_notifs: "الإشعارات",
     stab_speedtest: "قياس السرعة",
     grp_webhook: "الـ Webhook",
+    grp_telegram: "Telegram",
+    tg_token: "رمز البوت (Bot Token)",
+    tg_chat: "معرّف المحادثة (Chat ID)",
+    tg_note: "يُرسل نفس الإشعارات عبر بوت Telegram (اختياري)",
     grp_speed_settings: "إعدادات قياس السرعة",
     speed_timeout: "مدة الاختبار (ثانية)",
     speed_timeout_note:
@@ -276,6 +280,10 @@ const LANGS = {
     stab_notifs: "Notifications",
     stab_speedtest: "Speed Test",
     grp_webhook: "Webhook",
+    grp_telegram: "Telegram",
+    tg_token: "Bot Token",
+    tg_chat: "Chat ID",
+    tg_note: "Sends the same notifications via a Telegram bot (optional)",
     grp_speed_settings: "Speed Test Settings",
     speed_timeout: "Test duration (seconds)",
     speed_timeout_note:

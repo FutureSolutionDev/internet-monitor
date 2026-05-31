@@ -460,7 +460,13 @@ func (s *Server) serveConfig(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		var cfg config.Config
+		// Start from the existing config so fields the settings form doesn't
+		// manage (use_icmp, telegram_*, etc.) survive a save instead of being
+		// reset to zero.
+		cfg := config.Default
+		if existing, rerr := os.ReadFile(s.configPath); rerr == nil {
+			json.Unmarshal(existing, &cfg)
+		}
 		if err := json.Unmarshal(body, &cfg); err != nil {
 			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
 			return
@@ -1078,8 +1084,8 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 
 		if s.lgr != nil {
 			s.lgr.LogSpeedTest(event)
-			// Always send webhook with speed test result if webhook is configured
-			if cfg.WebhookURL != "" {
+			// Notify via webhook and/or Telegram if either is configured.
+			if cfg.WebhookURL != "" || (cfg.TelegramBotToken != "" && cfg.TelegramChatID != "") {
 				belowThreshold := cfg.SpeedTest.AlertThresholdMbps > 0 &&
 					result.DownloadMbps < cfg.SpeedTest.AlertThresholdMbps
 				s.lgr.SendSpeedTestResult(cfg.WebhookURL, event, cfg.SpeedTest.AlertThresholdMbps, belowThreshold)
