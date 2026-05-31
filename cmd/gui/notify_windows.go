@@ -63,9 +63,9 @@ func registerToastApp() {
 
 // ── Audio ──────────────────────────────────────────────────────
 
-// playRingtone plays the ringtone without blocking (the shared player sleeps
-// for the clip duration, so run it in a goroutine).
-func playRingtone() { go sound.Play() }
+// playRingtone plays the ringtone via the shared player, which stops any
+// previous sound first (non-blocking) so rapid notifications never overlap.
+func playRingtone() { sound.Play() }
 
 // ── Notifications ──────────────────────────────────────────────
 

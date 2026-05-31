@@ -7,3 +7,4 @@ config.json
 .claude
 tmp
 .playwright-mcp
+gitstat.txt

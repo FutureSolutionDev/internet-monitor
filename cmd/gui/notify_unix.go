@@ -6,25 +6,14 @@ import (
 	"fmt"
 	"internet-monitor/monitor"
 	"internet-monitor/notifytext"
+	"internet-monitor/sound"
 	"os/exec"
 	"runtime"
 )
 
-func playRingtone() {
-	path := getRingtonePath()
-	if path == "" {
-		return
-	}
-	switch runtime.GOOS {
-	case "darwin":
-		exec.Command("afplay", path).Start()
-	default: // linux — try common players
-		if exec.Command("mpg123", "-q", path).Start() == nil {
-			return
-		}
-		exec.Command("ffplay", "-nodisp", "-autoexit", path).Start()
-	}
-}
+// playRingtone plays the ringtone via the shared player, which stops any
+// previous sound first so rapid notifications never overlap.
+func playRingtone() { sound.Play() }
 
 func sendNotification(status monitor.Status, result monitor.CheckResult) {
 	title, body := notifyText(status, result)

@@ -5,7 +5,6 @@ package sound
 import (
 	"sync"
 	"syscall"
-	"time"
 	"unsafe"
 )
 
@@ -13,8 +12,7 @@ var (
 	modWinmm = syscall.NewLazyDLL("winmm.dll")
 	procMci  = modWinmm.NewProc("mciSendStringW")
 
-	playMu  sync.Mutex
-	playing bool
+	playMu sync.Mutex
 )
 
 func mci(cmd string) {
@@ -22,10 +20,12 @@ func mci(cmd string) {
 	procMci.Call(uintptr(unsafe.Pointer(p)), 0, 0, 0)
 }
 
-// Play plays the ringtone (if any) via MCI for ~15s, stopping any prior play
-// first. The whole open/play/sleep/stop/close session is serialized under
-// playMu so two concurrent callers can't interleave on the same alias.
-// Synchronous: callers that don't want to block should use `go Play()`.
+// Play stops any currently-playing ringtone and starts the latest one.
+//
+// MCI "play" returns immediately (asynchronous playback), so there is no
+// blocking sleep: a rapid second call simply stops the first and plays the new
+// one on the same alias. Every notification path funnels through here, so an
+// in-progress sound is always replaced — no overlapping audio.
 func Play() {
 	path := RingtonePath()
 	if path == "" {
@@ -34,17 +34,9 @@ func Play() {
 	playMu.Lock()
 	defer playMu.Unlock()
 
-	if playing {
-		mci("stop im_ring")
-		mci("close im_ring")
-	}
-	playing = true
-
-	mci(`open "` + path + `" type mpegvideo alias im_ring`)
-	mci("play im_ring")
-	time.Sleep(15 * time.Second)
+	// Kill whatever is currently playing, then start the latest.
 	mci("stop im_ring")
 	mci("close im_ring")
-
-	playing = false
+	mci(`open "` + path + `" type mpegvideo alias im_ring`)
+	mci("play im_ring")
 }

@@ -740,6 +740,9 @@ func (s *Server) serveTestNotification(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if s.lgr != nil {
+		s.lgr.AppLog("NOTIFICATION test triggered by user")
+	}
 	if s.OnTestNotification != nil {
 		go s.OnTestNotification()
 	}
