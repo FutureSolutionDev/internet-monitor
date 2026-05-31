@@ -49,7 +49,18 @@ func (l *Logger) ReadFile(path string) ([]byte, error) {
 
 // SetConfig swaps the logger's configuration under the same mutex that guards
 // all reads of l.cfg (Log / LogSpeedTest), so a live config change is race-free.
+// Ensures the new LogDir exists before swapping so future writes don't fail
+// silently when the dashboard saves a non-existent path.
 func (l *Logger) SetConfig(cfg *config.Config) {
+	if cfg == nil {
+		return
+	}
+	if cfg.LogDir != "" {
+		if err := os.MkdirAll(cfg.LogDir, 0755); err != nil {
+			l.AppLog("ERROR create log dir on config reload: %v", err)
+			return
+		}
+	}
 	l.mu.Lock()
 	l.cfg = cfg
 	l.mu.Unlock()
@@ -143,9 +154,15 @@ func (l *Logger) LogSample(s types.MetricSample) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	// Use the sample's own timestamp (the minute bucket) so a 23:59 flush after
+	// midnight lands in the correct day's file rather than today's.
+	date := s.Timestamp
+	if date.IsZero() {
+		date = time.Now()
+	}
 	filename := filepath.Join(
 		l.cfg.LogDir,
-		fmt.Sprintf("metrics_%s.jsonl", time.Now().Format("2006-01-02")),
+		fmt.Sprintf("metrics_%s.jsonl", date.Format("2006-01-02")),
 	)
 	data, err := json.Marshal(s)
 	if err != nil {

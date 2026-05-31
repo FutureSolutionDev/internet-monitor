@@ -63,7 +63,17 @@ func TestCheckTCPPerTarget(t *testing.T) {
 	defer ln.Close()
 	open := ln.Addr().String()
 
-	c := NewChecker(&config.Config{PingTargets: []string{open, "127.0.0.1:1"}})
+	// Pick another ephemeral port, then close it immediately so it's a
+	// deterministic "definitely closed" target (avoids flakiness from hardcoded
+	// privileged port 1, which may behave differently per platform).
+	closedLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed := closedLn.Addr().String()
+	closedLn.Close()
+
+	c := NewChecker(&config.Config{PingTargets: []string{open, closed}})
 	r := c.Check()
 
 	if !r.TCPPingOK {
@@ -79,7 +89,7 @@ func TestCheckTCPPerTarget(t *testing.T) {
 		if tr.Target == open {
 			openOK = &ok
 		}
-		if tr.Target == "127.0.0.1:1" {
+		if tr.Target == closed {
 			closedOK = &ok
 		}
 	}

@@ -63,6 +63,13 @@ func Run(ctx context.Context, cfg Config, progress func(float64, time.Duration))
 		cfg.Timeout = 10 * time.Second
 	}
 
+	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: false}}
+
+	// Latency to the download endpoint itself (headers only), measured BEFORE
+	// the download timer starts. Uses its own context so a tight
+	// timeout_seconds (e.g. 1–3s) isn't consumed by this preflight probe.
+	latencyMs := measureLatency(ctx, client, cfg.Endpoints[0])
+
 	tctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
 
@@ -70,13 +77,6 @@ func Run(ctx context.Context, cfg Config, progress func(float64, time.Duration))
 	var errCount atomic.Int64
 	var chunkIdx atomic.Int64
 	start := time.Now()
-
-	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: false}}
-
-	// Latency to the download endpoint itself (headers only), measured before
-	// saturating the link — this is the speed test's own RTT, not the
-	// connectivity monitor's ping latency.
-	latencyMs := measureLatency(tctx, client, cfg.Endpoints[0])
 
 	// Fixed worker pool: each worker fetches chunks in a loop until the context
 	// ends. Every wg.Add happens here, before wg.Wait — so Add never races with

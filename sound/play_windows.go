@@ -23,19 +23,22 @@ func mci(cmd string) {
 }
 
 // Play plays the ringtone (if any) via MCI for ~15s, stopping any prior play
-// first. Synchronous: callers that don't want to block should use `go Play()`.
+// first. The whole open/play/sleep/stop/close session is serialized under
+// playMu so two concurrent callers can't interleave on the same alias.
+// Synchronous: callers that don't want to block should use `go Play()`.
 func Play() {
 	path := RingtonePath()
 	if path == "" {
 		return
 	}
 	playMu.Lock()
+	defer playMu.Unlock()
+
 	if playing {
 		mci("stop im_ring")
 		mci("close im_ring")
 	}
 	playing = true
-	playMu.Unlock()
 
 	mci(`open "` + path + `" type mpegvideo alias im_ring`)
 	mci("play im_ring")
@@ -43,7 +46,5 @@ func Play() {
 	mci("stop im_ring")
 	mci("close im_ring")
 
-	playMu.Lock()
 	playing = false
-	playMu.Unlock()
 }

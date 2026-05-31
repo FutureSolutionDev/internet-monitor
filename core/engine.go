@@ -6,6 +6,7 @@ import (
 	"internet-monitor/monitor"
 	"internet-monitor/types"
 	"internet-monitor/updater"
+	"log"
 	"sync"
 	"time"
 )
@@ -21,19 +22,35 @@ type Notifier interface {
 // MultiNotifier fans out to multiple Notifier implementations in order.
 type MultiNotifier []Notifier
 
+// recoverFan recovers from a panic in a single child notifier so the remaining
+// siblings still receive the tick/event.
+func recoverFan() {
+	if r := recover(); r != nil {
+		log.Printf("[notifier] panic recovered: %v", r)
+	}
+}
+
 func (m MultiNotifier) OnTick(r types.CheckResult, s types.Status) {
 	for _, n := range m {
-		if n != nil {
-			n.OnTick(r, s)
+		if n == nil {
+			continue
 		}
+		func(n Notifier) {
+			defer recoverFan()
+			n.OnTick(r, s)
+		}(n)
 	}
 }
 
 func (m MultiNotifier) OnEvent(e types.Event) {
 	for _, n := range m {
-		if n != nil {
-			n.OnEvent(e)
+		if n == nil {
+			continue
 		}
+		func(n Notifier) {
+			defer recoverFan()
+			n.OnEvent(e)
+		}(n)
 	}
 }
 

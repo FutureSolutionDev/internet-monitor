@@ -94,7 +94,9 @@ func main() {
 	engine.Stop()
 	stopTray()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	dash.Shutdown(shutdownCtx)
+	if err := dash.Shutdown(shutdownCtx); err != nil {
+		log.Printf("dashboard shutdown error: %v", err)
+	}
 	cancel()
 	w.Destroy()
 	os.Exit(0)

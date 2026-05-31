@@ -757,8 +757,17 @@ func (s *Server) serveTestWebhook(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		URL string `json:"url"`
 	}
-	body, _ := io.ReadAll(http.MaxBytesReader(w, r.Body, 4096))
-	json.Unmarshal(body, &req)
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 4096))
+	if err != nil {
+		http.Error(w, `{"ok":false,"error":"request body too large or unreadable"}`, http.StatusRequestEntityTooLarge)
+		return
+	}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, `{"ok":false,"error":"invalid JSON"}`, http.StatusBadRequest)
+			return
+		}
+	}
 
 	url := req.URL
 	if url == "" {

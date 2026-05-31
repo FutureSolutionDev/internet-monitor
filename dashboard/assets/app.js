@@ -896,9 +896,11 @@ async function loadSettings() {
       cfg.packet_loss_threshold || 20;
     document.getElementById("cfg-latency-threshold").value =
       cfg.latency_threshold_ms || 500;
+    // Use ?? so an explicit 0 threshold is preserved (|| would silently
+    // replace 0 with the default and the reason text would diverge).
     monitorThresholds = {
-      loss: cfg.packet_loss_threshold || 20,
-      lat: cfg.latency_threshold_ms || 500,
+      loss: cfg.packet_loss_threshold ?? 20,
+      lat: cfg.latency_threshold_ms ?? 500,
     };
     document.getElementById("cfg-webhook").value = cfg.webhook_url || "";
     validateWebhookURL(cfg.webhook_url || "");
@@ -1058,7 +1060,12 @@ async function saveSettings() {
     const res = await api.post("/api/config", cfg);
 
     if (res.ok) {
-      msg.textContent = t("settings_saved");
+      let saved = t("settings_saved");
+      try {
+        const r = await res.json();
+        if (r.restart_required) saved += " — " + t("restart_required");
+      } catch (_) {}
+      msg.textContent = saved;
       msg.className = "msg-ok";
     } else {
       throw new Error(await res.text());
@@ -1386,9 +1393,11 @@ api
   .get("/api/config")
   .then((r) => r.json())
   .then((cfg) => {
+    // Use ?? so an explicit 0 threshold is preserved (|| would silently
+    // replace 0 with the default and the reason text would diverge).
     monitorThresholds = {
-      loss: cfg.packet_loss_threshold || 20,
-      lat: cfg.latency_threshold_ms || 500,
+      loss: cfg.packet_loss_threshold ?? 20,
+      lat: cfg.latency_threshold_ms ?? 500,
     };
   })
   .catch(() => {});

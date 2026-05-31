@@ -107,7 +107,7 @@ func (c *Config) Sanitize() {
 	if c.FailThreshold < 1 {
 		c.FailThreshold = Default.FailThreshold
 	}
-	if c.PacketLossThreshold < 0 {
+	if c.PacketLossThreshold < 0 || c.PacketLossThreshold > 100 {
 		c.PacketLossThreshold = Default.PacketLossThreshold
 	}
 	if c.LatencyThreshold < 0 {
@@ -128,9 +128,8 @@ func (c *Config) Sanitize() {
 	if len(c.SpeedTest.DownloadTargets) == 0 {
 		c.SpeedTest.DownloadTargets = Default.SpeedTest.DownloadTargets
 	}
-	if c.SpeedTest.UploadTarget == "" {
-		c.SpeedTest.UploadTarget = Default.SpeedTest.UploadTarget
-	}
+	// Keep empty upload_target as an explicit "disabled" — speedtest.MeasureUpload
+	// and the dashboard's runner both skip the upload phase when this is empty.
 }
 
 func writeDefault(path string, cfg Config) {

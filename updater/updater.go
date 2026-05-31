@@ -107,9 +107,16 @@ func Apply(downloadURL string) error {
 		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
+	const maxUpdateSize = 500 * 1024 * 1024 // 500 MB hard cap
+	if resp.ContentLength > maxUpdateSize {
+		return fmt.Errorf("update too large: %d bytes", resp.ContentLength)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxUpdateSize+1))
 	if err != nil {
 		return fmt.Errorf("read update body: %w", err)
+	}
+	if int64(len(data)) > maxUpdateSize {
+		return fmt.Errorf("update body exceeded %d-byte limit", maxUpdateSize)
 	}
 	if resp.ContentLength > 0 && int64(len(data)) != resp.ContentLength {
 		return fmt.Errorf("update size mismatch: got %d bytes, expected %d", len(data), resp.ContentLength)
@@ -119,9 +126,9 @@ func Apply(downloadURL string) error {
 	got := hex.EncodeToString(sum[:])
 	switch expected, cerr := fetchChecksum(downloadURL); {
 	case cerr != nil:
-		log.Printf("updater: SHA256SUMS unavailable (%v) — applying %d bytes sha256=%s unverified", cerr, len(data), got)
+		return fmt.Errorf("checksum file unavailable: %w", cerr)
 	case expected == "":
-		log.Printf("updater: asset not listed in SHA256SUMS — applying %d bytes sha256=%s unverified", len(data), got)
+		return fmt.Errorf("asset not listed in SHA256SUMS")
 	case !strings.EqualFold(got, expected):
 		return fmt.Errorf("checksum mismatch: got %s, expected %s", got, expected)
 	default:

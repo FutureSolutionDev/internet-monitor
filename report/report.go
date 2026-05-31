@@ -83,7 +83,25 @@ type dayAcc struct {
 
 // Summarize builds a monthly report from connectivity events and metric samples.
 // `now` is used to bound an outage that is still ongoing at report time.
+// Inputs are filtered to events/samples whose timestamps fall in `month`
+// (format "YYYY-MM"), so callers can safely pass broader history.
 func Summarize(events []types.Event, samples []types.MetricSample, month string, now time.Time) MonthlySummary {
+	if month != "" {
+		fe := make([]types.Event, 0, len(events))
+		for _, ev := range events {
+			if ev.Timestamp.Format("2006-01") == month {
+				fe = append(fe, ev)
+			}
+		}
+		events = fe
+		fs := make([]types.MetricSample, 0, len(samples))
+		for _, s := range samples {
+			if s.Timestamp.Format("2006-01") == month {
+				fs = append(fs, s)
+			}
+		}
+		samples = fs
+	}
 	sort.SliceStable(events, func(i, j int) bool { return events[i].Timestamp.Before(events[j].Timestamp) })
 
 	sum := MonthlySummary{
@@ -143,11 +161,26 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 				DurationSecs: dur,
 				Cause:        failedLayers(ev.Reason),
 			})
-			a := getDay(ev.Timestamp)
-			a.downtime += dur
+			// Split the outage across day boundaries so per-day downtime
+			// reflects what actually happened on each day. The outage count
+			// and worst-outage stay attributed to the start day.
+			start := ev.Timestamp
+			a := getDay(start)
 			a.outages++
 			if dur > a.worst {
 				a.worst = dur
+			}
+			remaining := dur
+			cursor := start
+			for remaining > 0 {
+				dayEnd := time.Date(cursor.Year(), cursor.Month(), cursor.Day(), 0, 0, 0, 0, cursor.Location()).Add(24 * time.Hour)
+				slice := dayEnd.Sub(cursor).Seconds()
+				if slice > remaining {
+					slice = remaining
+				}
+				getDay(cursor).downtime += slice
+				remaining -= slice
+				cursor = dayEnd
 			}
 		case "degraded":
 			sum.DegradedEpisodes++
