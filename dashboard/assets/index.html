@@ -93,6 +93,27 @@
       </div>
 
       <div class="section">
+        <div class="section-title">
+          <span data-i18n="availability_title">التوفّر</span>
+          <button class="btn btn-secondary btn-sm" style="float:inline-end" onclick="copySummary()" data-i18n="copy_summary">نسخ الملخّص</button>
+        </div>
+        <div class="cards">
+          <div class="card">
+            <div class="card-value" id="av-today">—</div>
+            <div class="card-label" data-i18n="av_today">اليوم</div>
+          </div>
+          <div class="card">
+            <div class="card-value" id="av-week">—</div>
+            <div class="card-label" data-i18n="av_week">آخر 7 أيام</div>
+          </div>
+          <div class="card">
+            <div class="card-value" id="av-month">—</div>
+            <div class="card-label" data-i18n="av_month">آخر 30 يوم</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="section-title" data-i18n="chart_title">زمن الاستجابة — آخر 60 فحص</div>
         <div id="chart-wrap"><canvas id="the-chart"></canvas></div>
         <div class="checks">
@@ -166,6 +187,8 @@
             <option value="" data-i18n="logs_select">اختر تاريخاً...</option>
           </select>
           <button class="btn btn-secondary" onclick="exportCSV()" data-i18n="export_csv">تصدير CSV</button>
+          <button class="btn btn-secondary" onclick="exportRangeCSV(7)" data-i18n="export_csv_7">CSV — 7 أيام</button>
+          <button class="btn btn-secondary" onclick="exportRangeCSV(30)" data-i18n="export_csv_30">CSV — 30 يوم</button>
           <input type="month" id="report-month" class="report-month" />
           <button class="btn btn-secondary" onclick="openReport()" data-i18n="report_btn">تقرير شهري (PDF)</button>
           <span id="log-count"></span>

@@ -287,6 +287,7 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/report", s.serveReport)
 	mux.HandleFunc("/report", s.serveReportPage)
 	mux.HandleFunc("/metrics", s.serveMetrics)
+	mux.HandleFunc("/api/availability", s.serveAvailability)
 
 	s.srv = &http.Server{
 		Addr:    fmt.Sprintf("127.0.0.1:%d", s.port),
@@ -1281,6 +1282,50 @@ func (s *Server) serveReport(w http.ResponseWriter, r *http.Request) {
 
 // serveMetrics exposes the live monitoring state in Prometheus text exposition
 // format. Hand-written to avoid pulling in the prometheus client dependency.
+// availabilityPct computes uptime % over the last `days` days from the
+// per-minute metric samples. Returns (pct, true) or (0, false) if no data.
+func (s *Server) availabilityPct(days int) (float64, bool) {
+	var total, up int
+	now := time.Now()
+	for i := 0; i < days; i++ {
+		date := now.AddDate(0, 0, -i).Format("2006-01-02")
+		filename := filepath.Join(s.getLogDir(), "metrics_"+date+".jsonl")
+		data, err := s.readDataFile(filename)
+		if err != nil {
+			continue
+		}
+		for _, line := range bytes.Split(bytes.TrimSpace(data), []byte{'\n'}) {
+			line = bytes.TrimSpace(line)
+			if len(line) == 0 || !json.Valid(line) {
+				continue
+			}
+			var m types.MetricSample
+			if json.Unmarshal(line, &m) == nil {
+				total += m.Samples
+				up += m.UpSamples
+			}
+		}
+	}
+	if total == 0 {
+		return 0, false
+	}
+	return float64(up) / float64(total) * 100, true
+}
+
+// serveAvailability returns uptime % for today / last 7 days / last 30 days.
+func (s *Server) serveAvailability(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	out := map[string]interface{}{}
+	for key, days := range map[string]int{"today": 1, "week": 7, "month": 30} {
+		if pct, ok := s.availabilityPct(days); ok {
+			out[key] = pct
+		} else {
+			out[key] = nil
+		}
+	}
+	json.NewEncoder(w).Encode(out)
+}
+
 func (s *Server) serveMetrics(w http.ResponseWriter, r *http.Request) {
 	s.stateMu.RLock()
 	status := s.status

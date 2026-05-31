@@ -516,21 +516,11 @@ function renderLogTable(entries) {
     .join("");
 }
 
-function exportCSV() {
-  if (!logsData.length) return;
+function buildCSV(entries) {
   const rows = [
-    [
-      "Time",
-      "Event",
-      "Duration(s)",
-      "TCP",
-      "HTTP",
-      "DNS",
-      "Loss%",
-      "Latency(ms)",
-    ],
+    ["Time", "Event", "Duration(s)", "TCP", "HTTP", "DNS", "Loss%", "Latency(ms)"],
   ];
-  logsData.forEach((e) => {
+  entries.forEach((e) => {
     const r = e.reason || {};
     rows.push([
       new Date(e.timestamp).toLocaleString(),
@@ -543,18 +533,42 @@ function exportCSV() {
       r.avg_latency_ms || 0,
     ]);
   });
-  const csv = rows
-    .map((r) =>
-      r.map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(","),
-    )
+  return rows
+    .map((r) => r.map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(","))
     .join("\n");
+}
+
+function downloadCSV(csv, name) {
   const a = document.createElement("a");
   a.href = "data:text/csv;charset=utf-8,﻿" + encodeURIComponent(csv);
-  a.download =
-    "internet-monitor-" +
-    (document.getElementById("log-date-select").value || "logs") +
-    ".csv";
+  a.download = name;
   a.click();
+}
+
+function exportCSV() {
+  if (!logsData.length) return;
+  downloadCSV(
+    buildCSV(logsData),
+    "internet-monitor-" +
+      (document.getElementById("log-date-select").value || "logs") +
+      ".csv",
+  );
+}
+
+// Exports the last N days of connectivity logs as a single combined CSV.
+async function exportRangeCSV(days) {
+  try {
+    const dates = await (await api.get("/api/log-dates")).json();
+    const pick = (dates || []).slice(0, days); // log-dates is newest-first
+    if (!pick.length) return;
+    let all = [];
+    for (const d of pick) {
+      const rows = await (await api.get("/api/logs?date=" + d)).json();
+      if (Array.isArray(rows)) all = all.concat(rows);
+    }
+    if (!all.length) return;
+    downloadCSV(buildCSV(all), "internet-monitor-last-" + days + "d.csv");
+  } catch (_) {}
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1312,6 +1326,49 @@ function minimizeToTray() {
 // ══════════════════════════════════════════════════════════════
 applyLang();
 connect();
+
+// ── Availability widget (today / 7d / 30d) ─────────────────────
+function fmtPct(v) {
+  return v == null ? "—" : v.toFixed(2) + "%";
+}
+async function loadAvailability() {
+  try {
+    const a = await (await api.get("/api/availability")).json();
+    const set = (id, v) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = fmtPct(v);
+    };
+    set("av-today", a.today);
+    set("av-week", a.week);
+    set("av-month", a.month);
+  } catch (_) {}
+}
+loadAvailability();
+setInterval(loadAvailability, 60000);
+
+// Copies a short, paste-ready outage summary to the clipboard.
+async function copySummary() {
+  const d = lastData || {};
+  let avail = {};
+  try {
+    avail = await (await api.get("/api/availability")).json();
+  } catch (_) {}
+  const lines = [
+    "Internet Monitor — summary",
+    `Status: ${d.status || "—"}`,
+    `Latency: ${d.latency_ms || 0}ms · Jitter: ${d.jitter_ms || 0}ms · Loss: ${(d.packet_loss || 0).toFixed(1)}%`,
+    `Uptime — today: ${fmtPct(avail.today)} · 7d: ${fmtPct(avail.week)} · 30d: ${fmtPct(avail.month)}`,
+    `Disconnections this session: ${d.disconnections || 0}`,
+    `Generated: ${new Date().toLocaleString()}`,
+  ];
+  const text = lines.join("\n");
+  try {
+    await navigator.clipboard.writeText(text);
+    alert(t("copied") || "Copied");
+  } catch (_) {
+    prompt(t("copy_summary") || "Copy", text);
+  }
+}
 
 // Show version in header
 api
