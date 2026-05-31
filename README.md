@@ -9,9 +9,13 @@
 
 > [🇸🇦 اقرأ بالعربية](README.ar.md)
 
-**A free, open-source tool for real-time internet connectivity monitoring and speed testing.**
+# Document your outages. Win the dispute with your ISP.
 
-Runs silently in the background, logs every disconnection with its cause and duration, measures your download speed on demand, and displays a live visual dashboard in your browser — with instant notifications on every status change.
+**Internet Monitor** is a free, open-source tool that captures **proof** of every internet drop — so you can stop arguing from memory and start attaching evidence to your support ticket.
+
+It logs each outage with **per-layer detail (TCP / HTTP / DNS)** — so you can prove things like *"DNS failed while the link was up"* — with exact **timestamps and durations**, and exports a clean **monthly report (PDF)** or **CSV** you can hand to your provider. 100% local: no account, no cloud, no telemetry.
+
+> It's also an excellent everyday connectivity monitor — live dashboard, latency/jitter trends, speed tests, and Discord/Slack/Telegram alerts.
 
 ---
 
@@ -29,13 +33,29 @@ Runs silently in the background, logs every disconnection with its cause and dur
 
 ## 💡 Why Internet Monitor?
 
-Users often experience internet drops without any concrete evidence — no timestamps, no causes, no durations. **Internet Monitor** solves this practically:
+Most "my internet is down" complaints fail because you have **no proof** — no timestamps, no causes, no durations. Internet Monitor produces that evidence:
+
+- **Per-layer logging (TCP / HTTP / DNS)** — prove *which* layer failed, not just "it was slow". (e.g. "DNS resolution failed while the link itself was reachable.")
+- **Exact timestamps + durations** for every disconnection, plus monthly availability %.
+- **Exportable evidence** — one-click **monthly outage report (PDF)** and **JSONL / CSV** you can attach to a ticket.
+- **LAN-vs-ISP diagnosis** (optional ICMP) — distinguish "my router is down" from "my ISP is down".
+
+## 🧾 How to use this against your ISP
+
+1. **Run it** in the background (system tray or standalone window) — it checks every few seconds, 24/7.
+2. **Let it capture the drops** — each outage is logged with its cause (TCP/HTTP/DNS), exact start time and duration.
+3. **Generate the monthly report** — open the dashboard → **Logs → Monthly report (PDF)**, pick the month, then **Print / Save as PDF**.
+4. **Attach it to your ticket/complaint.** The report is **neutral by default** (reads as your own document); an opt-in "shareable" toggle can add a small footer if you want.
+
+> Tip: enable **scheduled speed tests** and **ICMP/LAN-vs-ISP diagnosis** to back your case with latency, jitter, and throughput history.
+
+## 👥 Who is it for?
 
 | Who | What they get |
 | --- | ------------- |
-| 🧑 **End users** | Automatic notifications on every drop + one-click speed test |
-| 🛠️ **Support teams** | Full dashboard with exportable JSONL/CSV logs to present to ISPs |
-| 👨‍💻 **Developers** | Detailed Discord/Slack webhook with structured per-check data |
+| 🧑 **End users** | Proof for ISP disputes + notifications on every drop + one-click speed test |
+| 🛠️ **Support teams** | Full dashboard with exportable JSONL/CSV logs and monthly PDF reports |
+| 👨‍💻 **Developers** | Detailed Discord / Slack / Telegram alerts with structured per-check data + a `/metrics` Prometheus endpoint |
 
 ---
 
