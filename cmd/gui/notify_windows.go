@@ -4,6 +4,7 @@ package main
 
 import (
 	"internet-monitor/monitor"
+	"internet-monitor/notifytext"
 	"internet-monitor/sound"
 	"internet-monitor/tray"
 	"log"
@@ -76,10 +77,9 @@ var (
 const guiNotifyCooldown = 4 * time.Second
 
 func showSystemNotification(title, body string) {
-	// Always use the balloon: it shows via Shell_NotifyIcon on the tray icon and
-	// falls back to a PowerShell WinForms balloon, which reliably renders a box
-	// from an unpackaged exe. The WinRT toast path failed silently (no box).
-	tray.ShowBalloon(title, body)
+	// Prefer the app-named WinRT toast (falls back to the WinForms balloon when
+	// the Start Menu shortcut isn't present, e.g. under `air`).
+	tray.ShowNotification(title, body)
 }
 
 func sendNotification(status monitor.Status, result monitor.CheckResult) {
@@ -99,12 +99,13 @@ func sendNotification(status monitor.Status, result monitor.CheckResult) {
 	showSystemNotification(title, body)
 }
 
-func TestNotification() {
+func TestNotification(lang string) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("[notify] TestNotification panic recovered: %v", r)
 		}
 	}()
 	playRingtone()
-	showSystemNotification("🔔 اختبار الإشعار / Test", "الصوت والإشعار يعملان ✅")
+	title, body := notifytext.TestMessage(lang)
+	showSystemNotification(title, body)
 }

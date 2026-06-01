@@ -215,7 +215,7 @@ type Server struct {
 	version string
 
 	OnConfigChange     func(*config.Config)
-	OnTestNotification func()
+	OnTestNotification func(lang string)
 	OnTestWebhook      func(url string) string
 	OnApplyUpdate      func(downloadURL string) error
 	OnRestartApp       func()
@@ -747,11 +747,15 @@ func (s *Server) serveTestNotification(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	lang := r.URL.Query().Get("lang")
+	if lang != "ar" {
+		lang = "en" // default to English for any non-ar value
+	}
 	if s.lgr != nil {
-		s.lgr.AppLog("NOTIFICATION test triggered by user")
+		s.lgr.AppLog("NOTIFICATION test triggered by user (lang=%s)", lang)
 	}
 	if s.OnTestNotification != nil {
-		go s.OnTestNotification()
+		go s.OnTestNotification(lang)
 	}
 	w.Write([]byte(`{"ok":true}`))
 }

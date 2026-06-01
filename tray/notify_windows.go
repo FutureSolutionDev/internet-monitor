@@ -3,9 +3,12 @@
 package tray
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"syscall"
 
 	"golang.org/x/sys/windows/registry"
@@ -64,15 +67,63 @@ func init() {
 }
 
 // Notify shows a system notification with sound (tray binary).
-//
-// Routes straight to ShowBalloon, which renders via a PowerShell WinForms
-// balloon — reliable from an unpackaged exe. (The old WinRT-toast path failed
-// silently with no box, so it was removed.) Sound plays inline; sound.Play
-// stops any prior sound first.
 func Notify(title, message string) {
 	playTraySound()
 	notifyLogf("[notify] Notify(tray): title=%q", title)
+	ShowNotification(title, message)
+}
+
+// startMenuLnkPath is the Start Menu shortcut whose AppUserModelID associates
+// our notifications with the app's name (required for WinRT toasts on Win10/11).
+func startMenuLnkPath() string {
+	return filepath.Join(os.Getenv("APPDATA"),
+		"Microsoft", "Windows", "Start Menu", "Programs",
+		"Internet Monitor.lnk")
+}
+
+// ShowNotification shows a desktop notification. It prefers a WinRT toast —
+// which renders under the app's name/icon — when the Start Menu shortcut (with
+// our AppUserModelID) exists. Otherwise, or if the toast can't be shown, it
+// falls back to the PowerShell WinForms balloon (shows under "PowerShell" but
+// always renders, e.g. under `air` where the exe is a throwaway in tmp).
+func ShowNotification(title, message string) {
+	if _, err := os.Stat(startMenuLnkPath()); err == nil {
+		if showWinRTToast(title, message) {
+			return
+		}
+		notifyLogf("[notify] toast failed, falling back to balloon")
+	} else {
+		notifyLogf("[notify] no Start Menu shortcut yet, using balloon")
+	}
 	ShowBalloon(title, message)
+}
+
+// showWinRTToast fires a Windows 10/11 toast under our AUMID via PowerShell.
+// Returns true only if PowerShell reported the toast was shown.
+func showWinRTToast(title, body string) bool {
+	t := strings.ReplaceAll(title, "'", "''")
+	b := strings.ReplaceAll(body, "'", "''")
+	script := fmt.Sprintf(`
+[Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]|Out-Null
+$tpl=[Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
+$n=$tpl.GetElementsByTagName('text')
+$n.Item(0).AppendChild($tpl.CreateTextNode('%s'))|Out-Null
+$n.Item(1).AppendChild($tpl.CreateTextNode('%s'))|Out-Null
+$toast=[Windows.UI.Notifications.ToastNotification]::new($tpl)
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('%s').Show($toast)
+Write-Host 'TOAST_SHOWN'`, t, b, notifyAUMID)
+
+	cmd := exec.Command("powershell",
+		"-NoProfile", "-ExecutionPolicy", "Bypass",
+		"-WindowStyle", "Hidden", "-NonInteractive",
+		"-Command", script)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x00000008}
+	out, err := cmd.CombinedOutput()
+	if err != nil || !strings.Contains(string(out), "TOAST_SHOWN") {
+		notifyLogf("[notify] showWinRTToast: err=%v out=%q", err, strings.TrimSpace(string(out)))
+		return false
+	}
+	return true
 }
 
 func OpenURL(url string) {

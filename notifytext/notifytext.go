@@ -9,6 +9,15 @@ import (
 	"strings"
 )
 
+// TestMessage returns the (title, body) for a manual test notification in the
+// given UI language ("ar" for Arabic, anything else = English).
+func TestMessage(lang string) (title, body string) {
+	if lang == "ar" {
+		return "اختبار الإشعار", "🔔 الإشعار والصوت يعملان بشكل صحيح"
+	}
+	return "Test Notification", "🔔 Notifications and sound are working"
+}
+
 // StatusFromEventType maps an Event.EventType string to a Status.
 func StatusFromEventType(eventType string) types.Status {
 	switch eventType {

@@ -7,6 +7,7 @@ import (
 	"internet-monitor/dashboard"
 	"internet-monitor/logger"
 	"internet-monitor/monitor"
+	"internet-monitor/notifytext"
 	"internet-monitor/sound"
 	"internet-monitor/tray"
 	"internet-monitor/updater"
@@ -77,13 +78,14 @@ func main() {
 	if png := dashboard.FaviconPNG(); len(png) > 0 {
 		tray.SetCustomIcon(png)
 	}
-	dash.OnTestNotification = func() {
+	dash.OnTestNotification = func(lang string) {
 		defer func() {
 			if r := recover(); r != nil {
 				log.Printf("[notify] tray test notification panic recovered: %v", r)
 			}
 		}()
-		tray.Notify("اختبار الإشعار / Test Notification", "🔔 الإشعار يعمل بشكل صحيح")
+		title, body := notifytext.TestMessage(lang)
+		tray.Notify(title, body)
 	}
 
 	engine.Start()

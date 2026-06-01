@@ -1249,7 +1249,7 @@ async function testNotification() {
 
   // Always call server API (triggers OS toast + sound in native/tray mode)
   try {
-    const r = await api.post("/api/test-notification");
+    const r = await api.post("/api/test-notification?lang=" + lang);
     if (res) {
       res.className = r.ok ? "test-result test-ok" : "test-result test-warn";
       res.textContent = r.ok ? t("test_notif_ok") : "⚠️ server";

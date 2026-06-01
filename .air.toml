@@ -2,7 +2,7 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  cmd = "go build -o ./tmp/main.exe ."
+  cmd = "go build -o ./tmp/main.exe ./cmd/gui/"
   bin = "./tmp/main.exe"
   delay = 800
   exclude_dir = ["tmp", "vendor", "testdata", "logs", ".specify", ".git",".code-review-graph", ".serena",".claude"]
@@ -14,7 +14,7 @@ tmp_dir = "tmp"
   rerun_delay = 500
 
   [build.windows]
-    cmd = "$env:CGO_ENABLED='0'; go build -o ./tmp/main.exe ."
+    cmd = "$env:CGO_ENABLED='1'; go build -o ./tmp/main.exe ./cmd/gui/"
     bin = "tmp\\main.exe"
 
 [color]
