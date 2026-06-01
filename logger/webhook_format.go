@@ -5,10 +5,25 @@ import (
 	"internet-monitor/monitor"
 	"strings"
 	"time"
+	"unicode"
 )
+
+// capitalize upper-cases the first rune. Replaces the deprecated strings.Title
+// (event types are single ASCII words: connected/degraded/disconnected).
+func capitalize(s string) string {
+	if s == "" {
+		return s
+	}
+	r := []rune(s)
+	r[0] = unicode.ToUpper(r[0])
+	return string(r)
+}
 
 // ── URL Validation ────────────────────────────────────────────
 
+// IsDiscord/IsSlack/IsSupportedWebhook are the authoritative webhook
+// classification. The dashboard mirrors this in app.js (isDiscordURL/...) for a
+// UX hint only — keep the two in sync.
 func IsDiscord(url string) bool {
 	return strings.Contains(url, "discord.com/api/webhooks") ||
 		strings.Contains(url, "discordapp.com/api/webhooks")
@@ -30,6 +45,52 @@ func BuildEventPayload(event monitor.Event, url string) interface{} {
 		return discordEventPayload(event)
 	}
 	return slackEventPayload(event)
+}
+
+// ── Telegram (Bot API) ────────────────────────────────────────
+
+func tgMark(ok bool) string {
+	if ok {
+		return "✅"
+	}
+	return "❌"
+}
+
+// TelegramEventText builds a Markdown message for a connectivity event.
+func TelegramEventText(event monitor.Event) string {
+	emoji := map[string]string{"connected": "✅", "degraded": "⚠️", "disconnected": "❌"}[event.EventType]
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s *Internet %s*\n", emoji, capitalize(event.EventType))
+	fmt.Fprintf(&b, "TCP: %s  HTTP: %s  DNS: %s",
+		tgMark(!event.Reason.TCPPingFailed), tgMark(!event.Reason.HTTPFailed), tgMark(!event.Reason.DNSFailed))
+	if event.Reason.PacketLossPct > 0 {
+		fmt.Fprintf(&b, "\nPacket Loss: %.1f%%", event.Reason.PacketLossPct)
+	}
+	if event.Reason.AvgLatencyMs > 0 {
+		fmt.Fprintf(&b, "\nLatency: %dms", event.Reason.AvgLatencyMs)
+	}
+	if event.DurationSeconds > 0 {
+		fmt.Fprintf(&b, "\nDuration: %.0fs", event.DurationSeconds)
+	}
+	return b.String()
+}
+
+// TelegramSpeedText builds a Markdown message for a completed speed test.
+func TelegramSpeedText(event SpeedTestEvent, thresholdMbps float64, belowThreshold bool) string {
+	icon := "🚀"
+	if belowThreshold {
+		icon = "⚠️"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s *Speed Test*\n📥 Download: *%.1f Mbps*", icon, event.DownloadMbps)
+	if event.UploadMbps != nil {
+		fmt.Fprintf(&b, "\n📤 Upload: *%.1f Mbps*", *event.UploadMbps)
+	}
+	fmt.Fprintf(&b, "\n📡 Latency: %dms", event.LatencyMs)
+	if belowThreshold && thresholdMbps > 0 {
+		fmt.Fprintf(&b, "\n⚠️ Below threshold: %.1f Mbps", thresholdMbps)
+	}
+	return b.String()
 }
 
 func discordEventPayload(event monitor.Event) map[string]interface{} {
@@ -100,11 +161,11 @@ func discordEventPayload(event monitor.Event) map[string]interface{} {
 	return map[string]interface{}{
 		"username": "Internet Monitor",
 		"embeds": []map[string]interface{}{{
-			"title":       fmt.Sprintf("%s Internet %s", emoji, strings.Title(event.EventType)),
-			"color":       color,
-			"fields":      allFields,
-			"timestamp":   event.Timestamp.UTC().Format(time.RFC3339),
-			"footer":      map[string]string{"text": "Internet Monitor • Event Log"},
+			"title":     fmt.Sprintf("%s Internet %s", emoji, capitalize(event.EventType)),
+			"color":     color,
+			"fields":    allFields,
+			"timestamp": event.Timestamp.UTC().Format(time.RFC3339),
+			"footer":    map[string]string{"text": "Internet Monitor • Event Log"},
 		}},
 	}
 }
@@ -118,7 +179,7 @@ func slackEventPayload(event monitor.Event) map[string]interface{} {
 	emoji := emojis[event.EventType]
 
 	lines := []string{
-		fmt.Sprintf("%s *Internet %s*", emoji, strings.Title(event.EventType)),
+		fmt.Sprintf("%s *Internet %s*", emoji, capitalize(event.EventType)),
 		"",
 	}
 
@@ -196,9 +257,16 @@ func BuildSpeedResultPayload(event SpeedTestEvent, thresholdMbps float64, belowT
 
 	fields := []map[string]interface{}{
 		{"name": "📥 Download", "value": fmt.Sprintf("%.1f Mbps", event.DownloadMbps), "inline": true},
-		{"name": "⏱️ Duration", "value": fmt.Sprintf("%.1fs", event.DurationSeconds), "inline": true},
-		{"name": "📡 Latency", "value": fmt.Sprintf("%dms", event.LatencyMs), "inline": true},
 	}
+	if event.UploadMbps != nil {
+		fields = append(fields, map[string]interface{}{
+			"name": "📤 Upload", "value": fmt.Sprintf("%.1f Mbps", *event.UploadMbps), "inline": true,
+		})
+	}
+	fields = append(fields,
+		map[string]interface{}{"name": "⏱️ Duration", "value": fmt.Sprintf("%.1fs", event.DurationSeconds), "inline": true},
+		map[string]interface{}{"name": "📡 Latency", "value": fmt.Sprintf("%dms", event.LatencyMs), "inline": true},
+	)
 	if belowThreshold && thresholdMbps > 0 {
 		fields = append(fields, map[string]interface{}{
 			"name": "⚠️ Threshold", "value": fmt.Sprintf("%.1f Mbps", thresholdMbps), "inline": true,
@@ -221,8 +289,12 @@ func BuildSpeedResultPayload(event SpeedTestEvent, thresholdMbps float64, belowT
 	if belowThreshold {
 		statusIcon = "⚠️"
 	}
-	text := fmt.Sprintf("*%s %s*\n📥 Download: *%.1f Mbps* | ⏱️ %.1fs | 📡 %dms",
-		statusIcon, title, event.DownloadMbps, event.DurationSeconds, event.LatencyMs)
+	upStr := ""
+	if event.UploadMbps != nil {
+		upStr = fmt.Sprintf(" | 📤 %.1f Mbps", *event.UploadMbps)
+	}
+	text := fmt.Sprintf("*%s %s*\n📥 Download: *%.1f Mbps*%s | ⏱️ %.1fs | 📡 %dms",
+		statusIcon, title, event.DownloadMbps, upStr, event.DurationSeconds, event.LatencyMs)
 	if belowThreshold && thresholdMbps > 0 {
 		text += fmt.Sprintf("\n⚠️ Below threshold: %.1f Mbps", thresholdMbps)
 	}

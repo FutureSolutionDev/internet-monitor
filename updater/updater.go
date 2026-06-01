@@ -1,8 +1,13 @@
 package updater
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -15,17 +20,17 @@ import (
 )
 
 const (
-	apiURL  = "https://api.github.com/repos/FutureSolutionDev/internet-monitor/releases/latest"
+	apiURL        = "https://api.github.com/repos/FutureSolutionDev/internet-monitor/releases/latest"
 	checkInterval = 6 * time.Hour
 )
 
 // Info holds the result of a version check.
 type Info struct {
-	HasUpdate    bool   `json:"has_update"`
-	LatestVersion string `json:"latest_version"`
+	HasUpdate      bool   `json:"has_update"`
+	LatestVersion  string `json:"latest_version"`
 	CurrentVersion string `json:"current_version"`
-	DownloadURL  string `json:"download_url"`
-	ReleaseNotes string `json:"release_notes"`
+	DownloadURL    string `json:"download_url"`
+	ReleaseNotes   string `json:"release_notes"`
 }
 
 type ghRelease struct {
@@ -66,10 +71,10 @@ func Check(currentVersion string) (*Info, error) {
 	}
 
 	info := &Info{
-		HasUpdate:     compareVersions(rel.TagName, currentVersion) > 0,
-		LatestVersion: rel.TagName,
+		HasUpdate:      compareVersions(rel.TagName, currentVersion) > 0,
+		LatestVersion:  rel.TagName,
 		CurrentVersion: currentVersion,
-		ReleaseNotes:  rel.Body,
+		ReleaseNotes:   rel.Body,
 	}
 
 	if info.HasUpdate {
@@ -81,7 +86,16 @@ func Check(currentVersion string) (*Info, error) {
 
 // Apply downloads the binary at downloadURL and atomically replaces the current exe.
 // Returns nil on success; the caller should restart the process.
+//
+// Security: the URL must be HTTPS, and the downloaded length is checked against
+// Content-Length to reject truncated transfers; the SHA-256 of the payload is
+// logged. NOTE: release assets are not yet signed by this project — publishing
+// and verifying a signature/checksum here is tracked as follow-up work.
 func Apply(downloadURL string) error {
+	if !strings.HasPrefix(strings.ToLower(downloadURL), "https://") {
+		return fmt.Errorf("refusing non-HTTPS update URL")
+	}
+
 	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Get(downloadURL)
 	if err != nil {
@@ -93,7 +107,76 @@ func Apply(downloadURL string) error {
 		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
 	}
 
-	return selfupdate.Apply(resp.Body, selfupdate.Options{})
+	const maxUpdateSize = 500 * 1024 * 1024 // 500 MB hard cap
+	if resp.ContentLength > maxUpdateSize {
+		return fmt.Errorf("update too large: %d bytes", resp.ContentLength)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxUpdateSize+1))
+	if err != nil {
+		return fmt.Errorf("read update body: %w", err)
+	}
+	if int64(len(data)) > maxUpdateSize {
+		return fmt.Errorf("update body exceeded %d-byte limit", maxUpdateSize)
+	}
+	if resp.ContentLength > 0 && int64(len(data)) != resp.ContentLength {
+		return fmt.Errorf("update size mismatch: got %d bytes, expected %d", len(data), resp.ContentLength)
+	}
+
+	sum := sha256.Sum256(data)
+	got := hex.EncodeToString(sum[:])
+	switch expected, cerr := fetchChecksum(downloadURL); {
+	case cerr != nil:
+		return fmt.Errorf("checksum file unavailable: %w", cerr)
+	case expected == "":
+		return fmt.Errorf("asset not listed in SHA256SUMS")
+	case !strings.EqualFold(got, expected):
+		return fmt.Errorf("checksum mismatch: got %s, expected %s", got, expected)
+	default:
+		log.Printf("updater: checksum verified sha256=%s", got)
+	}
+	return selfupdate.Apply(bytes.NewReader(data), selfupdate.Options{})
+}
+
+// fetchChecksum downloads the sibling SHA256SUMS file (same release) and returns
+// the expected hash for the asset, "" if the asset isn't listed, or an error if
+// the file can't be fetched.
+func fetchChecksum(downloadURL string) (string, error) {
+	idx := strings.LastIndex(downloadURL, "/")
+	if idx < 0 {
+		return "", fmt.Errorf("malformed download URL")
+	}
+	checksumURL := downloadURL[:idx+1] + "SHA256SUMS"
+	asset := downloadURL[idx+1:]
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(checksumURL)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return "", err
+	}
+	return parseChecksums(data, asset), nil
+}
+
+// parseChecksums returns the hash for asset from a `sha256sum`-format file, or "".
+func parseChecksums(data []byte, asset string) string {
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		name := strings.TrimPrefix(fields[len(fields)-1], "*")
+		if name == asset {
+			return fields[0]
+		}
+	}
+	return ""
 }
 
 // Restart launches the updated binary and exits the current process.
@@ -110,7 +193,9 @@ func Restart() {
 	cmd.Dir = filepath.Dir(exe)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Start()
+	if err := cmd.Start(); err != nil {
+		log.Printf("updater: failed to relaunch %s: %v", exe, err)
+	}
 	os.Exit(0)
 }
 
@@ -120,7 +205,7 @@ func pickAsset(assets []ghAsset) string {
 	exe, _ := os.Executable()
 	isGUI := strings.Contains(strings.ToLower(filepath.Base(exe)), "gui")
 
-	var goos   = runtime.GOOS
+	var goos = runtime.GOOS
 	var goarch = runtime.GOARCH
 
 	// Build expected name fragments

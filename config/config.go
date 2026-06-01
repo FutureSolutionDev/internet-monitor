@@ -11,8 +11,9 @@ type SpeedTestConfig struct {
 	DownloadTargets     []string `json:"download_targets"`
 	ParallelConnections int      `json:"parallel_connections"`
 	TimeoutSeconds      int      `json:"timeout_seconds"`
-	UploadTarget        string   `json:"upload_target"`       // reserved, ignored in v1
+	UploadTarget        string   `json:"upload_target"` // POST endpoint for the upload test; empty disables it
 	AlertThresholdMbps  float64  `json:"alert_threshold_mbps"`
+	ScheduleMinutes     int      `json:"schedule_minutes"` // 0 = disabled; otherwise run an automatic speed test every N minutes
 }
 
 type Config struct {
@@ -25,7 +26,11 @@ type Config struct {
 	LatencyThreshold    int             `json:"latency_threshold_ms"`
 	LogDir              string          `json:"log_dir"`
 	WebhookURL          string          `json:"webhook_url"`
+	TelegramBotToken    string          `json:"telegram_bot_token"`
+	TelegramChatID      string          `json:"telegram_chat_id"`
 	DashboardPort       int             `json:"dashboard_port"`
+	UseICMP             bool            `json:"use_icmp"`  // use ICMP echo for ping (falls back to TCP)
+	Language            string          `json:"language"`  // "ar" or "en" — language for OS notifications
 	SpeedTest           SpeedTestConfig `json:"speed_test,omitempty"`
 }
 
@@ -40,10 +45,12 @@ var Default = Config{
 	LogDir:              "logs",
 	WebhookURL:          "",
 	DashboardPort:       8765,
+	Language:            "en",
 	SpeedTest: SpeedTestConfig{
 		DownloadTargets:     []string{"https://speed.cloudflare.com/__down"},
 		ParallelConnections: 4,
-		TimeoutSeconds:      10,
+		TimeoutSeconds:      30,
+		UploadTarget:        "https://speed.cloudflare.com/__up",
 	},
 }
 
@@ -88,7 +95,46 @@ func Load(path string) (*Config, error) {
 		cfg.SpeedTest.TimeoutSeconds = Default.SpeedTest.TimeoutSeconds
 	}
 
+	cfg.Sanitize()
 	return &cfg, nil
+}
+
+// Sanitize clamps out-of-range values to safe defaults so a malformed config
+// (e.g. check_interval_sec=0, which would panic time.NewTicker) can never crash
+// the process or be persisted from the dashboard.
+func (c *Config) Sanitize() {
+	if c.CheckIntervalSec < 1 {
+		c.CheckIntervalSec = Default.CheckIntervalSec
+	}
+	if c.FailThreshold < 1 {
+		c.FailThreshold = Default.FailThreshold
+	}
+	if c.PacketLossThreshold < 0 || c.PacketLossThreshold > 100 {
+		c.PacketLossThreshold = Default.PacketLossThreshold
+	}
+	if c.LatencyThreshold < 0 {
+		c.LatencyThreshold = Default.LatencyThreshold
+	}
+	if c.DashboardPort < 1 || c.DashboardPort > 65535 {
+		c.DashboardPort = Default.DashboardPort
+	}
+	if c.LogDir == "" {
+		c.LogDir = Default.LogDir
+	}
+	if c.Language != "ar" && c.Language != "en" {
+		c.Language = "en"
+	}
+	if c.SpeedTest.ParallelConnections < 1 {
+		c.SpeedTest.ParallelConnections = Default.SpeedTest.ParallelConnections
+	}
+	if c.SpeedTest.TimeoutSeconds < 1 {
+		c.SpeedTest.TimeoutSeconds = Default.SpeedTest.TimeoutSeconds
+	}
+	if len(c.SpeedTest.DownloadTargets) == 0 {
+		c.SpeedTest.DownloadTargets = Default.SpeedTest.DownloadTargets
+	}
+	// Keep empty upload_target as an explicit "disabled" — speedtest.MeasureUpload
+	// and the dashboard's runner both skip the upload phase when this is empty.
 }
 
 func writeDefault(path string, cfg Config) {
@@ -100,5 +146,8 @@ func writeDefault(path string, cfg Config) {
 }
 
 func (c *Config) CheckInterval() time.Duration {
+	if c.CheckIntervalSec < 1 {
+		return time.Second
+	}
 	return time.Duration(c.CheckIntervalSec) * time.Second
 }

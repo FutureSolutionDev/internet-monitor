@@ -4,8 +4,10 @@ go 1.24.0
 
 require (
 	github.com/getlantern/systray v1.2.2
+	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/minio/selfupdate v0.6.0
 	github.com/webview/webview_go v0.0.0-20240831120633-6173450d4dd6
+	golang.org/x/net v0.47.0
 	golang.org/x/sys v0.38.0
 )
 

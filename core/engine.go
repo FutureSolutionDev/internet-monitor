@@ -4,8 +4,10 @@ import (
 	"internet-monitor/config"
 	"internet-monitor/logger"
 	"internet-monitor/monitor"
+	"internet-monitor/notifytext"
 	"internet-monitor/types"
 	"internet-monitor/updater"
+	"log"
 	"sync"
 	"time"
 )
@@ -21,19 +23,35 @@ type Notifier interface {
 // MultiNotifier fans out to multiple Notifier implementations in order.
 type MultiNotifier []Notifier
 
+// recoverFan recovers from a panic in a single child notifier so the remaining
+// siblings still receive the tick/event.
+func recoverFan() {
+	if r := recover(); r != nil {
+		log.Printf("[notifier] panic recovered: %v", r)
+	}
+}
+
 func (m MultiNotifier) OnTick(r types.CheckResult, s types.Status) {
 	for _, n := range m {
-		if n != nil {
-			n.OnTick(r, s)
+		if n == nil {
+			continue
 		}
+		func(n Notifier) {
+			defer recoverFan()
+			n.OnTick(r, s)
+		}(n)
 	}
 }
 
 func (m MultiNotifier) OnEvent(e types.Event) {
 	for _, n := range m {
-		if n != nil {
-			n.OnEvent(e)
+		if n == nil {
+			continue
 		}
+		func(n Notifier) {
+			defer recoverFan()
+			n.OnEvent(e)
+		}(n)
 	}
 }
 
@@ -69,9 +87,33 @@ type Engine struct {
 	statusSince   time.Time
 	consecFails   int
 
-	stop chan struct{}
-	done chan struct{}
-	once sync.Once
+	agg minuteAgg
+
+	reload chan *config.Config
+	stop   chan struct{}
+	done   chan struct{}
+	once   sync.Once
+}
+
+const logRetention = 90 * 24 * time.Hour
+
+// minuteAgg accumulates check results within a one-minute bucket. Accessed only
+// from the run goroutine, so it needs no locking.
+type minuteAgg struct {
+	bucket    time.Time
+	samples   int
+	up        int
+	latSum    int64
+	latMax    int64
+	lossSum   float64
+	tcpFails  int
+	httpFails int
+	dnsFails  int
+
+	prevLat   int64
+	havePrev  bool
+	jitterSum int64
+	jitterN   int
 }
 
 // New creates a monitoring engine. Call Start() to begin monitoring.
@@ -81,8 +123,27 @@ func New(cfg *config.Config, checker *monitor.Checker, lgr *logger.Logger, versi
 		checker: checker,
 		lgr:     lgr,
 		version: version,
+		reload:  make(chan *config.Config, 1),
 		stop:    make(chan struct{}),
 		done:    make(chan struct{}),
+	}
+}
+
+// ApplyConfig hot-applies a new configuration to the running engine. The change
+// is handed to the run goroutine, which owns all config reads, so it takes
+// effect (new targets/thresholds/interval/webhook) without a restart and without
+// data races. Non-blocking: a stale pending reload is replaced by the latest.
+func (e *Engine) ApplyConfig(cfg *config.Config) {
+	if cfg == nil {
+		return
+	}
+	select {
+	case <-e.reload:
+	default:
+	}
+	select {
+	case e.reload <- cfg:
+	default:
 	}
 }
 
@@ -97,6 +158,27 @@ func (e *Engine) Start() {
 			select {
 			case <-ticker.C:
 				e.runCheck()
+			case cfg := <-e.reload:
+				e.cfg = cfg
+				e.checker.SetConfig(cfg)
+				e.lgr.SetConfig(cfg)
+				notifytext.SetLang(cfg.Language) // live notifications follow language changes
+				ticker.Reset(cfg.CheckInterval())
+				e.lgr.AppLog("CONFIG reloaded: interval=%ds targets(ping=%d http=%d dns=%d)",
+					cfg.CheckIntervalSec, len(cfg.PingTargets), len(cfg.HTTPTargets), len(cfg.DNSTargets))
+			case <-e.stop:
+				e.flushAgg() // persist the partial minute before exiting
+				return
+			}
+		}
+	}()
+
+	// Daily retention cleanup of old log files.
+	go func() {
+		for {
+			e.lgr.CleanupOldLogs(logRetention)
+			select {
+			case <-time.After(24 * time.Hour):
 			case <-e.stop:
 				return
 			}
@@ -134,12 +216,89 @@ func (e *Engine) Stop() {
 	}
 }
 
+// accumulate folds a check result into the current minute bucket, flushing a
+// completed minute to the metrics log. Runs only in the engine goroutine.
+func (e *Engine) accumulate(r types.CheckResult, status types.Status) {
+	min := r.Timestamp.Truncate(time.Minute)
+	if e.agg.bucket.IsZero() {
+		e.agg.bucket = min
+	}
+	if !min.Equal(e.agg.bucket) {
+		e.flushAgg()
+		e.agg = minuteAgg{bucket: min}
+	}
+	e.agg.samples++
+	if status != types.StatusDisconnected {
+		e.agg.up++
+	}
+	e.agg.latSum += r.LatencyMs
+	if r.LatencyMs > e.agg.latMax {
+		e.agg.latMax = r.LatencyMs
+	}
+	if e.agg.havePrev {
+		d := r.LatencyMs - e.agg.prevLat
+		if d < 0 {
+			d = -d
+		}
+		e.agg.jitterSum += d
+		e.agg.jitterN++
+	}
+	e.agg.prevLat = r.LatencyMs
+	e.agg.havePrev = true
+	e.agg.lossSum += r.PacketLoss
+	if !r.TCPPingOK {
+		e.agg.tcpFails++
+	}
+	if !r.HTTPOK {
+		e.agg.httpFails++
+	}
+	if !r.DNSOK {
+		e.agg.dnsFails++
+	}
+}
+
+// flushAgg writes the current minute bucket (if non-empty) to the metrics log.
+func (e *Engine) flushAgg() {
+	if e.agg.samples == 0 || e.lgr == nil {
+		return
+	}
+	jitter := int64(0)
+	if e.agg.jitterN > 0 {
+		jitter = e.agg.jitterSum / int64(e.agg.jitterN)
+	}
+	e.lgr.LogSample(types.MetricSample{
+		Timestamp:    e.agg.bucket,
+		Samples:      e.agg.samples,
+		UpSamples:    e.agg.up,
+		AvgLatencyMs: e.agg.latSum / int64(e.agg.samples),
+		MaxLatencyMs: e.agg.latMax,
+		JitterMs:     jitter,
+		AvgLossPct:   e.agg.lossSum / float64(e.agg.samples),
+		TCPFails:     e.agg.tcpFails,
+		HTTPFails:    e.agg.httpFails,
+		DNSFails:     e.agg.dnsFails,
+	})
+}
+
+// safeNotify runs a notifier callback, recovering from a panic so one bad
+// notifier can't take down the monitoring loop.
+func (e *Engine) safeNotify(fn func()) {
+	defer func() {
+		if r := recover(); r != nil && e.lgr != nil {
+			e.lgr.AppLog("PANIC recovered in notifier: %v", r)
+		}
+	}()
+	fn()
+}
+
 func (e *Engine) runCheck() {
 	result := e.checker.Check()
 	newStatus := DetermineStatus(result, &e.consecFails, e.cfg)
 
+	e.accumulate(result, newStatus)
+
 	if e.Notifier != nil {
-		e.Notifier.OnTick(result, newStatus)
+		e.safeNotify(func() { e.Notifier.OnTick(result, newStatus) })
 	}
 
 	if e.currentStatus == nil || *e.currentStatus != newStatus {
@@ -162,10 +321,15 @@ func (e *Engine) runCheck() {
 			},
 		}
 
-		e.lgr.Log(event)
-
-		if e.currentStatus != nil && e.Notifier != nil {
-			e.Notifier.OnEvent(event)
+		// First observation is a baseline, not a transition: only persist it if
+		// the link starts unhealthy (so a "started while down" is recorded), and
+		// never fire a notification for it.
+		isFirst := e.currentStatus == nil
+		if !isFirst || newStatus != types.StatusConnected {
+			e.lgr.Log(event)
+		}
+		if !isFirst && e.Notifier != nil {
+			e.safeNotify(func() { e.Notifier.OnEvent(event) })
 		}
 
 		s := newStatus

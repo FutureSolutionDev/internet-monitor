@@ -93,6 +93,27 @@
       </div>
 
       <div class="section">
+        <div class="section-title">
+          <span data-i18n="availability_title">التوفّر</span>
+          <button class="btn btn-secondary btn-sm" style="float:inline-end" onclick="copySummary()" data-i18n="copy_summary">نسخ الملخّص</button>
+        </div>
+        <div class="cards">
+          <div class="card">
+            <div class="card-value" id="av-today">—</div>
+            <div class="card-label" data-i18n="av_today">اليوم</div>
+          </div>
+          <div class="card">
+            <div class="card-value" id="av-week">—</div>
+            <div class="card-label" data-i18n="av_week">آخر 7 أيام</div>
+          </div>
+          <div class="card">
+            <div class="card-value" id="av-month">—</div>
+            <div class="card-label" data-i18n="av_month">آخر 30 يوم</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="section-title" data-i18n="chart_title">زمن الاستجابة — آخر 60 فحص</div>
         <div id="chart-wrap"><canvas id="the-chart"></canvas></div>
         <div class="checks">
@@ -100,7 +121,13 @@
           <span class="chk-badge ok" id="chk-http">HTTP ✓</span>
           <span class="chk-badge ok" id="chk-dns">DNS ✓</span>
           <span id="loss-val">0.0%</span>
+          <span id="jitter-val"></span>
         </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title" data-i18n="targets_title">حالة الأهداف</div>
+        <div id="targets-list" class="targets-list"></div>
       </div>
 
       <div class="section">
@@ -160,6 +187,10 @@
             <option value="" data-i18n="logs_select">اختر تاريخاً...</option>
           </select>
           <button class="btn btn-secondary" onclick="exportCSV()" data-i18n="export_csv">تصدير CSV</button>
+          <button class="btn btn-secondary" onclick="exportRangeCSV(7)" data-i18n="export_csv_7">CSV — 7 أيام</button>
+          <button class="btn btn-secondary" onclick="exportRangeCSV(30)" data-i18n="export_csv_30">CSV — 30 يوم</button>
+          <input type="month" id="report-month" class="report-month" />
+          <button class="btn btn-secondary" onclick="openReport()" data-i18n="report_btn">تقرير شهري (PDF)</button>
           <span id="log-count"></span>
         </div>
         <table>
@@ -192,6 +223,26 @@
         <div class="section-title" data-i18n="speed_title">قياس سرعة الإنترنت</div>
 
         <div class="speed-test-panel">
+          <!-- speedtest.net-style circular gauge -->
+          <div class="gauge-wrap">
+            <svg class="gauge" viewBox="0 0 200 130" id="speed-gauge">
+              <!-- background arc -->
+              <path class="gauge-track" d="M20 120 A80 80 0 0 1 180 120" />
+              <!-- live value arc -->
+              <path class="gauge-fill" id="gauge-fill" d="M20 120 A80 80 0 0 1 180 120" />
+              <!-- needle: pivots at the arc center (100,120); short tip riding
+                   just inside the arc (from r=64 up to r=40), so it never
+                   reaches the centered value text. -->
+              <line class="gauge-needle" id="gauge-needle" x1="100" y1="56" x2="100" y2="80" />
+              <circle class="gauge-hub" cx="100" cy="120" r="5" />
+            </svg>
+            <div class="gauge-center">
+              <div class="gauge-value" id="gauge-value">0.0</div>
+              <div class="gauge-unit">Mbps</div>
+              <div class="gauge-phase" id="gauge-phase" data-i18n="speed_idle">جاهز</div>
+            </div>
+          </div>
+
           <div class="speed-controls">
             <button id="speed-run-btn" class="btn-primary" onclick="startSpeedTest()" data-i18n="speed_run">قياس
               السرعة</button>
@@ -199,23 +250,21 @@
               data-i18n="speed_cancel">إيقاف</button>
           </div>
 
-          <div class="speed-progress-wrap" id="speed-progress-wrap" style="display:none">
-            <div class="speed-progress-bar">
-              <div id="speed-progress-fill" style="width:0%"></div>
-            </div>
-            <span id="speed-status" class="speed-status-text"></span>
-          </div>
-
           <div class="speed-results">
-            <div class="speed-result-card">
+            <div class="speed-result-card" id="speed-card-ping">
+              <div class="speed-result-label" data-i18n="speed_ping">زمن الاستجابة</div>
+              <div class="speed-result-value" id="speed-ping-result">—</div>
+              <div class="speed-result-unit">ms</div>
+            </div>
+            <div class="speed-result-card" id="speed-card-dl">
               <div class="speed-result-label" data-i18n="speed_dl">التنزيل</div>
               <div class="speed-result-value" id="speed-dl-result">—</div>
               <div class="speed-result-unit">Mbps</div>
             </div>
-            <div class="speed-result-card">
+            <div class="speed-result-card" id="speed-card-ul">
               <div class="speed-result-label" data-i18n="speed_ul">الرفع</div>
               <div class="speed-result-value" id="speed-ul-result">—</div>
-              <div class="speed-result-unit" data-i18n="speed_upload_soon" style="font-size:11px">قريباً</div>
+              <div class="speed-result-unit">Mbps</div>
             </div>
           </div>
         </div>
@@ -232,13 +281,14 @@
               <tr>
                 <th data-i18n="col_time">الوقت</th>
                 <th data-i18n="speed_dl">التنزيل (Mbps)</th>
+                <th data-i18n="speed_ul">الرفع (Mbps)</th>
                 <th data-i18n="col_duration">المدة (ث)</th>
                 <th data-i18n="speed_triggered">المصدر</th>
               </tr>
             </thead>
             <tbody id="speed-history-tbody">
               <tr>
-                <td colspan="4" class="empty" data-i18n="no_events">لا توجد اختبارات بعد</td>
+                <td colspan="5" class="empty" data-i18n="no_events">لا توجد اختبارات بعد</td>
               </tr>
             </tbody>
           </table>
@@ -399,6 +449,23 @@
           </div>
 
           <div class="settings-group">
+            <div class="settings-group-title" data-i18n="grp_telegram">Telegram</div>
+            <div class="settings-grid">
+              <div class="field">
+                <label data-i18n="tg_token">Bot Token</label>
+                <input type="text" id="cfg-tg-token" placeholder="123456:ABC-DEF...">
+              </div>
+              <div class="field">
+                <label data-i18n="tg_chat">Chat ID</label>
+                <input type="text" id="cfg-tg-chat" placeholder="-1001234567890">
+              </div>
+              <div class="field full-width">
+                <div class="field-note" data-i18n="tg_note">يُرسل نفس الإشعارات عبر بوت Telegram (اختياري)</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
             <div class="settings-group-title" data-i18n="grp_sound">نغمة الإشعار</div>
             <div class="settings-grid">
               <div class="field full-width">
@@ -471,6 +538,12 @@
                   data-i18n="add_target">+ إضافة عنوان</button>
                 <div class="field-note" data-i18n="speed_targets_note">الافتراضي: speed.cloudflare.com/__down</div>
               </div>
+              <div class="field full-width">
+                <label data-i18n="speed_ul_target">عنوان اختبار الرفع (فارغ = إيقاف الرفع)</label>
+                <input type="text" id="cfg-speed-upload" placeholder="https://speed.cloudflare.com/__up">
+                <div class="field-note" data-i18n="speed_ul_note">الافتراضي: speed.cloudflare.com/__up — اتركه فارغاً
+                  لتعطيل قياس الرفع</div>
+              </div>
               <div class="field">
                 <label data-i18n="speed_parallel">اتصالات متوازية (1–8)</label>
                 <input type="number" id="cfg-speed-parallel" min="1" max="8" value="4">
@@ -484,6 +557,10 @@
               <div class="field">
                 <label data-i18n="speed_alert_threshold">حد التنبيه (Mbps، 0 = معطّل)</label>
                 <input type="number" id="cfg-speed-alert" min="0" step="1" value="0">
+              </div>
+              <div class="field">
+                <label data-i18n="speed_schedule_minutes">اختبار تلقائي كل (دقيقة، 0 = معطّل)</label>
+                <input type="number" id="cfg-speed-schedule" min="0" step="1" value="0">
               </div>
             </div>
           </div>

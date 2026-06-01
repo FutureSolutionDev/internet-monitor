@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Outage Report</title>
+    <link rel="icon" href="/assets/favicon.png" />
+    <script src="/assets/chart.umd.min.js"></script>
+    <style>
+      :root {
+        --fg: #1e293b;
+        --muted: #64748b;
+        --line: #e2e8f0;
+        --bg: #f8fafc;
+        --red: #ef4444;
+        --yellow: #eab308;
+        --green: #22c55e;
+        --accent: #2563eb;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: system-ui, "Segoe UI", Tahoma, sans-serif;
+        color: var(--fg);
+        background: var(--bg);
+        padding: 24px;
+      }
+      .sheet {
+        max-width: 900px;
+        margin: 0 auto;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 28px;
+      }
+      header.rpt {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 2px solid var(--line);
+        padding-bottom: 14px;
+        margin-bottom: 18px;
+      }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      .muted { color: var(--muted); font-size: 13px; }
+      .toolbar { margin: 0 auto 16px; max-width: 900px; display: flex; gap: 8px; align-items: center; }
+      .brand-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
+      button, .btn {
+        font: inherit;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 8px;
+        padding: 8px 14px;
+        cursor: pointer;
+      }
+      button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+      .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 18px 0; }
+      .kpi { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+      .kpi .v { font-size: 22px; font-weight: 700; }
+      .kpi .l { font-size: 12px; color: var(--muted); }
+      h2 { font-size: 15px; margin: 22px 0 8px; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { text-align: start; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+      th { color: var(--muted); font-weight: 600; }
+      .chart-wrap { height: 240px; }
+      footer.rpt { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 10px; font-size: 11px; color: var(--muted); text-align: center; }
+      @media print {
+        body { background: #fff; padding: 0; }
+        .toolbar { display: none; }
+        .sheet { border: none; border-radius: 0; max-width: none; padding: 0; }
+        h2 { break-after: avoid; }
+        table, .chart-wrap { break-inside: avoid; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar">
+      <button class="primary" onclick="window.print()" id="btn-print"></button>
+      <a class="btn" href="/" id="btn-back"></a>
+      <label class="brand-toggle">
+        <input type="checkbox" id="brand-toggle" onchange="onBrandToggle()" />
+        <span id="brand-label"></span>
+      </label>
+    </div>
+
+    <div class="sheet" id="sheet">
+      <header class="rpt">
+        <div>
+          <h1 id="title"></h1>
+          <div class="muted" id="subtitle"></div>
+        </div>
+        <div class="muted" id="genat"></div>
+      </header>
+
+      <div class="kpis" id="kpis"></div>
+
+      <h2 id="h-causes"></h2>
+      <table>
+        <thead>
+          <tr><th id="th-cause"></th><th id="th-outages"></th><th id="th-cpct"></th><th id="th-cdown"></th></tr>
+        </thead>
+        <tbody id="causes-body"></tbody>
+      </table>
+
+      <h2 id="h-downtime"></h2>
+      <div class="chart-wrap"><canvas id="chart-downtime"></canvas></div>
+
+      <h2 id="h-latency"></h2>
+      <div class="chart-wrap"><canvas id="chart-latency"></canvas></div>
+
+      <h2 id="h-days"></h2>
+      <table>
+        <thead>
+          <tr>
+            <th id="th-date"></th><th id="th-ddown"></th><th id="th-dout"></th>
+            <th id="th-worst"></th><th id="th-lat"></th><th id="th-jit"></th><th id="th-loss"></th><th id="th-up"></th>
+          </tr>
+        </thead>
+        <tbody id="days-body"></tbody>
+      </table>
+
+      <h2 id="h-events"></h2>
+      <table>
+        <thead>
+          <tr><th id="th-etime"></th><th id="th-etype"></th><th id="th-edur"></th><th id="th-ecause"></th></tr>
+        </thead>
+        <tbody id="events-body"></tbody>
+      </table>
+
+      <footer class="rpt" id="footer"></footer>
+    </div>
+
+    <script>
+      const L = {
+        en: {
+          print: "🖨 Print / Save as PDF", back: "← Back",
+          title: "Internet Outage Report", gen: "Generated",
+          uptime: "Uptime", downtime: "Total downtime", degraded: "Degraded time",
+          disc: "Disconnections", longest: "Longest outage", mttr: "Avg outage (MTTR)",
+          jitter: "Avg jitter", monitored: "Monitored", causes: "Causes breakdown", cause: "Layer",
+          outages: "Outages", cdown: "Downtime", downByDay: "Downtime per day (minutes)",
+          latencyTrend: "Latency trend (ms)", perDay: "Per-day detail", date: "Date",
+          ddown: "Downtime", dout: "Outages", worst: "Worst", lat: "Avg latency",
+          jit: "Avg jitter", loss: "Avg loss", up: "Uptime", none: "No incidents recorded for this month.",
+          cpct: "Share", eventLog: "Event log", etime: "Time", etype: "Type", edur: "Duration", ecause: "Cause",
+          t_disconnected: "Disconnected", t_degraded: "Degraded",
+          footer: "Generated by Internet Monitor",
+          brand_label: 'Add "Internet Monitor" footer line',
+          avg: "Avg", max: "Max",
+        },
+        ar: {
+          print: "🖨 طباعة / حفظ PDF", back: "→ رجوع",
+          title: "تقرير انقطاع الإنترنت", gen: "تاريخ التوليد",
+          uptime: "زمن التشغيل", downtime: "إجمالي الانقطاع", degraded: "وقت الضعف",
+          disc: "مرات الانقطاع", longest: "أطول انقطاع", mttr: "متوسط الانقطاع (MTTR)",
+          jitter: "متوسط التذبذب", monitored: "مدة المراقبة", causes: "تفصيل الأسباب", cause: "الطبقة",
+          outages: "مرات", cdown: "وقت الانقطاع", downByDay: "الانقطاع لكل يوم (دقائق)",
+          latencyTrend: "اتجاه زمن الاستجابة (ms)", perDay: "تفصيل يومي", date: "اليوم",
+          ddown: "الانقطاع", dout: "مرات", worst: "الأسوأ", lat: "متوسط الاستجابة",
+          jit: "متوسط التذبذب", loss: "متوسط الفقد", up: "التشغيل", none: "لا توجد حوادث مسجّلة لهذا الشهر.",
+          cpct: "النسبة", eventLog: "سجل الأحداث", etime: "الوقت", etype: "النوع", edur: "المدة", ecause: "السبب",
+          t_disconnected: "انقطاع", t_degraded: "ضعيف",
+          footer: "تم التوليد بواسطة Internet Monitor",
+          brand_label: "إضافة سطر Internet Monitor في التذييل",
+          avg: "متوسط", max: "أقصى",
+        },
+      };
+      const lang = localStorage.getItem("lang") || "en";
+      const t = (k) => (L[lang] && L[lang][k]) || L.en[k] || k;
+      document.documentElement.lang = lang;
+      document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+
+      let currentMonth = "";
+
+      function param(name) {
+        return new URLSearchParams(location.search).get(name);
+      }
+
+      // The "Generated by Internet Monitor" line is OFF by default (neutral, so
+      // the report reads as the user's own document for an ISP complaint). The
+      // toggle opts it in and the choice is remembered.
+      const REPO_URL = "https://github.com/FutureSolutionDev/internet-monitor";
+
+      function renderFooter() {
+        const show = document.getElementById("brand-toggle").checked;
+        const f = document.getElementById("footer");
+        if (show) {
+          f.style.display = "";
+          f.textContent = t("footer") + " — " + REPO_URL + " · " + currentMonth;
+        } else {
+          f.style.display = "none";
+          f.textContent = "";
+        }
+      }
+      function onBrandToggle() {
+        localStorage.setItem(
+          "report_brand",
+          document.getElementById("brand-toggle").checked ? "1" : "0",
+        );
+        renderFooter();
+      }
+      function fmtDur(sec) {
+        sec = Math.round(sec || 0);
+        if (sec < 60) return sec + "s";
+        const m = Math.floor(sec / 60), s = sec % 60;
+        if (m < 60) return s ? `${m}m ${s}s` : `${m}m`;
+        const h = Math.floor(m / 60), mm = m % 60;
+        return mm ? `${h}h ${mm}m` : `${h}h`;
+      }
+
+      function kpi(value, label) {
+        return `<div class="kpi"><div class="v">${value}</div><div class="l">${label}</div></div>`;
+      }
+
+      function render(d) {
+        currentMonth = d.month;
+        document.title = `${t("title")} — ${d.month}`;
+        document.getElementById("btn-print").textContent = t("print");
+        document.getElementById("btn-back").textContent = t("back");
+        document.getElementById("brand-label").textContent = t("brand_label");
+        document.getElementById("brand-toggle").checked =
+          localStorage.getItem("report_brand") === "1";
+        document.getElementById("title").textContent = t("title");
+        document.getElementById("subtitle").textContent = d.month;
+        const gen = new Date(d.generated_at);
+        document.getElementById("genat").textContent =
+          t("gen") + ": " + (isNaN(gen) ? d.generated_at : gen.toLocaleString());
+
+        document.getElementById("kpis").innerHTML =
+          kpi((d.uptime_pct || 0).toFixed(2) + "%", t("uptime")) +
+          kpi(fmtDur(d.total_downtime_seconds), t("downtime")) +
+          kpi(d.disconnections || 0, t("disc")) +
+          kpi(fmtDur(d.longest_outage_seconds), t("longest")) +
+          kpi(fmtDur(d.mttr_seconds), t("mttr")) +
+          kpi(fmtDur(d.total_degraded_seconds), t("degraded")) +
+          kpi((d.avg_jitter_ms || 0) + " ms", t("jitter"));
+
+        // Causes
+        document.getElementById("h-causes").textContent = t("causes");
+        document.getElementById("th-cause").textContent = t("cause");
+        document.getElementById("th-outages").textContent = t("outages");
+        document.getElementById("th-cpct").textContent = t("cpct");
+        document.getElementById("th-cdown").textContent = t("cdown");
+        const causes = d.causes || {};
+        document.getElementById("causes-body").innerHTML = ["tcp", "http", "dns"]
+          .map((k) => {
+            const c = causes[k] || { outages: 0, downtime_seconds: 0, pct: 0 };
+            return `<tr><td>${k.toUpperCase()}</td><td>${c.outages}</td><td>${(c.pct || 0).toFixed(0)}%</td><td>${fmtDur(c.downtime_seconds)}</td></tr>`;
+          })
+          .join("");
+
+        // Per-day table
+        document.getElementById("h-downtime").textContent = t("downByDay");
+        document.getElementById("h-latency").textContent = t("latencyTrend");
+        document.getElementById("h-days").textContent = t("perDay");
+        const map = {
+          "th-date": "date", "th-ddown": "ddown", "th-dout": "dout",
+          "th-worst": "worst", "th-lat": "lat", "th-jit": "jit",
+          "th-loss": "loss", "th-up": "up",
+        };
+        for (const id in map) document.getElementById(id).textContent = t(map[id]);
+
+        const days = d.days || [];
+        document.getElementById("days-body").innerHTML = days.length
+          ? days
+              .map(
+                (x) =>
+                  `<tr><td>${x.date}</td><td>${fmtDur(x.downtime_seconds)}</td><td>${x.outages}</td>` +
+                  `<td>${fmtDur(x.worst_outage_seconds)}</td><td>${x.avg_latency_ms}ms</td>` +
+                  `<td>${x.avg_jitter_ms || 0}ms</td>` +
+                  `<td>${(x.avg_loss_pct || 0).toFixed(1)}%</td><td>${(x.uptime_pct || 0).toFixed(1)}%</td></tr>`,
+              )
+              .join("")
+          : `<tr><td colspan="8" class="muted">${t("none")}</td></tr>`;
+
+        // Event log (incidents only: degraded + disconnected)
+        document.getElementById("h-events").textContent = t("eventLog");
+        const emap = { "th-etime": "etime", "th-etype": "etype", "th-edur": "edur", "th-ecause": "ecause" };
+        for (const id in emap) document.getElementById(id).textContent = t(emap[id]);
+        const events = d.events || [];
+        document.getElementById("events-body").innerHTML = events.length
+          ? events
+              .map((e) => {
+                const ts = new Date(e.time);
+                const time = isNaN(ts) ? e.time : ts.toLocaleString();
+                return `<tr><td class="mono">${time}</td><td>${t("t_" + e.type) || e.type}</td><td>${fmtDur(e.duration_seconds)}</td><td class="mono">${e.cause || ""}</td></tr>`;
+              })
+              .join("")
+          : `<tr><td colspan="4" class="muted">${t("none")}</td></tr>`;
+
+        renderFooter();
+
+        drawCharts(d.trend || []);
+      }
+
+      function drawCharts(trend) {
+        const labels = trend.map((p) => p.date.slice(8)); // day-of-month
+        new Chart(document.getElementById("chart-downtime"), {
+          type: "bar",
+          data: {
+            labels,
+            datasets: [{
+              label: t("downByDay"),
+              data: trend.map((p) => +(p.downtime_seconds / 60).toFixed(1)),
+              backgroundColor: "#ef4444",
+            }],
+          },
+          options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } } },
+        });
+        new Chart(document.getElementById("chart-latency"), {
+          type: "line",
+          data: {
+            labels,
+            datasets: [
+              { label: t("avg"), data: trend.map((p) => p.avg_latency_ms), borderColor: "#2563eb", tension: 0.3 },
+              { label: t("max"), data: trend.map((p) => p.max_latency_ms), borderColor: "#eab308", tension: 0.3 },
+            ],
+          },
+          options: { responsive: true, maintainAspectRatio: false, animation: false },
+        });
+      }
+
+      (async function () {
+        let month = param("month");
+        if (!month) {
+          const n = new Date();
+          month = n.getFullYear() + "-" + String(n.getMonth() + 1).padStart(2, "0");
+        }
+        try {
+          const d = await (await fetch("/api/report?month=" + encodeURIComponent(month))).json();
+          render(d);
+        } catch (e) {
+          document.getElementById("sheet").innerHTML =
+            '<p class="muted">Failed to load report.</p>';
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -6,7 +6,7 @@ import "time"
 type Status int
 
 const (
-	StatusConnected    Status = iota
+	StatusConnected Status = iota
 	StatusDegraded
 	StatusDisconnected
 )
@@ -22,6 +22,14 @@ func (s Status) String() string {
 	}
 }
 
+// TargetResult is the per-target outcome within a check layer.
+type TargetResult struct {
+	Layer     string `json:"layer"` // "tcp" | "http" | "dns"
+	Target    string `json:"target"`
+	OK        bool   `json:"ok"`
+	LatencyMs int64  `json:"latency_ms"`
+}
+
 // CheckResult holds the outcome of a single check cycle.
 type CheckResult struct {
 	TCPPingOK  bool
@@ -30,6 +38,27 @@ type CheckResult struct {
 	LatencyMs  int64
 	PacketLoss float64
 	Timestamp  time.Time
+	Targets    []TargetResult `json:"targets,omitempty"`
+	Gateway    string         `json:"gateway,omitempty"`
+	GatewayOK  bool           `json:"gateway_ok,omitempty"`
+}
+
+// Diagnose classifies a check result into a coarse failure type, helping
+// distinguish a DNS problem from HTTP filtering from a full outage.
+// Returns one of: "ok", "down", "dns", "http", "partial".
+func Diagnose(r CheckResult) string {
+	switch {
+	case r.TCPPingOK && r.HTTPOK && r.DNSOK:
+		return "ok"
+	case !r.TCPPingOK:
+		return "down" // no L4 reachability — likely router/ISP
+	case !r.DNSOK:
+		return "dns" // reachable but name resolution failing
+	case !r.HTTPOK:
+		return "http" // reachable, DNS ok, but HTTP blocked/captive portal
+	default:
+		return "partial"
+	}
 }
 
 // EventReason contains per-layer failure details for a connectivity event.
@@ -47,4 +76,19 @@ type Event struct {
 	EventType       string      `json:"event"`
 	DurationSeconds float64     `json:"duration_seconds,omitempty"`
 	Reason          EventReason `json:"reason"`
+}
+
+// MetricSample is a one-minute aggregate of check results, persisted to
+// metrics_YYYY-MM-DD.jsonl and used to build rich monthly reports.
+type MetricSample struct {
+	Timestamp    time.Time `json:"timestamp"`  // start of the minute bucket
+	Samples      int       `json:"samples"`    // checks in this minute
+	UpSamples    int       `json:"up_samples"` // checks that were not disconnected
+	AvgLatencyMs int64     `json:"avg_latency_ms"`
+	MaxLatencyMs int64     `json:"max_latency_ms"`
+	JitterMs     int64     `json:"jitter_ms"`
+	AvgLossPct   float64   `json:"avg_loss_pct"`
+	TCPFails     int       `json:"tcp_fails"`
+	HTTPFails    int       `json:"http_fails"`
+	DNSFails     int       `json:"dns_fails"`
 }

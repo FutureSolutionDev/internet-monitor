@@ -3,11 +3,14 @@
 package main
 
 import (
+	"context"
 	"internet-monitor/config"
 	"internet-monitor/core"
 	"internet-monitor/dashboard"
 	"internet-monitor/logger"
 	"internet-monitor/monitor"
+	"internet-monitor/notifytext"
+	"internet-monitor/sound"
 	"internet-monitor/tray"
 	"internet-monitor/updater"
 	"log"
@@ -27,7 +30,9 @@ func main() {
 		if resolved, err2 := filepath.EvalSymlinks(exePath); err2 == nil {
 			exePath = resolved
 		}
-		os.Chdir(filepath.Dir(exePath))
+		if err := os.Chdir(filepath.Dir(exePath)); err != nil {
+			log.Printf("warning: could not chdir to exe dir: %v — config/logs will use the current working directory", err)
+		}
 	}
 
 	cfg, err := config.Load("config.json")
@@ -40,16 +45,24 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to init logger: %v", err)
 	}
+	// Route notification/sound diagnostics to logs/app.log (invisible otherwise
+	// in a -H=windowsgui build).
+	tray.Logf = lgr.AppLog
+	sound.Logf = lgr.AppLog
+	notifytext.SetLang(cfg.Language) // OS notifications use the configured language
 
 	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir, Version, lgr)
 	dash.OnTestNotification = TestNotification
 	dash.OnTestWebhook = lgr.SendTestWebhook
 	dash.OnApplyUpdate = updater.Apply
 	dash.OnRestartApp = updater.Restart
+	dash.OnPlaySound = sound.Play
+	dash.SetNativeNotifications(true) // GUI build shows native notifications
 	dash.Start()
 
 	checker := monitor.NewChecker(cfg)
 	engine := core.New(cfg, checker, lgr, Version)
+	dash.OnConfigChange = engine.ApplyConfig
 	engine.Notifier = core.MultiNotifier{
 		dashboard.NewNotifier(dash),
 		&guiNotifier{},
@@ -88,6 +101,11 @@ func main() {
 
 	engine.Stop()
 	stopTray()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	if err := dash.Shutdown(shutdownCtx); err != nil {
+		log.Printf("dashboard shutdown error: %v", err)
+	}
+	cancel()
 	w.Destroy()
 	os.Exit(0)
 }

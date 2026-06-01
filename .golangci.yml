@@ -1,0 +1,12 @@
+version: "2"
+
+# High-signal linters kept as a blocking CI gate. errcheck is intentionally
+# disabled for now: the codebase has many deliberate fire-and-forget calls
+# (resp.Body.Close, w.Write, exec.Start); enabling it is tracked as follow-up.
+linters:
+  default: standard
+  disable:
+    - errcheck
+  enable:
+    - misspell
+    - unconvert

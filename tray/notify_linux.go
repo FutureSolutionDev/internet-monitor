@@ -2,9 +2,13 @@
 
 package tray
 
-import "os/exec"
+import (
+	"internet-monitor/sound"
+	"os/exec"
+)
 
 func Notify(title, message string) {
+	sound.Play() // match Windows/GUI: ring on every notification (no overlap)
 	exec.Command("notify-send", "-a", "Internet Monitor", title, message).Start()
 }
 

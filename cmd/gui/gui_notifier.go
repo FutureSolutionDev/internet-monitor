@@ -2,6 +2,7 @@ package main
 
 import (
 	"internet-monitor/monitor"
+	"internet-monitor/notifytext"
 	"internet-monitor/types"
 )
 
@@ -13,15 +14,7 @@ func (g *guiNotifier) OnTick(_ types.CheckResult, status types.Status) {
 }
 
 func (g *guiNotifier) OnEvent(event types.Event) {
-	var s monitor.Status
-	switch event.EventType {
-	case "connected":
-		s = monitor.StatusConnected
-	case "degraded":
-		s = monitor.StatusDegraded
-	default:
-		s = monitor.StatusDisconnected
-	}
+	s := notifytext.StatusFromEventType(event.EventType)
 	go sendNotification(s, monitor.CheckResult{
 		TCPPingOK:  !event.Reason.TCPPingFailed,
 		HTTPOK:     !event.Reason.HTTPFailed,

@@ -4,8 +4,10 @@ package monitor
 import (
 	"context"
 	"internet-monitor/config"
+	"internet-monitor/types"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -23,6 +25,12 @@ func NewChecker(cfg *config.Config) *Checker {
 		history:  make([]bool, 0, 10),
 		httpClient: &http.Client{
 			Timeout: 5 * time.Second,
+			// Don't follow redirects: a captive portal that 302-redirects the
+			// generate_204 probe to a login page must count as "not connected",
+			// not as a success.
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
 			Transport: &http.Transport{
 				DisableKeepAlives:   true,
 				DisableCompression:  true,
@@ -32,20 +40,64 @@ func NewChecker(cfg *config.Config) *Checker {
 	}
 }
 
+// SetConfig swaps the checker's configuration. Only called from the engine's
+// run goroutine (the same goroutine that calls Check), so no lock is needed.
+func (c *Checker) SetConfig(cfg *config.Config) {
+	c.cfg = cfg
+}
+
+// probe runs fn for each target concurrently and returns per-target results in
+// input order. Bounding all targets of a layer to a single timeout keeps a
+// check from taking targets×timeout when several are down.
+func probe(layer string, targets []string, fn func(string) (bool, int64)) []types.TargetResult {
+	results := make([]types.TargetResult, len(targets))
+	var wg sync.WaitGroup
+	for i, target := range targets {
+		wg.Add(1)
+		go func(i int, target string) {
+			defer wg.Done()
+			ok, lat := fn(target)
+			results[i] = types.TargetResult{Layer: layer, Target: target, OK: ok, LatencyMs: lat}
+		}(i, target)
+	}
+	wg.Wait()
+	return results
+}
+
 func (c *Checker) Check() CheckResult {
 	result := CheckResult{Timestamp: time.Now()}
 
-	// ── TCP Ping: try each target, succeed on first success ──────
-	start := time.Now()
-	for _, target := range c.cfg.PingTargets {
+	// ── Ping ── (latency = fastest successful target). When use_icmp is set,
+	// try a real ICMP echo first and fall back to a TCP dial on any failure, so
+	// ICMP only ever helps.
+	useICMP := c.cfg.UseICMP
+	tcp := probe("tcp", c.cfg.PingTargets, func(target string) (bool, int64) {
+		host := target
+		if h, _, err := net.SplitHostPort(target); err == nil {
+			host = h
+		}
+		if useICMP {
+			if lat, ok := icmpPing(host, 2*time.Second); ok {
+				return true, lat
+			}
+		}
+		start := time.Now()
 		conn, err := net.DialTimeout("tcp", target, 2*time.Second)
-		if err == nil {
-			conn.Close()
+		if err != nil {
+			return false, 0
+		}
+		conn.Close()
+		return true, time.Since(start).Milliseconds()
+	})
+	for _, r := range tcp {
+		if r.OK {
 			result.TCPPingOK = true
-			result.LatencyMs = time.Since(start).Milliseconds()
-			break
+			if result.LatencyMs == 0 || r.LatencyMs < result.LatencyMs {
+				result.LatencyMs = r.LatencyMs
+			}
 		}
 	}
+	result.Targets = append(result.Targets, tcp...)
 
 	// Packet loss history (based on TCP ping results)
 	c.history = append(c.history, result.TCPPingOK)
@@ -62,26 +114,49 @@ func (c *Checker) Check() CheckResult {
 		result.PacketLoss = float64(failures) / float64(len(c.history)) * 100
 	}
 
-	// ── HTTP: try all targets, succeed on first 200/204 ──────────
-	for _, target := range c.cfg.HTTPTargets {
+	// ── HTTP ── (ok = any target returns 200/204)
+	httpRes := probe("http", c.cfg.HTTPTargets, func(target string) (bool, int64) {
+		start := time.Now()
 		resp, err := c.httpClient.Get(target)
-		if err == nil {
-			resp.Body.Close()
-			if resp.StatusCode == 200 || resp.StatusCode == 204 {
-				result.HTTPOK = true
-				break
-			}
+		if err != nil {
+			return false, 0
+		}
+		resp.Body.Close()
+		if resp.StatusCode == 200 || resp.StatusCode == 204 {
+			return true, time.Since(start).Milliseconds()
+		}
+		return false, 0
+	})
+	for _, r := range httpRes {
+		if r.OK {
+			result.HTTPOK = true
 		}
 	}
+	result.Targets = append(result.Targets, httpRes...)
 
-	// ── DNS: try all targets, succeed on first successful resolve ─
-	for _, target := range c.cfg.DNSTargets {
+	// ── DNS ── (ok = any target resolves)
+	dnsRes := probe("dns", c.cfg.DNSTargets, func(target string) (bool, int64) {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		_, err := net.DefaultResolver.LookupHost(ctx, target)
-		cancel()
-		if err == nil {
+		defer cancel()
+		start := time.Now()
+		if _, err := net.DefaultResolver.LookupHost(ctx, target); err != nil {
+			return false, 0
+		}
+		return true, time.Since(start).Milliseconds()
+	})
+	for _, r := range dnsRes {
+		if r.OK {
 			result.DNSOK = true
-			break
+		}
+	}
+	result.Targets = append(result.Targets, dnsRes...)
+
+	// Gateway probe (LAN vs ISP). Only meaningful with ICMP, since gateways
+	// rarely answer TCP. Lets the dashboard tell "router/LAN down" from "ISP down".
+	if useICMP {
+		if gw, ok := defaultGatewayIPv4(); ok {
+			result.Gateway = gw
+			_, result.GatewayOK = icmpPing(gw, time.Second)
 		}
 	}
 

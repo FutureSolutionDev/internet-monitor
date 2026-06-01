@@ -4,23 +4,27 @@ package dashboard
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"embed"
+	"encoding/json"
 	"fmt"
+	"internet-monitor/audio"
 	"internet-monitor/config"
 	"internet-monitor/logger"
+	"internet-monitor/report"
 	"internet-monitor/speedtest"
 	"internet-monitor/startup"
 	"internet-monitor/types"
-	"sync/atomic"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -111,9 +115,16 @@ func RingtoneMp3() []byte {
 	return data
 }
 
+// NotificationWav returns the embedded WAV notification chime. WAV is used for
+// the native player (winmm PlaySound) because PlaySound can't decode MP3.
+func NotificationWav() []byte {
+	data, _ := staticFiles.ReadFile("assets/notification.wav")
+	return data
+}
+
 const maxHistory = 60
-const maxEvents  = 100
-const maxTicks   = 20
+const maxEvents = 100
+const maxTicks = 20
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -131,33 +142,38 @@ type TickEntry struct {
 // EventEntry is the in-memory / SSE representation of a connectivity event.
 // Reason is sent as structured booleans so the client can translate it.
 type EventEntry struct {
-	Time          string  `json:"time"`
-	EventType     string  `json:"event_type"`
-	Duration      float64 `json:"duration_seconds"`
-	TCPFailed     bool    `json:"tcp_failed"`
-	HTTPFailed    bool    `json:"http_failed"`
-	DNSFailed     bool    `json:"dns_failed"`
-	PacketLoss    float64 `json:"packet_loss_pct"`
-	LatencyMs     int64   `json:"latency_ms"`
+	Time       string  `json:"time"`
+	EventType  string  `json:"event_type"`
+	Duration   float64 `json:"duration_seconds"`
+	TCPFailed  bool    `json:"tcp_failed"`
+	HTTPFailed bool    `json:"http_failed"`
+	DNSFailed  bool    `json:"dns_failed"`
+	PacketLoss float64 `json:"packet_loss_pct"`
+	LatencyMs  int64   `json:"latency_ms"`
 }
 
 type Snapshot struct {
-	Type           string       `json:"type"`
-	Status         string       `json:"status"`
-	LatencyMs      int64        `json:"latency_ms"`
-	PacketLoss     float64      `json:"packet_loss"`
-	TCPPingOK      bool         `json:"tcp_ping_ok"`
-	HTTPOK         bool         `json:"http_ok"`
-	DNSOK          bool         `json:"dns_ok"`
-	TotalChecks    int          `json:"total_checks"`
-	Disconnections int          `json:"disconnections"`
-	UptimeSeconds  float64      `json:"uptime_seconds"`
-	UptimePct      float64      `json:"uptime_pct"`
-	LatencyHistory []int64      `json:"latency_history"`
-	Events         []EventEntry `json:"events"`
-	Ticks          []TickEntry  `json:"ticks"`
-	UpdateInfo     *UpdateInfo  `json:"update_info,omitempty"`
-	SystemNotifs   bool         `json:"system_notifs"`
+	Type             string               `json:"type"`
+	Status           string               `json:"status"`
+	LatencyMs        int64                `json:"latency_ms"`
+	PacketLoss       float64              `json:"packet_loss"`
+	TCPPingOK        bool                 `json:"tcp_ping_ok"`
+	HTTPOK           bool                 `json:"http_ok"`
+	DNSOK            bool                 `json:"dns_ok"`
+	Diagnosis        string               `json:"diagnosis"`
+	Gateway          string               `json:"gateway,omitempty"`
+	TotalChecks      int                  `json:"total_checks"`
+	Disconnections   int                  `json:"disconnections"`
+	UptimeSeconds    float64              `json:"uptime_seconds"`
+	UptimePct        float64              `json:"uptime_pct"`
+	JitterMs         int64                `json:"jitter_ms"`
+	LatencyHistory   []int64              `json:"latency_history"`
+	Targets          []types.TargetResult `json:"targets"`
+	Events           []EventEntry         `json:"events"`
+	Ticks            []TickEntry          `json:"ticks"`
+	UpdateInfo       *UpdateInfo          `json:"update_info,omitempty"`
+	SystemNotifs     bool                 `json:"system_notifs"`
+	SpeedTestRunning bool                 `json:"speed_test_running"`
 }
 
 type testTargetResult struct {
@@ -181,18 +197,30 @@ type testTargetsResponse struct {
 type Server struct {
 	port       int
 	configPath string
-	logDir     string
 	lgr        *logger.Logger
 	clients    map[chan string]struct{}
 	mu         sync.Mutex
 
+	srv          *http.Server
+	shutdownCh   chan struct{}
+	shutdownOnce sync.Once
+
+	// cfgMu guards logDir, which can change at runtime when the config is saved.
+	cfgMu  sync.RWMutex
+	logDir string
+
+	// nativeNotifs is set by each binary to indicate the host shows OS-native
+	// notifications (so the local dashboard suppresses duplicate browser ones).
+	nativeNotifs bool
+
 	version string
 
-	OnConfigChange      func(*config.Config)
-	OnTestNotification  func()
-	OnTestWebhook       func(url string) string
-	OnApplyUpdate       func(downloadURL string) error
-	OnRestartApp        func()
+	OnConfigChange     func(*config.Config)
+	OnTestNotification func(lang string)
+	OnPlaySound        func() // plays the notification chime only (no banner)
+	OnTestWebhook      func(url string) string
+	OnApplyUpdate      func(downloadURL string) error
+	OnRestartApp       func()
 
 	updateMu   sync.RWMutex
 	updateInfo *updateSnapshot
@@ -206,11 +234,14 @@ type Server struct {
 	dnsOK          bool
 	totalChecks    int
 	disconnections int
-	connectedTicks int
+	upTicks        int
 	startTime      time.Time
 	latencyHistory []int64
 	events         []EventEntry
 	ticks          []TickEntry
+	targets        []types.TargetResult
+	gateway        string
+	gatewayOK      bool
 
 	// Speed test state
 	stRunning atomic.Bool
@@ -226,6 +257,7 @@ func NewServer(port int, configPath, logDir, version string, lgr *logger.Logger)
 		lgr:        lgr,
 		version:    version,
 		clients:    make(map[chan string]struct{}),
+		shutdownCh: make(chan struct{}),
 		startTime:  time.Now(),
 		status:     "checking",
 	}
@@ -254,6 +286,8 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/log-dates", s.serveLogDates)
 	mux.HandleFunc("/api/test-targets", s.serveTestTargets)
 	mux.HandleFunc("/api/test-notification", s.serveTestNotification)
+	mux.HandleFunc("/api/play-sound", s.servePlaySound)
+	mux.HandleFunc("/api/language", s.serveLanguage)
 	mux.HandleFunc("/api/test-webhook", s.serveTestWebhook)
 	mux.HandleFunc("/api/update", s.serveUpdate)
 	mux.HandleFunc("/api/startup", s.serveStartup)
@@ -261,12 +295,114 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/speed-test/start", s.serveSpeedTestStart)
 	mux.HandleFunc("/api/speed-test/cancel", s.serveSpeedTestCancel)
 	mux.HandleFunc("/api/speed-test/history", s.serveSpeedTestHistory)
+	mux.HandleFunc("/api/report", s.serveReport)
+	mux.HandleFunc("/report", s.serveReportPage)
+	mux.HandleFunc("/metrics", s.serveMetrics)
+	mux.HandleFunc("/api/availability", s.serveAvailability)
 
-	go http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", s.port), mux)
+	s.srv = &http.Server{
+		Addr:    fmt.Sprintf("127.0.0.1:%d", s.port),
+		Handler: s.csrfGuard(mux),
+	}
+	go func() {
+		if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("dashboard: failed to listen on %s: %v", s.srv.Addr, err)
+			if s.lgr != nil {
+				s.lgr.AppLog("FATAL dashboard ListenAndServe on %s: %v (port in use?)", s.srv.Addr, err)
+			}
+		}
+	}()
+
+	go s.scheduleSpeedTests()
+}
+
+// scheduleSpeedTests runs an automatic speed test every speed_test.schedule_minutes
+// (0 = disabled). It wakes once a minute, re-reading the config so the interval
+// can change at runtime, and skips a tick if a test is already running.
+func (s *Server) scheduleSpeedTests() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	var lastRun time.Time
+	for {
+		select {
+		case <-s.shutdownCh:
+			return
+		case <-ticker.C:
+			data, err := os.ReadFile(s.configPath)
+			if err != nil {
+				continue
+			}
+			var cfg config.Config
+			if json.Unmarshal(data, &cfg) != nil {
+				continue
+			}
+			every := cfg.SpeedTest.ScheduleMinutes
+			if every <= 0 {
+				continue
+			}
+			if time.Since(lastRun) >= time.Duration(every)*time.Minute {
+				if s.startSpeedTest("schedule") {
+					lastRun = time.Now()
+				}
+			}
+		}
+	}
+}
+
+// Shutdown gracefully stops the HTTP server: it signals SSE handlers to exit
+// (so long-lived streams don't block the drain) and then shuts down the server
+// within the given context's deadline. Safe to call once.
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.shutdownOnce.Do(func() { close(s.shutdownCh) })
+	if s.srv != nil {
+		return s.srv.Shutdown(ctx)
+	}
+	return nil
 }
 
 func (s *Server) URL() string {
 	return fmt.Sprintf("http://localhost:%d", s.port)
+}
+
+// SetNativeNotifications declares whether the host emits OS-native notifications.
+func (s *Server) SetNativeNotifications(v bool) {
+	s.cfgMu.Lock()
+	s.nativeNotifs = v
+	s.cfgMu.Unlock()
+}
+
+func (s *Server) getLogDir() string {
+	s.cfgMu.RLock()
+	defer s.cfgMu.RUnlock()
+	return s.logDir
+}
+
+func (s *Server) setLogDir(d string) {
+	s.cfgMu.Lock()
+	s.logDir = d
+	s.cfgMu.Unlock()
+}
+
+// csrfGuard rejects state-changing requests that carry a cross-origin Origin
+// header. The dashboard binds to loopback, so this blocks a malicious web page
+// from driving the local API (config writes, updates, speed tests) via the
+// browser. Requests with no Origin (non-browser clients) are allowed.
+func (s *Server) csrfGuard(next http.Handler) http.Handler {
+	allowed := map[string]bool{
+		fmt.Sprintf("http://localhost:%d", s.port): true,
+		fmt.Sprintf("http://127.0.0.1:%d", s.port): true,
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+		default:
+			if origin := r.Header.Get("Origin"); origin != "" && !allowed[origin] {
+				http.Error(w, "cross-origin request denied", http.StatusForbidden)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // ── Public update methods ─────────────────────────────────────
@@ -279,9 +415,14 @@ func (s *Server) UpdateTick(result types.CheckResult, status types.Status) {
 	s.tcpPingOK = result.TCPPingOK
 	s.httpOK = result.HTTPOK
 	s.dnsOK = result.DNSOK
+	s.targets = result.Targets
+	s.gateway = result.Gateway
+	s.gatewayOK = result.GatewayOK
 	s.totalChecks++
-	if status == types.StatusConnected {
-		s.connectedTicks++
+	// "Up" = reachable, including degraded (slow but online). Only a full
+	// disconnection counts against uptime.
+	if status != types.StatusDisconnected {
+		s.upTicks++
 	}
 	s.latencyHistory = append(s.latencyHistory, result.LatencyMs)
 	if len(s.latencyHistory) > maxHistory {
@@ -366,9 +507,20 @@ func (s *Server) serveConfig(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		var cfg config.Config
+		// Start from the existing config so fields the settings form doesn't
+		// manage (use_icmp, telegram_*, etc.) survive a save instead of being
+		// reset to zero.
+		cfg := config.Default
+		if existing, rerr := os.ReadFile(s.configPath); rerr == nil {
+			json.Unmarshal(existing, &cfg)
+		}
 		if err := json.Unmarshal(body, &cfg); err != nil {
 			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		cfg.Sanitize()
+		if strings.Contains(cfg.LogDir, "..") {
+			http.Error(w, `{"error":"log_dir must not contain '..'"}`, http.StatusBadRequest)
 			return
 		}
 		pretty, _ := json.MarshalIndent(cfg, "", "  ")
@@ -376,10 +528,18 @@ func (s *Server) serveConfig(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		// Apply live where possible: log dir is read by this server's handlers,
+		// so keep it in sync with what the engine's logger now writes.
+		s.setLogDir(cfg.LogDir)
 		if s.OnConfigChange != nil {
 			s.OnConfigChange(&cfg)
 		}
-		w.Write([]byte(`{"ok":true}`))
+		// The HTTP listener is bound once at startup; a port change needs a restart.
+		restartRequired := cfg.DashboardPort != s.port
+		if restartRequired && s.lgr != nil {
+			s.lgr.AppLog("CONFIG dashboard_port changed to %d — restart required to take effect", cfg.DashboardPort)
+		}
+		fmt.Fprintf(w, `{"ok":true,"restart_required":%t}`, restartRequired)
 
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -392,8 +552,8 @@ func (s *Server) serveLogs(w http.ResponseWriter, r *http.Request) {
 	if date == "" {
 		date = time.Now().Format("2006-01-02")
 	}
-	filename := filepath.Join(s.logDir, fmt.Sprintf("connectivity_%s.jsonl", date))
-	data, err := os.ReadFile(filename)
+	filename := filepath.Join(s.getLogDir(), fmt.Sprintf("connectivity_%s.jsonl", date))
+	data, err := s.readDataFile(filename)
 	if os.IsNotExist(err) {
 		w.Write([]byte("[]"))
 		return
@@ -418,7 +578,7 @@ func (s *Server) serveLogs(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) serveLogDates(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	entries, err := os.ReadDir(s.logDir)
+	entries, err := os.ReadDir(s.getLogDir())
 	if err != nil {
 		w.Write([]byte("[]"))
 		return
@@ -462,7 +622,11 @@ func (s *Server) serveTestTargets(w http.ResponseWriter, r *http.Request) {
 		req.DNSTargets = []string{req.DNSTarget}
 	}
 
-	httpClient := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{DisableKeepAlives: true}}
+	httpClient := &http.Client{
+		Timeout:       5 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+		Transport:     &http.Transport{DisableKeepAlives: true},
+	}
 	resp := testTargetsResponse{PingTargets: make([]testTargetResult, 0)}
 
 	for _, target := range req.PingTargets {
@@ -495,8 +659,14 @@ func (s *Server) serveTestTargets(w http.ResponseWriter, r *http.Request) {
 		rt := testTargetResult{Target: target}
 		if err == nil {
 			httpResp.Body.Close()
-			rt.OK = true
-			rt.LatencyMs = lat
+			// Mirror the live monitor: only 200/204 count as reachable, so the
+			// test doesn't give a false green for a 3xx/4xx/5xx endpoint.
+			if httpResp.StatusCode == 200 || httpResp.StatusCode == 204 {
+				rt.OK = true
+				rt.LatencyMs = lat
+			} else {
+				rt.Error = fmt.Sprintf("http_%d", httpResp.StatusCode)
+			}
 		} else {
 			rt.Error = simplifyError(err.Error())
 		}
@@ -581,8 +751,62 @@ func (s *Server) serveTestNotification(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	lang := r.URL.Query().Get("lang")
+	if lang != "ar" {
+		lang = "en" // default to English for any non-ar value
+	}
+	if s.lgr != nil {
+		s.lgr.AppLog("NOTIFICATION test triggered by user (lang=%s)", lang)
+	}
 	if s.OnTestNotification != nil {
-		go s.OnTestNotification()
+		go s.OnTestNotification(lang)
+	}
+	w.Write([]byte(`{"ok":true}`))
+}
+
+// servePlaySound plays the notification chime only (no banner). All sound in
+// the UI — preview, test, and live alerts — routes here so there is exactly one
+// playback channel (the native player), which makes overlapping audio
+// impossible regardless of how fast the user clicks.
+func (s *Server) servePlaySound(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if s.OnPlaySound != nil {
+		go s.OnPlaySound()
+	}
+	w.Write([]byte(`{"ok":true}`))
+}
+
+// serveLanguage persists the UI language into config (merging, so other fields
+// are untouched) so backend-sent OS notifications match the UI language. Fires
+// OnConfigChange so the running engine picks it up live.
+func (s *Server) serveLanguage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	lang := r.URL.Query().Get("lang")
+	if lang != "ar" {
+		lang = "en"
+	}
+
+	cfg := config.Default
+	if existing, err := os.ReadFile(s.configPath); err == nil {
+		json.Unmarshal(existing, &cfg)
+	}
+	cfg.Language = lang
+	cfg.Sanitize()
+	pretty, _ := json.MarshalIndent(cfg, "", "  ")
+	if err := os.WriteFile(s.configPath, pretty, 0644); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if s.OnConfigChange != nil {
+		s.OnConfigChange(&cfg)
 	}
 	w.Write([]byte(`{"ok":true}`))
 }
@@ -598,9 +822,17 @@ func (s *Server) serveTestWebhook(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		URL string `json:"url"`
 	}
-	body := make([]byte, 2048)
-	n, _ := r.Body.Read(body)
-	json.Unmarshal(body[:n], &req)
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 4096))
+	if err != nil {
+		http.Error(w, `{"ok":false,"error":"request body too large or unreadable"}`, http.StatusRequestEntityTooLarge)
+		return
+	}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			http.Error(w, `{"ok":false,"error":"invalid JSON"}`, http.StatusBadRequest)
+			return
+		}
+	}
 
 	url := req.URL
 	if url == "" {
@@ -696,8 +928,19 @@ func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 		case <-r.Context().Done():
 			return
+		case <-s.shutdownCh:
+			return
 		}
 	}
+}
+
+// readDataFile reads a log/history file under the logger's write lock when a
+// logger is present, so reads don't interleave with concurrent appends.
+func (s *Server) readDataFile(path string) ([]byte, error) {
+	if s.lgr != nil {
+		return s.lgr.ReadFile(path)
+	}
+	return os.ReadFile(path)
 }
 
 // ── Internal ──────────────────────────────────────────────────
@@ -706,6 +949,10 @@ func (s *Server) snapshot(msgType string) Snapshot {
 	s.updateMu.RLock()
 	updateInfo := s.updateInfo
 	s.updateMu.RUnlock()
+
+	s.cfgMu.RLock()
+	nativeNotifs := s.nativeNotifs
+	s.cfgMu.RUnlock()
 
 	s.stateMu.RLock()
 	defer s.stateMu.RUnlock()
@@ -716,30 +963,65 @@ func (s *Server) snapshot(msgType string) Snapshot {
 	copy(evts, s.events)
 	ticks := make([]TickEntry, len(s.ticks))
 	copy(ticks, s.ticks)
+	tgts := make([]types.TargetResult, len(s.targets))
+	copy(tgts, s.targets)
 
 	uptimePct := 0.0
 	if s.totalChecks > 0 {
-		uptimePct = float64(s.connectedTicks) / float64(s.totalChecks) * 100
+		uptimePct = float64(s.upTicks) / float64(s.totalChecks) * 100
+	}
+
+	// Refine "down" into "isp" vs "lan" when a gateway reachability signal exists.
+	diag := types.Diagnose(types.CheckResult{TCPPingOK: s.tcpPingOK, HTTPOK: s.httpOK, DNSOK: s.dnsOK})
+	if diag == "down" && s.gateway != "" {
+		if s.gatewayOK {
+			diag = "isp" // LAN/gateway reachable but no internet
+		} else {
+			diag = "lan" // can't even reach the gateway
+		}
 	}
 
 	return Snapshot{
-		Type:           msgType,
-		Status:         s.status,
-		LatencyMs:      s.latencyMs,
-		PacketLoss:     s.packetLoss,
-		TCPPingOK:      s.tcpPingOK,
-		HTTPOK:         s.httpOK,
-		DNSOK:          s.dnsOK,
-		TotalChecks:    s.totalChecks,
-		Disconnections: s.disconnections,
-		UptimeSeconds:  time.Since(s.startTime).Seconds(),
-		UptimePct:      uptimePct,
-		LatencyHistory: hist,
-		Events:         evts,
-		Ticks:          ticks,
-		UpdateInfo:     updateInfo,
-		SystemNotifs:   s.OnTestNotification != nil,
+		Type:             msgType,
+		Status:           s.status,
+		LatencyMs:        s.latencyMs,
+		PacketLoss:       s.packetLoss,
+		TCPPingOK:        s.tcpPingOK,
+		HTTPOK:           s.httpOK,
+		DNSOK:            s.dnsOK,
+		Diagnosis:        diag,
+		Gateway:          s.gateway,
+		TotalChecks:      s.totalChecks,
+		Disconnections:   s.disconnections,
+		UptimeSeconds:    time.Since(s.startTime).Seconds(),
+		UptimePct:        uptimePct,
+		JitterMs:         jitterOf(hist),
+		LatencyHistory:   hist,
+		Targets:          tgts,
+		Events:           evts,
+		Ticks:            ticks,
+		UpdateInfo:       updateInfo,
+		SystemNotifs:     nativeNotifs,
+		SpeedTestRunning: s.stRunning.Load(),
 	}
+}
+
+// jitterOf returns the mean absolute difference between consecutive latency
+// samples — a simple jitter estimate over the recent history window.
+func jitterOf(hist []int64) int64 {
+	if len(hist) < 2 {
+		return 0
+	}
+	var sum, n int64
+	for i := 1; i < len(hist); i++ {
+		d := hist[i] - hist[i-1]
+		if d < 0 {
+			d = -d
+		}
+		sum += d
+		n++
+	}
+	return sum / n
 }
 
 func (s *Server) broadcast(msgType string) {
@@ -809,23 +1091,36 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if s.stRunning.Load() {
+	if !s.startSpeedTest("user") {
 		w.WriteHeader(http.StatusConflict)
 		w.Write([]byte(`{"error":"test_already_running"}`))
 		return
 	}
-	s.stRunning.Store(true)
+	w.Write([]byte(`{"ok":true}`))
+}
+
+// startSpeedTest launches a speed test (download + optional upload) in the
+// background, logging and notifying on completion. triggeredBy is "user" or
+// "schedule". Returns false if a test is already running.
+func (s *Server) startSpeedTest(triggeredBy string) bool {
+	// Atomic check-and-set: two concurrent starts can't both pass.
+	if !s.stRunning.CompareAndSwap(false, true) {
+		return false
+	}
 
 	data, _ := os.ReadFile(s.configPath)
 	var cfg config.Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		cfg = config.Default
 	}
+	cfg.Sanitize() // clamp parallel_connections etc. even for hand-edited files
 	if len(cfg.SpeedTest.DownloadTargets) == 0 {
 		cfg.SpeedTest = config.Default.SpeedTest
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	// Store the cancel func before anyone can observe stRunning via a cancel
+	// request, so a running test is always cancelable.
 	s.stateMu.Lock()
 	s.stCancel = cancel
 	s.stateMu.Unlock()
@@ -835,63 +1130,84 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 		timeout = 10 * time.Second
 	}
 	stCfg := speedtest.Config{
-		Endpoints: cfg.SpeedTest.DownloadTargets,
-		Parallel:  cfg.SpeedTest.ParallelConnections,
-		Timeout:   timeout,
+		Endpoints:    cfg.SpeedTest.DownloadTargets,
+		Parallel:     cfg.SpeedTest.ParallelConnections,
+		Timeout:      timeout,
+		UploadTarget: cfg.SpeedTest.UploadTarget,
 	}
 
 	go func() {
 		defer func() {
-			s.stRunning.Store(false)
+			if rec := recover(); rec != nil && s.lgr != nil {
+				s.lgr.AppLog("PANIC recovered in speed test goroutine: %v", rec)
+			}
 			cancel()
+			s.stateMu.Lock()
+			s.stCancel = nil
+			s.stateMu.Unlock()
+			// Release the run lock last, so a new test can only start once this
+			// goroutine has fully torn down.
+			s.stRunning.Store(false)
 		}()
 
+		emit := func(m map[string]interface{}) {
+			m["type"] = "speed_test_progress"
+			b, _ := json.Marshal(m)
+			s.broadcastRaw(string(b))
+		}
 		totalSecs := stCfg.Timeout.Seconds()
+
+		// ── Phase 1: ping (latency to the download endpoint) ──
+		emit(map[string]interface{}{"phase": "ping", "done": false})
+
+		// ── Phase 2: download (live Mbps) ──
 		result, err := speedtest.Run(ctx, stCfg, func(mbps float64, elapsed time.Duration) {
-			progress, _ := json.Marshal(map[string]interface{}{
-				"type":            "speed_test_progress",
-				"phase":           "download",
-				"current_mbps":    mbps,
-				"elapsed_seconds": elapsed.Seconds(),
-				"total_seconds":   totalSecs,
-				"done":            false,
+			emit(map[string]interface{}{
+				"phase": "download", "current_mbps": mbps,
+				"elapsed_seconds": elapsed.Seconds(), "total_seconds": totalSecs, "done": false,
 			})
-			s.broadcastRaw(string(progress))
 		})
 
 		if ctx.Err() != nil && (result == nil || result.DownloadMbps == 0) {
-			cancelled, _ := json.Marshal(map[string]interface{}{
-				"type":      "speed_test_progress",
-				"done":      true,
-				"cancelled": true,
-			})
-			s.broadcastRaw(string(cancelled))
+			emit(map[string]interface{}{"done": true, "cancelled": true})
 			return
 		}
-
 		if err != nil || result == nil {
 			return
 		}
+		// Report the measured ping now that we have it.
+		emit(map[string]interface{}{"phase": "ping", "latency_ms": result.LatencyMs, "done": false})
 
-		s.stateMu.RLock()
-		latency := s.latencyMs
-		s.stateMu.RUnlock()
+		// ── Phase 3: upload (optional, live Mbps) ── reuses the cancel ctx.
+		var uploadMbps *float64
+		if stCfg.UploadTarget != "" {
+			mbps, uerr := speedtest.MeasureUpload(ctx, stCfg, func(m float64, elapsed time.Duration) {
+				emit(map[string]interface{}{
+					"phase": "upload", "current_mbps": m,
+					"elapsed_seconds": elapsed.Seconds(), "total_seconds": totalSecs, "done": false,
+				})
+			})
+			if uerr == nil {
+				uploadMbps = &mbps
+			}
+		}
 
 		event := logger.SpeedTestEvent{
 			Timestamp:       time.Now().UTC(),
 			Event:           "speed_test",
 			DownloadMbps:    result.DownloadMbps,
-			LatencyMs:       latency,
+			UploadMbps:      uploadMbps,
+			LatencyMs:       result.LatencyMs,
 			DurationSeconds: result.DurationSeconds,
 			Endpoints:       result.Endpoints,
 			ParallelConns:   result.ParallelConns,
-			TriggeredBy:     "user",
+			TriggeredBy:     triggeredBy,
 		}
 
 		if s.lgr != nil {
 			s.lgr.LogSpeedTest(event)
-			// Always send webhook with speed test result if webhook is configured
-			if cfg.WebhookURL != "" {
+			// Notify via webhook and/or Telegram if either is configured.
+			if cfg.WebhookURL != "" || (cfg.TelegramBotToken != "" && cfg.TelegramChatID != "") {
 				belowThreshold := cfg.SpeedTest.AlertThresholdMbps > 0 &&
 					result.DownloadMbps < cfg.SpeedTest.AlertThresholdMbps
 				s.lgr.SendSpeedTestResult(cfg.WebhookURL, event, cfg.SpeedTest.AlertThresholdMbps, belowThreshold)
@@ -902,18 +1218,16 @@ func (s *Server) serveSpeedTestStart(w http.ResponseWriter, r *http.Request) {
 		s.stLast = &event
 		s.stateMu.Unlock()
 
-		done, _ := json.Marshal(map[string]interface{}{
-			"type":  "speed_test_progress",
-			"phase": "download",
-			"current_mbps": result.DownloadMbps,
-			"elapsed_seconds": result.DurationSeconds,
-			"done":   true,
-			"result": event,
+		emit(map[string]interface{}{
+			"phase":         "done",
+			"download_mbps": result.DownloadMbps,
+			"latency_ms":    result.LatencyMs,
+			"done":          true,
+			"result":        event,
 		})
-		s.broadcastRaw(string(done))
 	}()
 
-	w.Write([]byte(`{"ok":true}`))
+	return true
 }
 
 func (s *Server) serveSpeedTestCancel(w http.ResponseWriter, r *http.Request) {
@@ -922,13 +1236,15 @@ func (s *Server) serveSpeedTestCancel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	// Only trigger cancellation; the run goroutine's defer clears stCancel and
+	// releases stRunning once it has actually torn down. Flipping them here
+	// would let a second test start while the first is still winding down.
 	s.stateMu.Lock()
-	if s.stCancel != nil {
-		s.stCancel()
-		s.stCancel = nil
-	}
+	cancel := s.stCancel
 	s.stateMu.Unlock()
-	s.stRunning.Store(false)
+	if cancel != nil {
+		cancel()
+	}
 	w.Write([]byte(`{"ok":true}`))
 }
 
@@ -936,7 +1252,7 @@ func (s *Server) serveSpeedTestHistory(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	limit := 20
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := parseInt(v); err == nil && n > 0 {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			if n > 100 {
 				n = 100
 			}
@@ -948,8 +1264,8 @@ func (s *Server) serveSpeedTestHistory(w http.ResponseWriter, r *http.Request) {
 		date = time.Now().Format("2006-01-02")
 	}
 
-	filename := filepath.Join(s.logDir, fmt.Sprintf("speedtest_%s.jsonl", date))
-	data, err := os.ReadFile(filename)
+	filename := filepath.Join(s.getLogDir(), fmt.Sprintf("speedtest_%s.jsonl", date))
+	data, err := s.readDataFile(filename)
 	if os.IsNotExist(err) {
 		w.Write([]byte("[]"))
 		return
@@ -977,6 +1293,201 @@ func (s *Server) serveSpeedTestHistory(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(entries)
 }
 
+// ── Monthly report ────────────────────────────────────────────
+
+func validMonth(m string) bool {
+	if len(m) != 7 || m[4] != '-' {
+		return false
+	}
+	for i, c := range m {
+		if i == 4 {
+			continue
+		}
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// adjacentMonths returns the "YYYY-MM" strings for the months before and after
+// the given "YYYY-MM" (empty strings if it can't be parsed).
+func adjacentMonths(month string) (prev, next string) {
+	var y, mo int
+	if _, err := fmt.Sscanf(month, "%d-%d", &y, &mo); err != nil || mo < 1 || mo > 12 {
+		return "", ""
+	}
+	// Local time to match report.Summarize's month window; only month
+	// arithmetic on day 1 is used, so the result is the calendar-adjacent month.
+	t := time.Date(y, time.Month(mo), 1, 0, 0, 0, 0, time.Local)
+	return t.AddDate(0, -1, 0).Format("2006-01"), t.AddDate(0, 1, 0).Format("2006-01")
+}
+
+// readMonthlyJSONL reads every "<prefix><month>-*.jsonl" file in the log dir
+// (under the logger lock) and unmarshals each valid line into T.
+func readMonthlyJSONL[T any](s *Server, prefix, month string) []T {
+	dir := s.getLogDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	want := prefix + month
+	var out []T
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasPrefix(name, want) || !strings.HasSuffix(name, ".jsonl") {
+			continue
+		}
+		data, err := s.readDataFile(filepath.Join(dir, name))
+		if err != nil {
+			continue
+		}
+		for _, line := range bytes.Split(bytes.TrimSpace(data), []byte{'\n'}) {
+			line = bytes.TrimSpace(line)
+			if len(line) == 0 || !json.Valid(line) {
+				continue
+			}
+			var v T
+			if json.Unmarshal(line, &v) == nil {
+				out = append(out, v)
+			}
+		}
+	}
+	return out
+}
+
+func (s *Server) serveReport(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	month := r.URL.Query().Get("month")
+	if !validMonth(month) {
+		month = time.Now().Format("2006-01")
+	}
+	// Read neighbor months too so an outage that crosses a month boundary has
+	// its full duration available; report.Summarize clips it to this month.
+	prev, next := adjacentMonths(month)
+	events := readMonthlyJSONL[types.Event](s, "connectivity_", month)
+	events = append(events, readMonthlyJSONL[types.Event](s, "connectivity_", prev)...)
+	events = append(events, readMonthlyJSONL[types.Event](s, "connectivity_", next)...)
+	samples := readMonthlyJSONL[types.MetricSample](s, "metrics_", month)
+	json.NewEncoder(w).Encode(report.Summarize(events, samples, month, time.Now()))
+}
+
+// serveMetrics exposes the live monitoring state in Prometheus text exposition
+// format. Hand-written to avoid pulling in the prometheus client dependency.
+// serveAvailability returns uptime % for today / last 7 days / last 30 days.
+// It walks the per-minute metric files once (descending from today), reading
+// each day's file a single time and capturing the 1/7/30-day cumulative
+// subtotals in the same pass — instead of re-reading overlapping files per
+// window. Keys are "today", "week" (rolling 7d) and "month" (rolling 30d).
+func (s *Server) serveAvailability(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var total, up int
+	var tToday, uToday, tWeek, uWeek int
+	now := time.Now()
+	for i := 0; i < 30; i++ {
+		date := now.AddDate(0, 0, -i).Format("2006-01-02")
+		data, err := s.readDataFile(filepath.Join(s.getLogDir(), "metrics_"+date+".jsonl"))
+		if err == nil {
+			for _, line := range bytes.Split(bytes.TrimSpace(data), []byte{'\n'}) {
+				line = bytes.TrimSpace(line)
+				if len(line) == 0 || !json.Valid(line) {
+					continue
+				}
+				var m types.MetricSample
+				if json.Unmarshal(line, &m) == nil {
+					total += m.Samples
+					up += m.UpSamples
+				}
+			}
+		}
+		switch i {
+		case 0:
+			tToday, uToday = total, up
+		case 6:
+			tWeek, uWeek = total, up
+		}
+	}
+
+	pct := func(t, u int) interface{} {
+		if t == 0 {
+			return nil
+		}
+		return float64(u) / float64(t) * 100
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"today": pct(tToday, uToday),
+		"week":  pct(tWeek, uWeek),
+		"month": pct(total, up),
+	})
+}
+
+func (s *Server) serveMetrics(w http.ResponseWriter, r *http.Request) {
+	s.stateMu.RLock()
+	status := s.status
+	latency := s.latencyMs
+	loss := s.packetLoss
+	tcp, httpOK, dns := s.tcpPingOK, s.httpOK, s.dnsOK
+	total, disc, up := s.totalChecks, s.disconnections, s.upTicks
+	stLast := s.stLast
+	hist := make([]int64, len(s.latencyHistory))
+	copy(hist, s.latencyHistory)
+	s.stateMu.RUnlock()
+
+	b01 := func(ok bool) int {
+		if ok {
+			return 1
+		}
+		return 0
+	}
+	upVal := 0
+	if status == "connected" || status == "degraded" {
+		upVal = 1
+	}
+	uptimeRatio := 0.0
+	if total > 0 {
+		uptimeRatio = float64(up) / float64(total)
+	}
+
+	var b strings.Builder
+	metric := func(name, typ, help string, val interface{}) {
+		fmt.Fprintf(&b, "# HELP %s %s\n# TYPE %s %s\n%s %v\n", name, help, name, typ, name, val)
+	}
+
+	fmt.Fprintf(&b, "# HELP internet_monitor_build_info Build information.\n# TYPE internet_monitor_build_info gauge\ninternet_monitor_build_info{version=%q} 1\n", s.version)
+	metric("internet_monitor_up", "gauge", "1 if the internet is reachable (connected or degraded), else 0.", upVal)
+	metric("internet_monitor_latency_ms", "gauge", "Most recent connectivity latency in milliseconds.", latency)
+	metric("internet_monitor_jitter_ms", "gauge", "Mean latency jitter over the recent history window.", jitterOf(hist))
+	metric("internet_monitor_packet_loss_ratio", "gauge", "Most recent packet loss ratio (0-1).", loss/100)
+	metric("internet_monitor_tcp_ok", "gauge", "1 if the last TCP ping succeeded.", b01(tcp))
+	metric("internet_monitor_http_ok", "gauge", "1 if the last HTTP check succeeded.", b01(httpOK))
+	metric("internet_monitor_dns_ok", "gauge", "1 if the last DNS lookup succeeded.", b01(dns))
+	metric("internet_monitor_checks_total", "counter", "Total checks performed since start.", total)
+	metric("internet_monitor_up_checks_total", "counter", "Checks where the link was up since start.", up)
+	metric("internet_monitor_disconnections_total", "counter", "Disconnection events since start.", disc)
+	metric("internet_monitor_uptime_ratio", "gauge", "Up checks divided by total checks (0-1).", uptimeRatio)
+	if stLast != nil {
+		metric("internet_monitor_speedtest_download_mbps", "gauge", "Download speed (Mbps) from the last speed test.", stLast.DownloadMbps)
+		metric("internet_monitor_speedtest_latency_ms", "gauge", "Latency (ms) from the last speed test.", stLast.LatencyMs)
+		if stLast.UploadMbps != nil {
+			metric("internet_monitor_speedtest_upload_mbps", "gauge", "Upload speed (Mbps) from the last speed test.", *stLast.UploadMbps)
+		}
+	}
+
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	w.Write([]byte(b.String()))
+}
+
+func (s *Server) serveReportPage(w http.ResponseWriter, r *http.Request) {
+	data, err := staticFiles.ReadFile("assets/report.html")
+	if err != nil {
+		http.Error(w, "report.html not found", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(data)
+}
+
 func (s *Server) broadcastRaw(msg string) {
 	s.mu.Lock()
 	for ch := range s.clients {
@@ -988,21 +1499,17 @@ func (s *Server) broadcastRaw(msg string) {
 	s.mu.Unlock()
 }
 
-func parseInt(s string) (int, error) {
-	n := 0
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return 0, fmt.Errorf("invalid")
-		}
-		n = n*10 + int(c-'0')
-	}
-	return n, nil
-}
-
 // ── Custom notification sound ─────────────────────────────────
 
 func (s *Server) customSoundPath() string {
 	return filepath.Join(filepath.Dir(s.configPath), "notification.mp3")
+}
+
+// customWavPath is where the native player (sound.RingtonePath) looks for a
+// user override. The uploaded MP3 is transcoded here so the OS notification
+// sound matches the browser-preview sound.
+func (s *Server) customWavPath() string {
+	return filepath.Join(filepath.Dir(s.configPath), "notification.wav")
 }
 
 // serveNotificationSound handles GET (serve sound) and POST (upload) and DELETE (reset).
@@ -1051,11 +1558,26 @@ func (s *Server) serveNotificationSound(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, `{"error":"save failed"}`, http.StatusInternalServerError)
 			return
 		}
+		// Transcode to WAV for the native player (winmm PlaySound is WAV-only),
+		// so the OS notification sound matches the uploaded MP3. If conversion
+		// fails, keep the MP3 for the browser but drop any stale WAV so the
+		// native player falls back to the embedded default instead of an old one.
+		if wav, cerr := audio.ConvertMP3ToWAV(data); cerr == nil {
+			if werr := os.WriteFile(s.customWavPath(), wav, 0644); werr != nil && s.lgr != nil {
+				s.lgr.AppLog("custom sound: WAV save failed: %v", werr)
+			}
+		} else {
+			os.Remove(s.customWavPath())
+			if s.lgr != nil {
+				s.lgr.AppLog("custom sound: MP3->WAV conversion failed: %v", cerr)
+			}
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"ok":true}`))
 
 	case http.MethodDelete:
 		os.Remove(customPath)
+		os.Remove(s.customWavPath())
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"ok":true}`))
 

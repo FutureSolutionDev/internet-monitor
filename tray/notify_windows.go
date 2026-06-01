@@ -16,6 +16,19 @@ import (
 
 const notifyAUMID = "InternetMonitor"
 
+// Logf, if set, receives notification-path diagnostics (wired to logger.AppLog
+// by main so they land in logs/app.log; the standard log package is invisible
+// in a -H=windowsgui build).
+var Logf func(format string, args ...interface{})
+
+func notifyLogf(format string, args ...interface{}) {
+	if Logf != nil {
+		Logf(format, args...)
+	} else {
+		log.Printf(format, args...)
+	}
+}
+
 func init() {
 	// 1. Register AUMID display name + icon (used by WinRT toast notifications).
 	if k, _, err := registry.CreateKey(
@@ -55,60 +68,66 @@ func init() {
 
 // Notify shows a system notification with sound (tray binary).
 func Notify(title, message string) {
-	go playTraySound()
-	lnk := filepath.Join(os.Getenv("APPDATA"),
+	playTraySound()
+	notifyLogf("[notify] Notify(tray): title=%q", title)
+	ShowNotification(title, message)
+}
+
+// startMenuLnkPath is the Start Menu shortcut whose AppUserModelID associates
+// our notifications with the app's name (required for WinRT toasts on Win10/11).
+func startMenuLnkPath() string {
+	return filepath.Join(os.Getenv("APPDATA"),
 		"Microsoft", "Windows", "Start Menu", "Programs",
 		"Internet Monitor.lnk")
-	if _, err := os.Stat(lnk); err == nil {
-		showWinRTToast(title, message)
+}
+
+// ShowNotification shows a desktop notification. It prefers a WinRT toast —
+// which renders under the app's name/icon — when the Start Menu shortcut (with
+// our AppUserModelID) exists. Otherwise, or if the toast can't be shown, it
+// falls back to the PowerShell WinForms balloon (shows under "PowerShell" but
+// always renders, e.g. under `air` where the exe is a throwaway in tmp).
+func ShowNotification(title, message string) {
+	if _, err := os.Stat(startMenuLnkPath()); err == nil {
+		if showWinRTToast(title, message) {
+			return
+		}
+		notifyLogf("[notify] toast failed, falling back to balloon")
 	} else {
-		ShowBalloon(title, message)
+		notifyLogf("[notify] no Start Menu shortcut yet, using balloon")
 	}
+	ShowBalloon(title, message)
 }
 
-// ShowWinRTToast is exported so cmd/gui can call it directly.
-func ShowWinRTToast(title, body string) {
-	showWinRTToast(title, body)
-}
-
-// showWinRTToast fires a Windows 10/11 WinRT toast via PowerShell.
-// Uses GetTemplateContent to avoid having to load Windows.Data.Xml.Dom
-// separately. AppendChild+CreateTextNode is more reliable than InnerText.
-// DETACHED_PROCESS prevents the notification from stealing console focus.
-func showWinRTToast(title, body string) {
+// showWinRTToast fires a Windows 10/11 toast under our AUMID via PowerShell.
+// Returns true only if PowerShell reported the toast was shown.
+func showWinRTToast(title, body string) bool {
 	t := strings.ReplaceAll(title, "'", "''")
 	b := strings.ReplaceAll(body, "'", "''")
-
 	script := fmt.Sprintf(`
 [Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]|Out-Null
-$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('%s')
-Write-Host "notifier.Setting=$($notifier.Setting)"
-if ($notifier.Setting -ne 0) { Write-Host "BLOCKED setting=$($notifier.Setting)"; exit 0 }
-$tpl   = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
-$nodes = $tpl.GetElementsByTagName('text')
-$nodes.Item(0).AppendChild($tpl.CreateTextNode('%s')) | Out-Null
-$nodes.Item(1).AppendChild($tpl.CreateTextNode('%s')) | Out-Null
-$toast = [Windows.UI.Notifications.ToastNotification]::new($tpl)
-$notifier.Show($toast)
-Write-Host "SHOWN"
-`, notifyAUMID, t, b)
+$tpl=[Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
+$n=$tpl.GetElementsByTagName('text')
+$n.Item(0).AppendChild($tpl.CreateTextNode('%s'))|Out-Null
+$n.Item(1).AppendChild($tpl.CreateTextNode('%s'))|Out-Null
+$toast=[Windows.UI.Notifications.ToastNotification]::new($tpl)
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('%s').Show($toast)
+Write-Host 'TOAST_SHOWN'`, t, b, notifyAUMID)
 
+	// NOTE: do NOT set DETACHED_PROCESS here — it detaches stdout so
+	// CombinedOutput() returns "" even though the toast was shown, making us
+	// wrongly think it failed and fall back to the (PowerShell-named) balloon.
+	// HideWindow alone keeps the console hidden.
 	cmd := exec.Command("powershell",
-		"-WindowStyle", "Hidden",
-		"-NonInteractive",
+		"-NoProfile", "-ExecutionPolicy", "Bypass",
+		"-WindowStyle", "Hidden", "-NonInteractive",
 		"-Command", script)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow:    true,
-		CreationFlags: 0x00000008, // DETACHED_PROCESS — no console focus steal
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	out, err := cmd.CombinedOutput()
+	if err != nil || !strings.Contains(string(out), "TOAST_SHOWN") {
+		notifyLogf("[notify] showWinRTToast: err=%v out=%q", err, strings.TrimSpace(string(out)))
+		return false
 	}
-	go func() {
-		out, err := cmd.CombinedOutput()
-		if err != nil || len(out) > 0 {
-			log.Printf("[notify] showWinRTToast: err=%v output=%s", err, out)
-		} else {
-			log.Println("[notify] showWinRTToast: OK")
-		}
-	}()
+	return true
 }
 
 func OpenURL(url string) {

@@ -27,16 +27,16 @@ func SetCustomIcon(pngData []byte) {
 		return
 	}
 	customPNG = pngData
-	iconGreen  = blendOnColor(34, 197, 94)
+	iconGreen = blendOnColor(34, 197, 94)
 	iconYellow = blendOnColor(234, 179, 8)
-	iconRed    = blendOnColor(239, 68, 68)
-	iconGray   = blendOnColor(148, 163, 184)
+	iconRed = blendOnColor(239, 68, 68)
+	iconGray = blendOnColor(148, 163, 184)
 }
 
-func GreenIcon()  []byte { return orFallback(iconGreen,  34, 197, 94) }
+func GreenIcon() []byte  { return orFallback(iconGreen, 34, 197, 94) }
 func YellowIcon() []byte { return orFallback(iconYellow, 234, 179, 8) }
-func RedIcon()    []byte { return orFallback(iconRed,    239, 68, 68) }
-func GrayIcon()   []byte { return orFallback(iconGray,   148, 163, 184) }
+func RedIcon() []byte    { return orFallback(iconRed, 239, 68, 68) }
+func GrayIcon() []byte   { return orFallback(iconGray, 148, 163, 184) }
 
 func orFallback(cached []byte, r, g, b uint8) []byte {
 	if len(cached) > 0 {
@@ -49,8 +49,8 @@ func orFallback(cached []byte, r, g, b uint8) []byte {
 // The colored ring around the favicon is always visible regardless of favicon transparency.
 func blendOnColor(r, g, b uint8) []byte {
 	const size = 32
-	const iconSize = 22                    // favicon rendered at 22x22 (≈70%)
-	const offset = (size - iconSize) / 2  // centered: 5px border
+	const iconSize = 22                  // favicon rendered at 22x22 (≈70%)
+	const offset = (size - iconSize) / 2 // centered: 5px border
 
 	// Decode favicon PNG
 	src, err := png.Decode(bytes.NewReader(customPNG))
@@ -138,17 +138,17 @@ func generateFallback(r, g, b uint8) []byte {
 // pngToICO wraps any PNG in a minimal ICO container (PNG-in-ICO, Vista+).
 func pngToICO(pngData []byte) []byte {
 	buf := &bytes.Buffer{}
-	binary.Write(buf, binary.LittleEndian, uint16(0)) // reserved
-	binary.Write(buf, binary.LittleEndian, uint16(1)) // type = ICO
-	binary.Write(buf, binary.LittleEndian, uint16(1)) // count = 1
-	buf.WriteByte(0)                                                  // width  (0 = from PNG)
-	buf.WriteByte(0)                                                  // height (0 = from PNG)
-	buf.WriteByte(0)                                                  // color count
-	buf.WriteByte(0)                                                  // reserved
-	binary.Write(buf, binary.LittleEndian, uint16(1))                 // planes
-	binary.Write(buf, binary.LittleEndian, uint16(32))                // bpp
-	binary.Write(buf, binary.LittleEndian, uint32(len(pngData)))      // image size
-	binary.Write(buf, binary.LittleEndian, uint32(6+16))              // offset
+	binary.Write(buf, binary.LittleEndian, uint16(0))            // reserved
+	binary.Write(buf, binary.LittleEndian, uint16(1))            // type = ICO
+	binary.Write(buf, binary.LittleEndian, uint16(1))            // count = 1
+	buf.WriteByte(0)                                             // width  (0 = from PNG)
+	buf.WriteByte(0)                                             // height (0 = from PNG)
+	buf.WriteByte(0)                                             // color count
+	buf.WriteByte(0)                                             // reserved
+	binary.Write(buf, binary.LittleEndian, uint16(1))            // planes
+	binary.Write(buf, binary.LittleEndian, uint16(32))           // bpp
+	binary.Write(buf, binary.LittleEndian, uint32(len(pngData))) // image size
+	binary.Write(buf, binary.LittleEndian, uint32(6+16))         // offset
 	buf.Write(pngData)
 	return buf.Bytes()
 }

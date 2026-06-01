@@ -4,128 +4,28 @@ package tray
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"os/exec"
 	"strings"
 	"sync"
 	"syscall"
-	"unsafe"
-
-	"golang.org/x/sys/windows"
+	"time"
 )
+
+// Each balloon spawns a powershell.exe that lives ~6s; without a guard, rapid
+// notifications (e.g. mashing the test button) spawn a storm of processes.
+// balloonCooldown debounces calls so at most one balloon fires per window.
+const balloonCooldown = 4 * time.Second
 
 var (
-	user32dll     = windows.NewLazySystemDLL("user32.dll")
-	shell32dll    = windows.NewLazySystemDLL("shell32.dll")
-	shellNotify   = shell32dll.NewProc("Shell_NotifyIconW")
-	enumWindowsW  = user32dll.NewProc("EnumWindows")
-	getWinThread  = user32dll.NewProc("GetWindowThreadProcessId")
-	getClassNameW = user32dll.NewProc("GetClassNameW")
+	balloonMu   sync.Mutex
+	lastBalloon time.Time
 )
 
-// balloonNID mirrors NOTIFYICONDATA (Vista+ full layout, 976 bytes on 64-bit).
-// Go's automatic field alignment produces the same padding as the C struct.
-type balloonNID struct {
-	Size            uint32
-	Wnd             windows.Handle // 8-byte aligned → 4 bytes auto-padding before
-	ID              uint32
-	Flags           uint32
-	CallbackMessage uint32
-	Icon            windows.Handle // 8-byte aligned → 4 bytes auto-padding before
-	Tip             [128]uint16
-	State           uint32
-	StateMask       uint32
-	Info            [256]uint16
-	Timeout         uint32 // union with Version; deprecated Vista+
-	InfoTitle       [64]uint16
-	InfoFlags       uint32
-	GuidItem        windows.GUID
-	BalloonIcon     windows.Handle
-}
-
-const (
-	nimModify   = 0x00000001
-	nifInfo     = 0x00000020
-	niifNoSound = 0x00000010 // suppress default system sound (we play our own)
-)
-
-var ourPID = uint32(os.Getpid())
-
-// Package-level result + mutex so the EnumWindows callback never writes to
-// a Go stack pointer (which could become stale if the goroutine stack grows).
-var (
-	enumResult   windows.Handle
-	enumResultMu sync.Mutex
-)
-
-// enumCB is cached once — syscall.NewCallback allocates permanent memory.
-// The closure only reads package-level vars and writes to enumResult (heap).
-var enumCB = syscall.NewCallback(func(hwnd uintptr, _ uintptr) uintptr {
-	pid := new(uint32)
-	getWinThread.Call(hwnd, uintptr(unsafe.Pointer(pid)))
-	if *pid != ourPID {
-		return 1 // continue — different process
-	}
-	className := new([256]uint16)
-	getClassNameW.Call(hwnd, uintptr(unsafe.Pointer(className)), 256)
-	if windows.UTF16ToString(className[:]) == "SystrayClass" {
-		enumResult = windows.Handle(hwnd)
-		return 0 // stop enumeration
-	}
-	return 1 // continue
-})
-
-// findSystrayHWND returns the HWND of the SystrayClass window that belongs
-// to THIS process (registered by getlantern/systray with icon ID=100).
-func findSystrayHWND() windows.Handle {
-	enumResultMu.Lock()
-	defer enumResultMu.Unlock()
-	enumResult = 0
-	enumWindowsW.Call(enumCB, 0)
-	return enumResult
-}
-
-// tryNativeBalloon calls Shell_NotifyIcon(NIM_MODIFY, NIF_INFO) on the
-// existing systray icon. Returns true when Shell_NotifyIcon succeeds.
-func tryNativeBalloon(title, message string) bool {
-	hwnd := findSystrayHWND()
-	if hwnd == 0 {
-		log.Println("[notify] tryNativeBalloon: SystrayClass window not found — systray not yet ready?")
-		return false
-	}
-	log.Printf("[notify] tryNativeBalloon: found SystrayClass HWND=0x%X", hwnd)
-
-	nid := &balloonNID{
-		Wnd:       hwnd,
-		ID:        100, // getlantern/systray always registers with ID=100
-		Flags:     nifInfo,
-		InfoFlags: niifNoSound,
-	}
-	nid.Size = uint32(unsafe.Sizeof(*nid))
-
-	if title != "" {
-		t := windows.StringToUTF16(title)
-		n := copy(nid.InfoTitle[:len(nid.InfoTitle)-1], t)
-		nid.InfoTitle[n] = 0
-	}
-	if message != "" {
-		m := windows.StringToUTF16(message)
-		n := copy(nid.Info[:len(nid.Info)-1], m)
-		nid.Info[n] = 0
-	}
-
-	ret, _, lastErr := shellNotify.Call(nimModify, uintptr(unsafe.Pointer(nid)))
-	if ret == 0 {
-		log.Printf("[notify] tryNativeBalloon: Shell_NotifyIcon failed — err=%v", lastErr)
-		return false
-	}
-	log.Println("[notify] tryNativeBalloon: Shell_NotifyIcon succeeded")
-	return true
-}
-
-// showBalloonWinForms uses PowerShell + System.Windows.Forms as a reliable
-// fallback that works without AUMID registration or a Start Menu shortcut.
+// showBalloonWinForms shows a notification balloon via PowerShell +
+// System.Windows.Forms.NotifyIcon. This borrows powershell.exe's notification
+// identity, so it renders reliably from an unpackaged Go exe — unlike a WinRT
+// toast or a Shell_NotifyIcon balloon on our own (identity-less) window, both
+// of which report success but render nothing on Win10/11.
 func showBalloonWinForms(title, message string) {
 	t := strings.ReplaceAll(title, "'", "''")
 	m := strings.ReplaceAll(message, "'", "''")
@@ -145,19 +45,29 @@ $n.Visible = $false
 $n.Dispose()`, t, m)
 
 	cmd := exec.Command("powershell",
+		"-NoProfile",
+		"-ExecutionPolicy", "Bypass",
 		"-WindowStyle", "Hidden",
 		"-NonInteractive",
 		"-Command", script)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	cmd.Start()
+	go func() {
+		if out, err := cmd.CombinedOutput(); err != nil {
+			notifyLogf("[notify] WinForms balloon error: %v output=%q", err, strings.TrimSpace(string(out)))
+		}
+	}()
 }
 
-// ShowBalloon shows a notification balloon.
-// Tries native Shell_NotifyIcon first; falls back to PowerShell WinForms.
+// ShowBalloon shows a notification balloon (PowerShell WinForms), debounced so
+// rapid calls can't spawn a storm of powershell processes.
 func ShowBalloon(title, message string) {
-	log.Printf("[notify] ShowBalloon: title=%q", title)
-	if !tryNativeBalloon(title, message) {
-		log.Println("[notify] ShowBalloon: falling back to PowerShell WinForms")
-		showBalloonWinForms(title, message)
+	balloonMu.Lock()
+	if time.Since(lastBalloon) < balloonCooldown {
+		balloonMu.Unlock()
+		notifyLogf("[notify] ShowBalloon: debounced")
+		return
 	}
+	lastBalloon = time.Now()
+	balloonMu.Unlock()
+	showBalloonWinForms(title, message)
 }
