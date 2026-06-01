@@ -163,9 +163,10 @@ func Run(ctx context.Context, cfg Config, progress func(float64, time.Duration))
 }
 
 // MeasureUpload saturates the upload link by POSTing fixed-size chunks with a
-// pool of workers until the timeout, returning the measured Mbps. Returns
+// pool of workers until the timeout, returning the measured Mbps. progress (may
+// be nil) is called ~once a second with (currentMbps, elapsed). Returns
 // (0, err) if cancelled before any bytes were sent or all requests failed.
-func MeasureUpload(ctx context.Context, cfg Config) (float64, error) {
+func MeasureUpload(ctx context.Context, cfg Config, progress func(float64, time.Duration)) (float64, error) {
 	if cfg.UploadTarget == "" {
 		return 0, errors.New("no upload target configured")
 	}
@@ -213,6 +214,23 @@ func MeasureUpload(ctx context.Context, cfg Config) (float64, error) {
 		wg.Add(1)
 		go worker()
 	}
+
+	// Live progress reporter (single goroutine reading atomic counters).
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-tctx.Done():
+				return
+			case <-ticker.C:
+				el := time.Since(start)
+				if progress != nil && el.Seconds() > 0 {
+					progress(float64(totalBytes.Load()*8)/el.Seconds()/1_000_000, el)
+				}
+			}
+		}
+	}()
 
 	<-tctx.Done()
 	wg.Wait()

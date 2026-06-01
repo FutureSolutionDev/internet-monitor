@@ -7,8 +7,4 @@ config.json
 .claude
 tmp
 .playwright-mcp
-gitstat.txt
-act.txt
-
-COMMIT_MSG.txt
-n*.txt
+*.txt

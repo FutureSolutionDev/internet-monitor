@@ -18,7 +18,7 @@ func TestMeasureUpload(t *testing.T) {
 	defer srv.Close()
 
 	mbps, err := MeasureUpload(context.Background(),
-		Config{UploadTarget: srv.URL + "/__up", Parallel: 2, Timeout: time.Second})
+		Config{UploadTarget: srv.URL + "/__up", Parallel: 2, Timeout: time.Second}, nil)
 	if err != nil {
 		t.Fatalf("MeasureUpload error: %v", err)
 	}
@@ -28,7 +28,7 @@ func TestMeasureUpload(t *testing.T) {
 }
 
 func TestMeasureUploadNoTarget(t *testing.T) {
-	if _, err := MeasureUpload(context.Background(), Config{Timeout: time.Second}); err == nil {
+	if _, err := MeasureUpload(context.Background(), Config{Timeout: time.Second}, nil); err == nil {
 		t.Error("expected error when upload target is empty")
 	}
 }

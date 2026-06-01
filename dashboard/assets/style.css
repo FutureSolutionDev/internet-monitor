@@ -780,6 +780,7 @@ input:focus {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  align-items: center;
 }
 
 .speed-controls {
@@ -788,10 +789,82 @@ input:focus {
   align-items: center;
 }
 
+/* ── Circular gauge ── */
+.gauge-wrap {
+  position: relative;
+  width: 320px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+.gauge {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+.gauge-track {
+  fill: none;
+  stroke: var(--bg3);
+  stroke-width: 12;
+  stroke-linecap: round;
+}
+.gauge-fill {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 12;
+  stroke-linecap: round;
+  transition: d .25s linear, stroke .3s ease;
+}
+.gauge[data-phase="الرفع"] .gauge-fill,
+.gauge[data-phase="Upload"] .gauge-fill {
+  stroke: #22c55e;
+}
+.gauge-needle {
+  stroke: var(--fg);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transition: x2 .25s linear, y2 .25s linear;
+}
+.gauge-hub {
+  fill: var(--fg);
+}
+.gauge-center {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6%;
+  text-align: center;
+  pointer-events: none;
+}
+.gauge-value {
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.gauge-unit {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.gauge-phase {
+  font-size: 13px;
+  color: var(--blue);
+  margin-top: 6px;
+  font-weight: 600;
+}
+
 .speed-results {
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
+  justify-content: center;
+}
+
+.speed-result-card.active {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 2px var(--blue) inset;
 }
 
 .speed-result-card {

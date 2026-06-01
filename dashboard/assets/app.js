@@ -943,6 +943,8 @@ async function loadSettings() {
     if (alertEl) alertEl.value = st.alert_threshold_mbps || 0;
     const schedEl = document.getElementById("cfg-speed-schedule");
     if (schedEl) schedEl.value = st.schedule_minutes || 0;
+    const ulEl = document.getElementById("cfg-speed-upload");
+    if (ulEl) ulEl.value = st.upload_target ?? "https://speed.cloudflare.com/__up";
 
     pingTargets = Array.isArray(cfg.ping_targets)
       ? [...cfg.ping_targets]
@@ -1070,7 +1072,7 @@ async function saveSettings() {
         parseInt(document.getElementById("cfg-speed-parallel")?.value) || 4,
       timeout_seconds:
         parseInt(document.getElementById("cfg-speed-timeout")?.value) || 10,
-      upload_target: cfg.speed_test?.upload_target || "",
+      upload_target: (document.getElementById("cfg-speed-upload")?.value || "").trim(),
       alert_threshold_mbps:
         parseFloat(document.getElementById("cfg-speed-alert")?.value) || 0,
       schedule_minutes:
@@ -1489,40 +1491,105 @@ setTimeout(checkNativeMode, 500);
 
 // ── Speed Test ─────────────────────────────────────────────────
 
-function handleSpeedProgress(d) {
-  const fill = document.getElementById("speed-progress-fill");
-  const status = document.getElementById("speed-status");
-  const dl = document.getElementById("speed-dl-result");
-  const wrap = document.getElementById("speed-progress-wrap");
+// ── Circular gauge (speedtest.net style) ───────────────────────
+// The arc spans 160° (from 200° to 20°, i.e. the bottom semicircle opening up).
+// Mbps is mapped on a log scale so 1→1000 Mbps all read nicely.
+const GAUGE_R = 80,
+  GAUGE_CX = 100,
+  GAUGE_CY = 120,
+  GAUGE_A0 = 180, // start angle (deg) — left
+  GAUGE_A1 = 0; // end angle (deg) — right
 
+function _mbpsToFrac(mbps) {
+  if (mbps <= 0) return 0;
+  // log scale: 0 at 0.1 Mbps, 1 at 1000 Mbps
+  const f = (Math.log10(mbps) + 1) / 4;
+  return Math.max(0, Math.min(1, f));
+}
+function _polar(cx, cy, r, deg) {
+  const a = (deg * Math.PI) / 180;
+  return [cx + r * Math.cos(a), cy - r * Math.sin(a)];
+}
+function _arcPath(frac) {
+  const a = GAUGE_A0 + (GAUGE_A1 - GAUGE_A0) * frac;
+  const [x0, y0] = _polar(GAUGE_CX, GAUGE_CY, GAUGE_R, GAUGE_A0);
+  const [x1, y1] = _polar(GAUGE_CX, GAUGE_CY, GAUGE_R, a);
+  const large = 0;
+  const sweep = 1;
+  return `M${x0.toFixed(1)} ${y0.toFixed(1)} A${GAUGE_R} ${GAUGE_R} 0 ${large} ${sweep} ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+}
+function setGauge(mbps, phase) {
+  const frac = _mbpsToFrac(mbps);
+  const fill = document.getElementById("gauge-fill");
+  const needle = document.getElementById("gauge-needle");
+  const val = document.getElementById("gauge-value");
+  const ph = document.getElementById("gauge-phase");
+  if (fill) fill.setAttribute("d", _arcPath(frac));
+  if (needle) {
+    const a = GAUGE_A0 + (GAUGE_A1 - GAUGE_A0) * frac;
+    const [nx, ny] = _polar(GAUGE_CX, GAUGE_CY, GAUGE_R - 16, a);
+    needle.setAttribute("x2", nx.toFixed(1));
+    needle.setAttribute("y2", ny.toFixed(1));
+  }
+  if (val) val.textContent = (mbps || 0).toFixed(mbps >= 100 ? 0 : 1);
+  if (ph && phase) ph.textContent = phase;
+  const g = document.getElementById("speed-gauge");
+  if (g) g.setAttribute("data-phase", phase || "");
+}
+
+function _activeCard(id) {
+  ["speed-card-ping", "speed-card-dl", "speed-card-ul"].forEach((c) => {
+    const el = document.getElementById(c);
+    if (el) el.classList.toggle("active", c === id);
+  });
+}
+
+function handleSpeedProgress(d) {
   if (d.cancelled) {
-    if (status) status.textContent = t("speed_cancelled");
+    setGauge(0, t("speed_cancelled"));
+    _activeCard(null);
     _speedReset();
     return;
   }
-  if (d.phase === "upload" && !d.done) {
-    if (status) status.textContent = t("speed_uploading");
+
+  if (d.phase === "ping") {
+    setGauge(0, t("speed_ping"));
+    _activeCard("speed-card-ping");
+    if (d.latency_ms != null) {
+      const p = document.getElementById("speed-ping-result");
+      if (p) p.textContent = d.latency_ms;
+    }
     return;
   }
+
   if (d.done) {
-    if (dl) dl.textContent = (d.current_mbps || 0).toFixed(1);
+    const dl = document.getElementById("speed-dl-result");
     const ul = document.getElementById("speed-ul-result");
+    const p = document.getElementById("speed-ping-result");
+    if (dl && d.download_mbps != null) dl.textContent = d.download_mbps.toFixed(1);
+    if (p && d.latency_ms != null) p.textContent = d.latency_ms;
     if (ul && d.result && d.result.upload_mbps != null)
       ul.textContent = d.result.upload_mbps.toFixed(1);
-    if (status) status.textContent = t("speed_done");
-    if (fill) fill.style.width = "100%";
+    setGauge(d.download_mbps || 0, t("speed_done"));
+    _activeCard(null);
     _speedReset();
     loadSpeedHistory();
     return;
   }
-  if (wrap) wrap.style.display = "";
-  const total = d.total_seconds || 10;
-  if (fill)
-    fill.style.width = Math.min((d.elapsed_seconds / total) * 100, 99) + "%";
-  if (dl) dl.textContent = (d.current_mbps || 0).toFixed(1);
-  if (status)
-    status.textContent =
-      t("speed_running") + " " + (d.elapsed_seconds || 0).toFixed(1) + "s";
+
+  // Live download/upload tick.
+  const mbps = d.current_mbps || 0;
+  if (d.phase === "upload") {
+    _activeCard("speed-card-ul");
+    setGauge(mbps, t("speed_uploading"));
+    const ul = document.getElementById("speed-ul-result");
+    if (ul) ul.textContent = mbps.toFixed(1);
+  } else {
+    _activeCard("speed-card-dl");
+    setGauge(mbps, t("speed_downloading"));
+    const dl = document.getElementById("speed-dl-result");
+    if (dl) dl.textContent = mbps.toFixed(1);
+  }
 }
 
 function _speedReset() {
@@ -1535,20 +1602,20 @@ function _speedReset() {
 async function startSpeedTest() {
   const run = document.getElementById("speed-run-btn");
   const cancel = document.getElementById("speed-cancel-btn");
-  const status = document.getElementById("speed-status");
-  const fill = document.getElementById("speed-progress-fill");
-  const wrap = document.getElementById("speed-progress-wrap");
 
   if (run) run.disabled = true;
   if (cancel) cancel.style.display = "";
-  if (status) status.textContent = t("speed_running");
-  if (fill) fill.style.width = "0%";
-  if (wrap) wrap.style.display = "";
+  // Reset readouts + gauge for a fresh run.
+  ["speed-ping-result", "speed-dl-result", "speed-ul-result"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = "—";
+  });
+  setGauge(0, t("speed_starting"));
 
   try {
     const r = await api.post("/api/speed-test/start");
     if (r.status === 409) {
-      if (status) status.textContent = t("speed_running");
+      setGauge(0, t("speed_running"));
     }
   } catch (_) {
     _speedReset();

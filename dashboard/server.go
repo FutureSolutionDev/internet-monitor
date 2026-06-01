@@ -1150,42 +1150,44 @@ func (s *Server) startSpeedTest(triggeredBy string) bool {
 			s.stRunning.Store(false)
 		}()
 
+		emit := func(m map[string]interface{}) {
+			m["type"] = "speed_test_progress"
+			b, _ := json.Marshal(m)
+			s.broadcastRaw(string(b))
+		}
 		totalSecs := stCfg.Timeout.Seconds()
+
+		// ── Phase 1: ping (latency to the download endpoint) ──
+		emit(map[string]interface{}{"phase": "ping", "done": false})
+
+		// ── Phase 2: download (live Mbps) ──
 		result, err := speedtest.Run(ctx, stCfg, func(mbps float64, elapsed time.Duration) {
-			progress, _ := json.Marshal(map[string]interface{}{
-				"type":            "speed_test_progress",
-				"phase":           "download",
-				"current_mbps":    mbps,
-				"elapsed_seconds": elapsed.Seconds(),
-				"total_seconds":   totalSecs,
-				"done":            false,
+			emit(map[string]interface{}{
+				"phase": "download", "current_mbps": mbps,
+				"elapsed_seconds": elapsed.Seconds(), "total_seconds": totalSecs, "done": false,
 			})
-			s.broadcastRaw(string(progress))
 		})
 
 		if ctx.Err() != nil && (result == nil || result.DownloadMbps == 0) {
-			cancelled, _ := json.Marshal(map[string]interface{}{
-				"type":      "speed_test_progress",
-				"done":      true,
-				"cancelled": true,
-			})
-			s.broadcastRaw(string(cancelled))
+			emit(map[string]interface{}{"done": true, "cancelled": true})
 			return
 		}
-
 		if err != nil || result == nil {
 			return
 		}
+		// Report the measured ping now that we have it.
+		emit(map[string]interface{}{"phase": "ping", "latency_ms": result.LatencyMs, "done": false})
 
-		// Upload phase (optional). Reuses the run's cancel context so a cancel
-		// request stops it too.
+		// ── Phase 3: upload (optional, live Mbps) ── reuses the cancel ctx.
 		var uploadMbps *float64
 		if stCfg.UploadTarget != "" {
-			up, _ := json.Marshal(map[string]interface{}{
-				"type": "speed_test_progress", "phase": "upload", "done": false,
+			mbps, uerr := speedtest.MeasureUpload(ctx, stCfg, func(m float64, elapsed time.Duration) {
+				emit(map[string]interface{}{
+					"phase": "upload", "current_mbps": m,
+					"elapsed_seconds": elapsed.Seconds(), "total_seconds": totalSecs, "done": false,
+				})
 			})
-			s.broadcastRaw(string(up))
-			if mbps, uerr := speedtest.MeasureUpload(ctx, stCfg); uerr == nil {
+			if uerr == nil {
 				uploadMbps = &mbps
 			}
 		}
@@ -1216,15 +1218,13 @@ func (s *Server) startSpeedTest(triggeredBy string) bool {
 		s.stLast = &event
 		s.stateMu.Unlock()
 
-		done, _ := json.Marshal(map[string]interface{}{
-			"type":            "speed_test_progress",
-			"phase":           "download",
-			"current_mbps":    result.DownloadMbps,
-			"elapsed_seconds": result.DurationSeconds,
-			"done":            true,
-			"result":          event,
+		emit(map[string]interface{}{
+			"phase":         "done",
+			"download_mbps": result.DownloadMbps,
+			"latency_ms":    result.LatencyMs,
+			"done":          true,
+			"result":        event,
 		})
-		s.broadcastRaw(string(done))
 	}()
 
 	return true
