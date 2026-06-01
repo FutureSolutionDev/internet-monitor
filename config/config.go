@@ -29,8 +29,8 @@ type Config struct {
 	TelegramBotToken    string          `json:"telegram_bot_token"`
 	TelegramChatID      string          `json:"telegram_chat_id"`
 	DashboardPort       int             `json:"dashboard_port"`
-	UseICMP             bool            `json:"use_icmp"`  // use ICMP echo for ping (falls back to TCP)
-	Language            string          `json:"language"`  // "ar" or "en" — language for OS notifications
+	UseICMP             bool            `json:"use_icmp"` // use ICMP echo for ping (falls back to TCP)
+	Language            string          `json:"language"` // "ar" or "en" — language for OS notifications
 	SpeedTest           SpeedTestConfig `json:"speed_test,omitempty"`
 }
 
