@@ -114,6 +114,13 @@ func RingtoneMp3() []byte {
 	return data
 }
 
+// NotificationWav returns the embedded WAV notification chime. WAV is used for
+// the native player (winmm PlaySound) because PlaySound can't decode MP3.
+func NotificationWav() []byte {
+	data, _ := staticFiles.ReadFile("assets/notification.wav")
+	return data
+}
+
 const maxHistory = 60
 const maxEvents = 100
 const maxTicks = 20

@@ -3,11 +3,9 @@
 package tray
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 	"syscall"
 
 	"golang.org/x/sys/windows/registry"
@@ -67,62 +65,14 @@ func init() {
 
 // Notify shows a system notification with sound (tray binary).
 //
-// Routes straight to ShowBalloon: the balloon uses Shell_NotifyIcon on the
-// existing tray icon and falls back to a PowerShell WinForms balloon, which
-// reliably shows a box from an unpackaged exe. The previous WinRT-toast path
-// failed silently (no box) on unpackaged Go binaries, so it's no longer the
-// default. Sound is played inline (sound.Play stops any prior sound first).
+// Routes straight to ShowBalloon, which renders via a PowerShell WinForms
+// balloon — reliable from an unpackaged exe. (The old WinRT-toast path failed
+// silently with no box, so it was removed.) Sound plays inline; sound.Play
+// stops any prior sound first.
 func Notify(title, message string) {
 	playTraySound()
 	notifyLogf("[notify] Notify(tray): title=%q", title)
 	ShowBalloon(title, message)
-}
-
-// ShowWinRTToast is kept for compatibility but now routes to the balloon,
-// because the WinRT toast fails silently from an unpackaged exe.
-func ShowWinRTToast(title, body string) {
-	notifyLogf("[notify] ShowWinRTToast -> balloon (toast unreliable unpackaged): title=%q", title)
-	ShowBalloon(title, body)
-}
-
-// showWinRTToast fires a Windows 10/11 WinRT toast via PowerShell.
-// Uses GetTemplateContent to avoid having to load Windows.Data.Xml.Dom
-// separately. AppendChild+CreateTextNode is more reliable than InnerText.
-// DETACHED_PROCESS prevents the notification from stealing console focus.
-func showWinRTToast(title, body string) {
-	t := strings.ReplaceAll(title, "'", "''")
-	b := strings.ReplaceAll(body, "'", "''")
-
-	script := fmt.Sprintf(`
-[Windows.UI.Notifications.ToastNotificationManager,Windows.UI.Notifications,ContentType=WindowsRuntime]|Out-Null
-$notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('%s')
-Write-Host "notifier.Setting=$($notifier.Setting)"
-if ($notifier.Setting -ne 0) { Write-Host "BLOCKED setting=$($notifier.Setting)"; exit 0 }
-$tpl   = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
-$nodes = $tpl.GetElementsByTagName('text')
-$nodes.Item(0).AppendChild($tpl.CreateTextNode('%s')) | Out-Null
-$nodes.Item(1).AppendChild($tpl.CreateTextNode('%s')) | Out-Null
-$toast = [Windows.UI.Notifications.ToastNotification]::new($tpl)
-$notifier.Show($toast)
-Write-Host "SHOWN"
-`, notifyAUMID, t, b)
-
-	cmd := exec.Command("powershell",
-		"-WindowStyle", "Hidden",
-		"-NonInteractive",
-		"-Command", script)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		HideWindow:    true,
-		CreationFlags: 0x00000008, // DETACHED_PROCESS — no console focus steal
-	}
-	go func() {
-		out, err := cmd.CombinedOutput()
-		if err != nil || len(out) > 0 {
-			log.Printf("[notify] showWinRTToast: err=%v output=%s", err, out)
-		} else {
-			log.Println("[notify] showWinRTToast: OK")
-		}
-	}()
 }
 
 func OpenURL(url string) {

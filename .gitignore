@@ -9,3 +9,5 @@ tmp
 .playwright-mcp
 gitstat.txt
 act.txt
+
+COMMIT_MSG.txt
