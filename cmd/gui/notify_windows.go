@@ -8,7 +8,6 @@ import (
 	"internet-monitor/tray"
 	"log"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -77,20 +76,10 @@ var (
 const guiNotifyCooldown = 4 * time.Second
 
 func showSystemNotification(title, body string) {
-	// Prefer WinRT toast (banner popup) if Start Menu shortcut already exists.
-	// Fall back to Shell_NotifyIcon balloon otherwise.
-	lnk := startMenuLnkPath()
-	if _, err := os.Stat(lnk); err == nil {
-		tray.ShowWinRTToast(title, body)
-	} else {
-		tray.ShowBalloon(title, body)
-	}
-}
-
-func startMenuLnkPath() string {
-	return filepath.Join(os.Getenv("APPDATA"),
-		"Microsoft", "Windows", "Start Menu", "Programs",
-		"Internet Monitor.lnk")
+	// Always use the balloon: it shows via Shell_NotifyIcon on the tray icon and
+	// falls back to a PowerShell WinForms balloon, which reliably renders a box
+	// from an unpackaged exe. The WinRT toast path failed silently (no box).
+	tray.ShowBalloon(title, body)
 }
 
 func sendNotification(status monitor.Status, result monitor.CheckResult) {

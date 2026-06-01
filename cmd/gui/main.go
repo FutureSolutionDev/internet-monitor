@@ -9,6 +9,7 @@ import (
 	"internet-monitor/dashboard"
 	"internet-monitor/logger"
 	"internet-monitor/monitor"
+	"internet-monitor/sound"
 	"internet-monitor/tray"
 	"internet-monitor/updater"
 	"log"
@@ -43,6 +44,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to init logger: %v", err)
 	}
+	// Route notification/sound diagnostics to logs/app.log (invisible otherwise
+	// in a -H=windowsgui build).
+	tray.Logf = lgr.AppLog
+	sound.Logf = lgr.AppLog
 
 	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir, Version, lgr)
 	dash.OnTestNotification = TestNotification

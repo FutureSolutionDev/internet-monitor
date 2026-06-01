@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -15,6 +14,19 @@ import (
 )
 
 const notifyAUMID = "InternetMonitor"
+
+// Logf, if set, receives notification-path diagnostics (wired to logger.AppLog
+// by main so they land in logs/app.log; the standard log package is invisible
+// in a -H=windowsgui build).
+var Logf func(format string, args ...interface{})
+
+func notifyLogf(format string, args ...interface{}) {
+	if Logf != nil {
+		Logf(format, args...)
+	} else {
+		log.Printf(format, args...)
+	}
+}
 
 func init() {
 	// 1. Register AUMID display name + icon (used by WinRT toast notifications).
@@ -54,21 +66,23 @@ func init() {
 }
 
 // Notify shows a system notification with sound (tray binary).
+//
+// Routes straight to ShowBalloon: the balloon uses Shell_NotifyIcon on the
+// existing tray icon and falls back to a PowerShell WinForms balloon, which
+// reliably shows a box from an unpackaged exe. The previous WinRT-toast path
+// failed silently (no box) on unpackaged Go binaries, so it's no longer the
+// default. Sound is played inline (sound.Play stops any prior sound first).
 func Notify(title, message string) {
-	go playTraySound()
-	lnk := filepath.Join(os.Getenv("APPDATA"),
-		"Microsoft", "Windows", "Start Menu", "Programs",
-		"Internet Monitor.lnk")
-	if _, err := os.Stat(lnk); err == nil {
-		showWinRTToast(title, message)
-	} else {
-		ShowBalloon(title, message)
-	}
+	playTraySound()
+	notifyLogf("[notify] Notify(tray): title=%q", title)
+	ShowBalloon(title, message)
 }
 
-// ShowWinRTToast is exported so cmd/gui can call it directly.
+// ShowWinRTToast is kept for compatibility but now routes to the balloon,
+// because the WinRT toast fails silently from an unpackaged exe.
 func ShowWinRTToast(title, body string) {
-	showWinRTToast(title, body)
+	notifyLogf("[notify] ShowWinRTToast -> balloon (toast unreliable unpackaged): title=%q", title)
+	ShowBalloon(title, body)
 }
 
 // showWinRTToast fires a Windows 10/11 WinRT toast via PowerShell.

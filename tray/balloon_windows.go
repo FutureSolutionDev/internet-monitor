@@ -4,7 +4,6 @@ package tray
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -91,10 +90,10 @@ func findSystrayHWND() windows.Handle {
 func tryNativeBalloon(title, message string) bool {
 	hwnd := findSystrayHWND()
 	if hwnd == 0 {
-		log.Println("[notify] tryNativeBalloon: SystrayClass window not found — systray not yet ready?")
+		notifyLogf("[notify] tryNativeBalloon: SystrayClass window not found — systray not yet ready?")
 		return false
 	}
-	log.Printf("[notify] tryNativeBalloon: found SystrayClass HWND=0x%X", hwnd)
+	notifyLogf("[notify] tryNativeBalloon: found SystrayClass HWND=0x%X", hwnd)
 
 	nid := &balloonNID{
 		Wnd:       hwnd,
@@ -117,10 +116,10 @@ func tryNativeBalloon(title, message string) bool {
 
 	ret, _, lastErr := shellNotify.Call(nimModify, uintptr(unsafe.Pointer(nid)))
 	if ret == 0 {
-		log.Printf("[notify] tryNativeBalloon: Shell_NotifyIcon failed — err=%v", lastErr)
+		notifyLogf("[notify] tryNativeBalloon: Shell_NotifyIcon failed — err=%v", lastErr)
 		return false
 	}
-	log.Println("[notify] tryNativeBalloon: Shell_NotifyIcon succeeded")
+	notifyLogf("[notify] tryNativeBalloon: Shell_NotifyIcon succeeded")
 	return true
 }
 
@@ -155,9 +154,9 @@ $n.Dispose()`, t, m)
 // ShowBalloon shows a notification balloon.
 // Tries native Shell_NotifyIcon first; falls back to PowerShell WinForms.
 func ShowBalloon(title, message string) {
-	log.Printf("[notify] ShowBalloon: title=%q", title)
+	notifyLogf("[notify] ShowBalloon: title=%q", title)
 	if !tryNativeBalloon(title, message) {
-		log.Println("[notify] ShowBalloon: falling back to PowerShell WinForms")
+		notifyLogf("[notify] ShowBalloon: native failed, falling back to PowerShell WinForms")
 		showBalloonWinForms(title, message)
 	}
 }
