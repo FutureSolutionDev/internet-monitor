@@ -65,11 +65,11 @@ Most "my internet is down" complaints fail because you have **no proof** — no 
 | ------- | ------- |
 | 🔍 **Multi-layer checking** | TCP Ping + HTTP + DNS simultaneously — all targets configurable as arrays |
 | 📊 **Live dashboard** | Real-time latency chart + stats + event log + recent checks table |
-| ⚡ **Speed Test** | Adaptive download measurement (Cloudflare endpoint) with configurable parallel connections and timeout |
-| 🔔 **Instant notifications** | Windows Toast + Discord/Slack Webhook + custom alert sound |
+| ⚡ **Speed Test** | Download **and upload** measurement (Cloudflare endpoint) with a speedtest.net-style circular gauge, configurable parallel connections/timeout, and optional **scheduled automatic tests** |
+| 🔔 **Instant notifications** | Windows Toast + Discord / Slack / **Telegram** + custom alert sound, localized to your chosen language |
 | 📋 **Structured logs** | Daily JSONL files — connectivity events in `connectivity_DATE.jsonl`, speed tests in `speedtest_DATE.jsonl` |
 | 📤 **CSV export** | Export connectivity logs and speed test history directly from the dashboard |
-| 🔄 **Auto-update** | Checks GitHub Releases, one-click update with automatic restart |
+| 🔄 **Auto-update** | Checks GitHub Releases (background + a manual **"Check for updates"** button), one-click update with automatic restart |
 | 🌐 **Bilingual UI** | Arabic & English with full RTL support, toggle anytime |
 | 🖥️ **Two modes** | System Tray (background) + Standalone native window |
 | 🔒 **Single instance** | Prevents running more than one copy at the same time |
@@ -222,7 +222,9 @@ Edit it directly or use the **Settings tab** in the dashboard.
   "speed_test": {
     "download_targets": ["https://speed.cloudflare.com/__down"],
     "parallel_connections": 4,
-    "timeout_seconds": 10,
+    "timeout_seconds": 30,
+    "upload_target": "https://speed.cloudflare.com/__up",
+    "schedule_minutes": 0,
     "alert_threshold_mbps": 0
   }
 }
@@ -236,7 +238,9 @@ Edit it directly or use the **Settings tab** in the dashboard.
 | `fail_threshold` | Consecutive failures before declaring disconnected |
 | `webhook_url` | Discord or Slack webhook URL (leave empty to disable) |
 | `speed_test.parallel_connections` | Parallel HTTP connections for download test (1–8, default 4) |
-| `speed_test.timeout_seconds` | Download test duration in seconds (default 10) |
+| `speed_test.timeout_seconds` | Download test duration in seconds (default 30) |
+| `speed_test.upload_target` | POST endpoint for the upload test (default Cloudflare `__up`; empty disables upload) |
+| `speed_test.schedule_minutes` | Run an automatic speed test every N minutes (0 = disabled) |
 | `speed_test.alert_threshold_mbps` | Send webhook if speed drops below this value (0 = disabled) |
 
 ---
@@ -292,11 +296,13 @@ Internet Monitor sends webhook notifications for three event types:
 
 ## ⚡ Speed Test
 
-The built-in speed test uses an **adaptive HTTP download** approach:
+The built-in speed test uses an **adaptive HTTP download + upload** approach, shown live on a **speedtest.net-style circular gauge**:
 
+- Measures ping, then **download**, then **upload** — the gauge animates through each phase
 - Starts with small payloads and increases chunk size over the configured duration
 - Opens multiple parallel connections (default: 4) to saturate modern high-speed links
 - Uses **Cloudflare's speed endpoint** (`speed.cloudflare.com`) by default — no account required
+- Optional **scheduled automatic tests** (`speed_test.schedule_minutes`) build a throughput history unattended
 - Results are stored in `logs/speedtest_DATE.jsonl` (separate from connectivity logs)
 - History is viewable and exportable as CSV directly from the dashboard
 
@@ -370,7 +376,7 @@ logs/
   "timestamp": "2026-05-11T14:35:00Z",
   "event": "speed_test",
   "download_mbps": 94.3,
-  "upload_mbps": null,
+  "upload_mbps": 18.7,
   "latency_ms": 12,
   "duration_seconds": 9.8,
   "endpoints": ["https://speed.cloudflare.com/__down"],
@@ -419,7 +425,6 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) — commit t
 ### Areas looking for help
 
 - Windows ARM64 build support
-- Telegram webhook integration
 - Mobile-responsive dashboard improvements
 - macOS native menu bar integration
 - Per-target latency history charts
@@ -431,13 +436,14 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) — commit t
 
 | Feature | Status |
 | ------- | ------ |
-| ⬆️ Upload speed measurement | 🔜 v2 |
-| 📬 Telegram webhook support | 🔜 Planned |
-| ⏰ Scheduled speed tests | 🔜 Planned |
+| ⬆️ Upload speed measurement | ✅ Done |
+| 📬 Telegram webhook support | ✅ Done |
+| ⏰ Scheduled speed tests | ✅ Done |
+| 📄 PDF report export (for ISP complaints) | ✅ Done |
+| 🔄 Manual "Check for updates" button | ✅ Done |
 | 📱 Mobile-responsive dashboard | 🔜 Planned |
 | 🪟 Windows ARM64 build | 🔜 Planned |
 | 📈 Per-ISP analytics & weekly reports | 💡 Proposed |
-| 📄 PDF report export (for ISP complaints) | 💡 Proposed |
 | 🔌 Plugin API for custom check types | 💡 Proposed |
 
 ---
