@@ -49,7 +49,7 @@ var Default = Config{
 	SpeedTest: SpeedTestConfig{
 		DownloadTargets:     []string{"https://speed.cloudflare.com/__down"},
 		ParallelConnections: 4,
-		TimeoutSeconds:      10,
+		TimeoutSeconds:      30,
 		UploadTarget:        "https://speed.cloudflare.com/__up",
 	},
 }

@@ -944,7 +944,9 @@ async function loadSettings() {
     const schedEl = document.getElementById("cfg-speed-schedule");
     if (schedEl) schedEl.value = st.schedule_minutes || 0;
     const ulEl = document.getElementById("cfg-speed-upload");
-    if (ulEl) ulEl.value = st.upload_target ?? "https://speed.cloudflare.com/__up";
+    // Pre-fill the default when unset/empty so upload is enabled out of the box;
+    // the user can still clear it to disable upload.
+    if (ulEl) ulEl.value = st.upload_target || "https://speed.cloudflare.com/__up";
 
     pingTargets = Array.isArray(cfg.ping_targets)
       ? [...cfg.ping_targets]
@@ -1492,31 +1494,16 @@ setTimeout(checkNativeMode, 500);
 // ── Speed Test ─────────────────────────────────────────────────
 
 // ── Circular gauge (speedtest.net style) ───────────────────────
-// The arc spans 160° (from 200° to 20°, i.e. the bottom semicircle opening up).
-// Mbps is mapped on a log scale so 1→1000 Mbps all read nicely.
-const GAUGE_R = 80,
-  GAUGE_CX = 100,
-  GAUGE_CY = 120,
-  GAUGE_A0 = 180, // start angle (deg) — left
-  GAUGE_A1 = 0; // end angle (deg) — right
+// The fill is the same semicircular arc as the track; we reveal a fraction of
+// it with stroke-dasharray/offset (progress-ring technique — no arc-flag math).
+// The needle is a vertical line rotated from -90° (left) to +90° (right) about
+// the hub. Mbps maps on a log scale so 1→1000 Mbps all read nicely.
+const GAUGE_ARC_LEN = Math.PI * 80; // half-circumference, r=80 ≈ 251.3
 
 function _mbpsToFrac(mbps) {
   if (mbps <= 0) return 0;
-  // log scale: 0 at 0.1 Mbps, 1 at 1000 Mbps
-  const f = (Math.log10(mbps) + 1) / 4;
+  const f = (Math.log10(mbps) + 1) / 4; // 0 at 0.1 Mbps, 1 at 1000 Mbps
   return Math.max(0, Math.min(1, f));
-}
-function _polar(cx, cy, r, deg) {
-  const a = (deg * Math.PI) / 180;
-  return [cx + r * Math.cos(a), cy - r * Math.sin(a)];
-}
-function _arcPath(frac) {
-  const a = GAUGE_A0 + (GAUGE_A1 - GAUGE_A0) * frac;
-  const [x0, y0] = _polar(GAUGE_CX, GAUGE_CY, GAUGE_R, GAUGE_A0);
-  const [x1, y1] = _polar(GAUGE_CX, GAUGE_CY, GAUGE_R, a);
-  const large = 0;
-  const sweep = 1;
-  return `M${x0.toFixed(1)} ${y0.toFixed(1)} A${GAUGE_R} ${GAUGE_R} 0 ${large} ${sweep} ${x1.toFixed(1)} ${y1.toFixed(1)}`;
 }
 function setGauge(mbps, phase) {
   const frac = _mbpsToFrac(mbps);
@@ -1524,12 +1511,15 @@ function setGauge(mbps, phase) {
   const needle = document.getElementById("gauge-needle");
   const val = document.getElementById("gauge-value");
   const ph = document.getElementById("gauge-phase");
-  if (fill) fill.setAttribute("d", _arcPath(frac));
+  if (fill) {
+    fill.style.strokeDasharray = GAUGE_ARC_LEN;
+    fill.style.strokeDashoffset = GAUGE_ARC_LEN * (1 - frac);
+  }
   if (needle) {
-    const a = GAUGE_A0 + (GAUGE_A1 - GAUGE_A0) * frac;
-    const [nx, ny] = _polar(GAUGE_CX, GAUGE_CY, GAUGE_R - 16, a);
-    needle.setAttribute("x2", nx.toFixed(1));
-    needle.setAttribute("y2", ny.toFixed(1));
+    // 0 -> -90° (points left), 1 -> +90° (points right); rotate about the arc
+    // center (100,120) so the tip rides along the arc.
+    const deg = -90 + 180 * frac;
+    needle.setAttribute("transform", `rotate(${deg.toFixed(1)} 100 120)`);
   }
   if (val) val.textContent = (mbps || 0).toFixed(mbps >= 100 ? 0 : 1);
   if (ph && phase) ph.textContent = phase;

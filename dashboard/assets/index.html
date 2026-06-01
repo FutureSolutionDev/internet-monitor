@@ -230,9 +230,11 @@
               <path class="gauge-track" d="M20 120 A80 80 0 0 1 180 120" />
               <!-- live value arc -->
               <path class="gauge-fill" id="gauge-fill" d="M20 120 A80 80 0 0 1 180 120" />
-              <!-- needle -->
-              <line class="gauge-needle" id="gauge-needle" x1="100" y1="120" x2="100" y2="48" />
-              <circle class="gauge-hub" cx="100" cy="120" r="6" />
+              <!-- needle: pivots at the arc center (100,120); short tip riding
+                   just inside the arc (from r=64 up to r=40), so it never
+                   reaches the centered value text. -->
+              <line class="gauge-needle" id="gauge-needle" x1="100" y1="56" x2="100" y2="80" />
+              <circle class="gauge-hub" cx="100" cy="120" r="5" />
             </svg>
             <div class="gauge-center">
               <div class="gauge-value" id="gauge-value">0.0</div>
