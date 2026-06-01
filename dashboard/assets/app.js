@@ -1479,6 +1479,33 @@ async function applyUpdate() {
   }
 }
 
+// Manual "Check for updates" button — forces a fresh server-side check
+// instead of reading the cached snapshot from the background poller.
+async function checkForUpdates() {
+  const btn = document.getElementById("check-update-btn");
+  const status = document.getElementById("check-update-status");
+  if (btn) btn.disabled = true;
+  if (status) {
+    status.style.color = "";
+    status.textContent = t("update_checking");
+  }
+  try {
+    const r = await api.post("/api/update/check");
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "");
+    if (d.has_update) {
+      showUpdateBanner(d);
+      if (status) status.textContent = "";
+    } else if (status) {
+      status.textContent = t("update_uptodate") + " (" + (d.current_version || "") + ")";
+    }
+  } catch (e) {
+    if (status) status.textContent = t("update_check_err");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 // Check for available update on page load
 api
   .get("/api/update")

@@ -53,6 +53,19 @@ func main() {
 	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir, Version, lgr)
 	dash.OnApplyUpdate = updater.Apply
 	dash.OnRestartApp = updater.Restart
+	dash.OnCheckUpdate = func() (*dashboard.UpdateInfo, error) {
+		info, err := updater.Check(Version)
+		if err != nil {
+			return nil, err
+		}
+		return &dashboard.UpdateInfo{
+			HasUpdate:      info.HasUpdate,
+			LatestVersion:  info.LatestVersion,
+			CurrentVersion: info.CurrentVersion,
+			DownloadURL:    info.DownloadURL,
+			ReleaseNotes:   info.ReleaseNotes,
+		}, nil
+	}
 	dash.OnTestWebhook = lgr.SendTestWebhook
 	dash.OnPlaySound = sound.Play
 	dash.SetNativeNotifications(true) // tray build shows OS toasts

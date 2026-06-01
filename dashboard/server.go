@@ -109,6 +109,31 @@ func (s *Server) serveUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// serveUpdateCheck (POST) performs a fresh, on-demand version check — the
+// "Check for updates" button — instead of returning the cached snapshot the
+// background poller maintains. On success it caches and broadcasts the result
+// (so the banner appears) and returns it to the caller.
+func (s *Server) serveUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.OnCheckUpdate == nil {
+		http.Error(w, `{"error":"updater not configured"}`, http.StatusInternalServerError)
+		return
+	}
+	info, err := s.OnCheckUpdate()
+	if err != nil {
+		resp, _ := json.Marshal(map[string]string{"error": err.Error()})
+		w.WriteHeader(http.StatusBadGateway)
+		w.Write(resp)
+		return
+	}
+	s.SetUpdateInfo(info) // cache + broadcast so the banner appears everywhere
+	json.NewEncoder(w).Encode(info)
+}
+
 // RingtoneMp3 returns the raw bytes of the embedded Ringtone.mp3.
 func RingtoneMp3() []byte {
 	data, _ := staticFiles.ReadFile("assets/Ringtone.mp3")
@@ -221,6 +246,7 @@ type Server struct {
 	OnTestWebhook      func(url string) string
 	OnApplyUpdate      func(downloadURL string) error
 	OnRestartApp       func()
+	OnCheckUpdate      func() (*UpdateInfo, error) // performs a fresh, on-demand version check
 
 	updateMu   sync.RWMutex
 	updateInfo *updateSnapshot
@@ -290,6 +316,7 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/language", s.serveLanguage)
 	mux.HandleFunc("/api/test-webhook", s.serveTestWebhook)
 	mux.HandleFunc("/api/update", s.serveUpdate)
+	mux.HandleFunc("/api/update/check", s.serveUpdateCheck)
 	mux.HandleFunc("/api/startup", s.serveStartup)
 	mux.HandleFunc("/notification-sound", s.serveNotificationSound)
 	mux.HandleFunc("/api/speed-test/start", s.serveSpeedTestStart)
