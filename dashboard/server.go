@@ -217,6 +217,7 @@ type Server struct {
 
 	OnConfigChange     func(*config.Config)
 	OnTestNotification func(lang string)
+	OnPlaySound        func() // plays the notification chime only (no banner)
 	OnTestWebhook      func(url string) string
 	OnApplyUpdate      func(downloadURL string) error
 	OnRestartApp       func()
@@ -285,6 +286,7 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/log-dates", s.serveLogDates)
 	mux.HandleFunc("/api/test-targets", s.serveTestTargets)
 	mux.HandleFunc("/api/test-notification", s.serveTestNotification)
+	mux.HandleFunc("/api/play-sound", s.servePlaySound)
 	mux.HandleFunc("/api/test-webhook", s.serveTestWebhook)
 	mux.HandleFunc("/api/update", s.serveUpdate)
 	mux.HandleFunc("/api/startup", s.serveStartup)
@@ -757,6 +759,22 @@ func (s *Server) serveTestNotification(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.OnTestNotification != nil {
 		go s.OnTestNotification(lang)
+	}
+	w.Write([]byte(`{"ok":true}`))
+}
+
+// servePlaySound plays the notification chime only (no banner). All sound in
+// the UI — preview, test, and live alerts — routes here so there is exactly one
+// playback channel (the native player), which makes overlapping audio
+// impossible regardless of how fast the user clicks.
+func (s *Server) servePlaySound(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if s.OnPlaySound != nil {
+		go s.OnPlaySound()
 	}
 	w.Write([]byte(`{"ok":true}`))
 }

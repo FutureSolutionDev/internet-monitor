@@ -1105,20 +1105,14 @@ async function saveSettings() {
   }
 })();
 
-let _alertAudio = null;
+// playAlert is the SINGLE entry point for all sound in the UI (preview, test,
+// live alerts). It delegates to the backend's one native player (sound.Play),
+// which stops any in-progress sound and plays the latest — so there is exactly
+// one playback channel and overlapping audio is impossible no matter how fast
+// the user clicks. (We deliberately do NOT use an HTML <audio> element, which
+// would be a second, uncoordinated channel.)
 function playAlert() {
-  try {
-    // Reuse one Audio element and restart it, so rapid events don't overlap
-    // (mirrors the native sound.Play "stop previous, play latest" behavior).
-    if (!_alertAudio) {
-      _alertAudio = new Audio("/notification-sound");
-      _alertAudio.volume = 0.85;
-    } else {
-      _alertAudio.pause();
-      _alertAudio.currentTime = 0;
-    }
-    _alertAudio.play().catch(() => {});
-  } catch (_) {}
+  api.post("/api/play-sound").catch(() => {});
 }
 
 async function loadSoundState() {
@@ -1233,12 +1227,12 @@ async function testNotification() {
     res.textContent = "...";
   }
 
-  // Skip browser audio/notification when the Go backend handles it natively.
+  // Show a browser banner only (no sound here): the server call below plays the
+  // chime via the one native player, so calling playAlert() too would double it.
   if (!lastData?.system_notifs) {
     if ("Notification" in window && Notification.permission === "default") {
       await Notification.requestPermission();
     }
-    playAlert();
     showBrowserNotification(
       lang === "ar" ? "🔔 اختبار الإشعار" : "🔔 Test Notification",
       lang === "ar"
@@ -1247,7 +1241,7 @@ async function testNotification() {
     );
   }
 
-  // Always call server API (triggers OS toast + sound in native/tray mode)
+  // Always call server API: plays the chime (one native player) + OS banner.
   try {
     const r = await api.post("/api/test-notification?lang=" + lang);
     if (res) {

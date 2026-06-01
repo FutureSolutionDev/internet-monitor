@@ -54,6 +54,7 @@ func main() {
 	dash.OnTestWebhook = lgr.SendTestWebhook
 	dash.OnApplyUpdate = updater.Apply
 	dash.OnRestartApp = updater.Restart
+	dash.OnPlaySound = sound.Play
 	dash.SetNativeNotifications(true) // GUI build shows native notifications
 	dash.Start()
 

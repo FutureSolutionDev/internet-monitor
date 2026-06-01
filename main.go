@@ -53,6 +53,7 @@ func main() {
 	dash.OnApplyUpdate = updater.Apply
 	dash.OnRestartApp = updater.Restart
 	dash.OnTestWebhook = lgr.SendTestWebhook
+	dash.OnPlaySound = sound.Play
 	dash.SetNativeNotifications(true) // tray build shows OS toasts
 	dash.Start()
 

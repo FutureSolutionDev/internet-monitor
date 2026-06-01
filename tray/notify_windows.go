@@ -113,11 +113,15 @@ $toast=[Windows.UI.Notifications.ToastNotification]::new($tpl)
 [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('%s').Show($toast)
 Write-Host 'TOAST_SHOWN'`, t, b, notifyAUMID)
 
+	// NOTE: do NOT set DETACHED_PROCESS here — it detaches stdout so
+	// CombinedOutput() returns "" even though the toast was shown, making us
+	// wrongly think it failed and fall back to the (PowerShell-named) balloon.
+	// HideWindow alone keeps the console hidden.
 	cmd := exec.Command("powershell",
 		"-NoProfile", "-ExecutionPolicy", "Bypass",
 		"-WindowStyle", "Hidden", "-NonInteractive",
 		"-Command", script)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x00000008}
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	out, err := cmd.CombinedOutput()
 	if err != nil || !strings.Contains(string(out), "TOAST_SHOWN") {
 		notifyLogf("[notify] showWinRTToast: err=%v out=%q", err, strings.TrimSpace(string(out)))
