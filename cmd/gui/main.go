@@ -9,6 +9,7 @@ import (
 	"internet-monitor/dashboard"
 	"internet-monitor/logger"
 	"internet-monitor/monitor"
+	"internet-monitor/notifytext"
 	"internet-monitor/sound"
 	"internet-monitor/tray"
 	"internet-monitor/updater"
@@ -48,6 +49,7 @@ func main() {
 	// in a -H=windowsgui build).
 	tray.Logf = lgr.AppLog
 	sound.Logf = lgr.AppLog
+	notifytext.SetLang(cfg.Language) // OS notifications use the configured language
 
 	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir, Version, lgr)
 	dash.OnTestNotification = TestNotification

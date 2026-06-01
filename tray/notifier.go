@@ -37,7 +37,7 @@ func (n *TrayNotifier) OnEvent(event types.Event) {
 	}
 	n.t.applyStatus(s, r)
 
-	title, body := notifytext.Build(s, r)
+	title, body := notifytext.Build(notifytext.Lang(), s, r)
 
 	// Debounce: skip if a notification was sent within the cooldown window.
 	n.mu.Lock()

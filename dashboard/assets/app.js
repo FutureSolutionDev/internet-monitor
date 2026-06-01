@@ -19,6 +19,9 @@ function applyLang() {
 function toggleLang() {
   lang = lang === "ar" ? "en" : "ar";
   localStorage.setItem("lang", lang);
+  // Persist to config so OS notifications (sent by the backend) use this
+  // language too — keeps the toast/balloon language matching the UI.
+  api.post("/api/language?lang=" + lang).catch(() => {});
   applyLang();
   if (lastData) process(lastData);
   if (logsData.length) renderLogTable(logsData); // re-translate logs tab

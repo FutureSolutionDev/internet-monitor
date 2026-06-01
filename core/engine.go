@@ -4,6 +4,7 @@ import (
 	"internet-monitor/config"
 	"internet-monitor/logger"
 	"internet-monitor/monitor"
+	"internet-monitor/notifytext"
 	"internet-monitor/types"
 	"internet-monitor/updater"
 	"log"
@@ -161,6 +162,7 @@ func (e *Engine) Start() {
 				e.cfg = cfg
 				e.checker.SetConfig(cfg)
 				e.lgr.SetConfig(cfg)
+				notifytext.SetLang(cfg.Language) // live notifications follow language changes
 				ticker.Reset(cfg.CheckInterval())
 				e.lgr.AppLog("CONFIG reloaded: interval=%ds targets(ping=%d http=%d dns=%d)",
 					cfg.CheckIntervalSec, len(cfg.PingTargets), len(cfg.HTTPTargets), len(cfg.DNSTargets))

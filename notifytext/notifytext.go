@@ -7,7 +7,29 @@ import (
 	"fmt"
 	"internet-monitor/types"
 	"strings"
+	"sync/atomic"
 )
+
+// lang holds the current UI language ("ar"/"en") for OS notifications. It is
+// set from config at startup and on every config reload, and read by the live
+// notifiers (tray/GUI) which don't otherwise have access to the config.
+var lang atomic.Value // string
+
+// SetLang updates the language used by Lang()/BuildCurrent. Safe for concurrent use.
+func SetLang(l string) {
+	if l != "ar" {
+		l = "en"
+	}
+	lang.Store(l)
+}
+
+// Lang returns the current notification language ("ar"/"en"), defaulting to "en".
+func Lang() string {
+	if v, ok := lang.Load().(string); ok && v != "" {
+		return v
+	}
+	return "en"
+}
 
 // TestMessage returns the (title, body) for a manual test notification in the
 // given UI language ("ar" for Arabic, anything else = English).
@@ -30,18 +52,31 @@ func StatusFromEventType(eventType string) types.Status {
 	}
 }
 
-// Build returns the notification (title, body) for a status and check result.
-func Build(status types.Status, r types.CheckResult) (title, body string) {
+// Build returns the notification (title, body) for a status and check result,
+// in a single language ("ar" for Arabic, anything else = English) so OS
+// notifications never mix the two.
+func Build(lang string, status types.Status, r types.CheckResult) (title, body string) {
+	ar := lang == "ar"
 	switch status {
 	case types.StatusConnected:
-		if r.LatencyMs > 0 {
-			return "✅ الإنترنت عاد / Restored", fmt.Sprintf("زمن الاستجابة: %dms", r.LatencyMs)
+		if ar {
+			title = "✅ عاد الإنترنت"
+			if r.LatencyMs > 0 {
+				return title, fmt.Sprintf("زمن الاستجابة: %dms", r.LatencyMs)
+			}
+			return title, "جميع الفحوصات ناجحة"
 		}
-		return "✅ الإنترنت عاد / Restored", "جميع الفحوصات ناجحة"
+		title = "✅ Internet Restored"
+		if r.LatencyMs > 0 {
+			return title, fmt.Sprintf("Latency: %dms", r.LatencyMs)
+		}
+		return title, "All checks passing"
 
 	case types.StatusDegraded:
-		return "⚠️ الإنترنت ضعيف / Degraded",
-			fmt.Sprintf("فقدان: %.0f%% — زمن: %dms", r.PacketLoss, r.LatencyMs)
+		if ar {
+			return "⚠️ الإنترنت ضعيف", fmt.Sprintf("فقدان: %.0f%% — زمن: %dms", r.PacketLoss, r.LatencyMs)
+		}
+		return "⚠️ Internet Degraded", fmt.Sprintf("Loss: %.0f%% — latency: %dms", r.PacketLoss, r.LatencyMs)
 
 	default:
 		var parts []string
@@ -54,10 +89,18 @@ func Build(status types.Status, r types.CheckResult) (title, body string) {
 		if !r.DNSOK {
 			parts = append(parts, "DNS")
 		}
-		if len(parts) > 0 {
-			return "🔴 الإنترنت انقطع / Disconnected", strings.Join(parts, " + ") + " فشل"
+		if ar {
+			title = "🔴 انقطع الإنترنت"
+			if len(parts) > 0 {
+				return title, "فشل: " + strings.Join(parts, " + ")
+			}
+			return title, "فقدان الاتصال"
 		}
-		return "🔴 الإنترنت انقطع / Disconnected", "فقدان الاتصال"
+		title = "🔴 Internet Disconnected"
+		if len(parts) > 0 {
+			return title, "Failed: " + strings.Join(parts, " + ")
+		}
+		return title, "Connection lost"
 	}
 }
 

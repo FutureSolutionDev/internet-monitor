@@ -287,6 +287,7 @@ func (s *Server) Start() {
 	mux.HandleFunc("/api/test-targets", s.serveTestTargets)
 	mux.HandleFunc("/api/test-notification", s.serveTestNotification)
 	mux.HandleFunc("/api/play-sound", s.servePlaySound)
+	mux.HandleFunc("/api/language", s.serveLanguage)
 	mux.HandleFunc("/api/test-webhook", s.serveTestWebhook)
 	mux.HandleFunc("/api/update", s.serveUpdate)
 	mux.HandleFunc("/api/startup", s.serveStartup)
@@ -775,6 +776,37 @@ func (s *Server) servePlaySound(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.OnPlaySound != nil {
 		go s.OnPlaySound()
+	}
+	w.Write([]byte(`{"ok":true}`))
+}
+
+// serveLanguage persists the UI language into config (merging, so other fields
+// are untouched) so backend-sent OS notifications match the UI language. Fires
+// OnConfigChange so the running engine picks it up live.
+func (s *Server) serveLanguage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	lang := r.URL.Query().Get("lang")
+	if lang != "ar" {
+		lang = "en"
+	}
+
+	cfg := config.Default
+	if existing, err := os.ReadFile(s.configPath); err == nil {
+		json.Unmarshal(existing, &cfg)
+	}
+	cfg.Language = lang
+	cfg.Sanitize()
+	pretty, _ := json.MarshalIndent(cfg, "", "  ")
+	if err := os.WriteFile(s.configPath, pretty, 0644); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if s.OnConfigChange != nil {
+		s.OnConfigChange(&cfg)
 	}
 	w.Write([]byte(`{"ok":true}`))
 }
