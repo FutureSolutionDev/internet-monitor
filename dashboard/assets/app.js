@@ -539,10 +539,15 @@ function buildCSV(entries) {
 }
 
 function downloadCSV(csv, name) {
+  // Blob + object URL (not a data: URI) so large multi-day exports aren't
+  // truncated by browser data-URI length limits. ﻿ = UTF-8 BOM for Excel.
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = "data:text/csv;charset=utf-8,﻿" + encodeURIComponent(csv);
+  a.href = url;
   a.download = name;
   a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function exportCSV() {
@@ -556,16 +561,28 @@ function exportCSV() {
 }
 
 // Exports the last N days of connectivity logs as a single combined CSV.
+// Day files are fetched concurrently (not one-at-a-time) and merged in date
+// order; a failed day surfaces a warning instead of silently shrinking the CSV.
 async function exportRangeCSV(days) {
   try {
     const dates = await (await api.get("/api/log-dates")).json();
     const pick = (dates || []).slice(0, days); // log-dates is newest-first
     if (!pick.length) return;
-    let all = [];
-    for (const d of pick) {
-      const rows = await (await api.get("/api/logs?date=" + d)).json();
-      if (Array.isArray(rows)) all = all.concat(rows);
+    const results = await Promise.all(
+      pick.map((d) =>
+        api
+          .get("/api/logs?date=" + d)
+          .then((r) => r.json())
+          .catch(() => null),
+      ),
+    );
+    if (results.some((r) => r === null)) {
+      alert(t("export_partial") || "Some days failed to load; export may be incomplete.");
     }
+    let all = [];
+    results.forEach((rows) => {
+      if (Array.isArray(rows)) all = all.concat(rows);
+    });
     if (!all.length) return;
     downloadCSV(buildCSV(all), "internet-monitor-last-" + days + "d.csv");
   } catch (_) {}
@@ -1088,11 +1105,19 @@ async function saveSettings() {
   }
 })();
 
+let _alertAudio = null;
 function playAlert() {
   try {
-    const audio = new Audio("/notification-sound");
-    audio.volume = 0.85;
-    audio.play().catch(() => {});
+    // Reuse one Audio element and restart it, so rapid events don't overlap
+    // (mirrors the native sound.Play "stop previous, play latest" behavior).
+    if (!_alertAudio) {
+      _alertAudio = new Audio("/notification-sound");
+      _alertAudio.volume = 0.85;
+    } else {
+      _alertAudio.pause();
+      _alertAudio.currentTime = 0;
+    }
+    _alertAudio.play().catch(() => {});
   } catch (_) {}
 }
 

@@ -1255,7 +1255,9 @@ func adjacentMonths(month string) (prev, next string) {
 	if _, err := fmt.Sscanf(month, "%d-%d", &y, &mo); err != nil || mo < 1 || mo > 12 {
 		return "", ""
 	}
-	t := time.Date(y, time.Month(mo), 1, 0, 0, 0, 0, time.UTC)
+	// Local time to match report.Summarize's month window; only month
+	// arithmetic on day 1 is used, so the result is the calendar-adjacent month.
+	t := time.Date(y, time.Month(mo), 1, 0, 0, 0, 0, time.Local)
 	return t.AddDate(0, -1, 0).Format("2006-01"), t.AddDate(0, 1, 0).Format("2006-01")
 }
 
@@ -1310,48 +1312,52 @@ func (s *Server) serveReport(w http.ResponseWriter, r *http.Request) {
 
 // serveMetrics exposes the live monitoring state in Prometheus text exposition
 // format. Hand-written to avoid pulling in the prometheus client dependency.
-// availabilityPct computes uptime % over the last `days` days from the
-// per-minute metric samples. Returns (pct, true) or (0, false) if no data.
-func (s *Server) availabilityPct(days int) (float64, bool) {
-	var total, up int
-	now := time.Now()
-	for i := 0; i < days; i++ {
-		date := now.AddDate(0, 0, -i).Format("2006-01-02")
-		filename := filepath.Join(s.getLogDir(), "metrics_"+date+".jsonl")
-		data, err := s.readDataFile(filename)
-		if err != nil {
-			continue
-		}
-		for _, line := range bytes.Split(bytes.TrimSpace(data), []byte{'\n'}) {
-			line = bytes.TrimSpace(line)
-			if len(line) == 0 || !json.Valid(line) {
-				continue
-			}
-			var m types.MetricSample
-			if json.Unmarshal(line, &m) == nil {
-				total += m.Samples
-				up += m.UpSamples
-			}
-		}
-	}
-	if total == 0 {
-		return 0, false
-	}
-	return float64(up) / float64(total) * 100, true
-}
-
 // serveAvailability returns uptime % for today / last 7 days / last 30 days.
+// It walks the per-minute metric files once (descending from today), reading
+// each day's file a single time and capturing the 1/7/30-day cumulative
+// subtotals in the same pass — instead of re-reading overlapping files per
+// window. Keys are "today", "week" (rolling 7d) and "month" (rolling 30d).
 func (s *Server) serveAvailability(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	out := map[string]interface{}{}
-	for key, days := range map[string]int{"today": 1, "week": 7, "month": 30} {
-		if pct, ok := s.availabilityPct(days); ok {
-			out[key] = pct
-		} else {
-			out[key] = nil
+
+	var total, up int
+	var tToday, uToday, tWeek, uWeek int
+	now := time.Now()
+	for i := 0; i < 30; i++ {
+		date := now.AddDate(0, 0, -i).Format("2006-01-02")
+		data, err := s.readDataFile(filepath.Join(s.getLogDir(), "metrics_"+date+".jsonl"))
+		if err == nil {
+			for _, line := range bytes.Split(bytes.TrimSpace(data), []byte{'\n'}) {
+				line = bytes.TrimSpace(line)
+				if len(line) == 0 || !json.Valid(line) {
+					continue
+				}
+				var m types.MetricSample
+				if json.Unmarshal(line, &m) == nil {
+					total += m.Samples
+					up += m.UpSamples
+				}
+			}
+		}
+		switch i {
+		case 0:
+			tToday, uToday = total, up
+		case 6:
+			tWeek, uWeek = total, up
 		}
 	}
-	json.NewEncoder(w).Encode(out)
+
+	pct := func(t, u int) interface{} {
+		if t == 0 {
+			return nil
+		}
+		return float64(u) / float64(t) * 100
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"today": pct(tToday, uToday),
+		"week":  pct(tWeek, uWeek),
+		"month": pct(total, up),
+	})
 }
 
 func (s *Server) serveMetrics(w http.ResponseWriter, r *http.Request) {

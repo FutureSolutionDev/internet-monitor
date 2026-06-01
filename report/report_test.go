@@ -135,6 +135,16 @@ func TestSummarizeClipsCrossMonthOutage(t *testing.T) {
 	if may.TotalDowntimeSecs != 3600 { // only 23:00–24:00 falls in May
 		t.Errorf("May downtime = %v, want 3600", may.TotalDowntimeSecs)
 	}
+	// Longest must be the in-month portion, never exceeding total downtime.
+	if may.LongestOutageSecs != 3600 {
+		t.Errorf("May longest = %v, want 3600 (clipped, not full 7200)", may.LongestOutageSecs)
+	}
+	if may.CarriedOverSecs != 0 {
+		t.Errorf("May carried-over = %v, want 0", may.CarriedOverSecs)
+	}
+	if may.MTTRSecs != 3600 { // 3600 in-window downtime / 1 disconnection
+		t.Errorf("May MTTR = %v, want 3600", may.MTTRSecs)
+	}
 
 	jun := Summarize(events, nil, "2026-06", now)
 	if jun.Disconnections != 0 { // started in May, must not be counted again
@@ -142,6 +152,17 @@ func TestSummarizeClipsCrossMonthOutage(t *testing.T) {
 	}
 	if jun.TotalDowntimeSecs != 3600 { // 00:00–01:00 falls in June
 		t.Errorf("June downtime = %v, want 3600", jun.TotalDowntimeSecs)
+	}
+	// The June spillover is surfaced as carried-over (not a silent downtime
+	// with zero incidents), and MTTR stays 0 (no in-month disconnections).
+	if jun.CarriedOverSecs != 3600 {
+		t.Errorf("June carried-over = %v, want 3600", jun.CarriedOverSecs)
+	}
+	if jun.MTTRSecs != 0 {
+		t.Errorf("June MTTR = %v, want 0", jun.MTTRSecs)
+	}
+	if len(jun.Events) != 1 || jun.Events[0].Cause != "carried over from previous month" {
+		t.Errorf("June events = %+v, want one carried-over row", jun.Events)
 	}
 }
 

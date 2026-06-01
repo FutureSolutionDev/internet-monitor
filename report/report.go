@@ -61,6 +61,7 @@ type MonthlySummary struct {
 	DegradedEpisodes  int                  `json:"degraded_episodes"`
 	LongestOutageSecs float64              `json:"longest_outage_seconds"`
 	LongestOutageAt   string               `json:"longest_outage_at"`
+	CarriedOverSecs   float64              `json:"carried_over_seconds"` // downtime from an outage that started in a previous month
 	MTTRSecs          float64              `json:"mttr_seconds"`
 	AvgJitterMs       int64                `json:"avg_jitter_ms"`
 	Causes            map[string]CauseStat `json:"causes"`
@@ -159,6 +160,11 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 		sum.Causes[layer] = c
 	}
 
+	// Downtime from outages that STARTED this month — the MTTR numerator, kept
+	// consistent with the Disconnections denominator (carried-over downtime is
+	// excluded from both).
+	var inWindowDowntime float64
+
 	// Outages / degraded episodes from transition events.
 	for k, ev := range events {
 		switch ev.EventType {
@@ -173,11 +179,14 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 			sum.TotalDowntimeSecs += clipped
 
 			// Split the clipped interval across day boundaries so per-day
-			// downtime reflects what actually happened on each day.
+			// downtime reflects what actually happened on each day. Advance by
+			// calendar day (AddDate) rather than +24h so DST-transition days
+			// (23h/25h) bucket correctly.
 			remaining := clipped
 			cursor := cStart
 			for remaining > 1e-6 {
-				dayEnd := time.Date(cursor.Year(), cursor.Month(), cursor.Day(), 0, 0, 0, 0, cursor.Location()).Add(24 * time.Hour)
+				dayStart := time.Date(cursor.Year(), cursor.Month(), cursor.Day(), 0, 0, 0, 0, cursor.Location())
+				dayEnd := dayStart.AddDate(0, 0, 1)
 				slice := dayEnd.Sub(cursor).Seconds()
 				if slice > remaining {
 					slice = remaining
@@ -187,14 +196,17 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 				cursor = dayEnd
 			}
 
-			// Count / attribute / log only for outages that STARTED this month,
-			// so a cross-month outage isn't double-counted across two reports.
-			if inWindow(start) {
+			startedThisMonth := inWindow(start)
+			if startedThisMonth {
+				// Outage started this month: count/attribute/log it here.
 				sum.Disconnections++
-				if dur > sum.LongestOutageSecs {
-					sum.LongestOutageSecs = dur
+				// "Longest" is the in-month portion so it can never exceed the
+				// month's total downtime.
+				if clipped > sum.LongestOutageSecs {
+					sum.LongestOutageSecs = clipped
 					sum.LongestOutageAt = start.Format(time.RFC3339)
 				}
+				inWindowDowntime += clipped
 				if ev.Reason.TCPPingFailed {
 					addCause("tcp", clipped)
 				}
@@ -217,9 +229,20 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 				})
 				a := getDay(start)
 				a.outages++
-				if dur > a.worst {
-					a.worst = dur
+				if clipped > a.worst {
+					a.worst = clipped
 				}
+			} else {
+				// Outage started in a previous month and spilled into this one:
+				// surface its in-month downtime as carried-over, and add a
+				// synthetic event row so the log isn't empty-but-with-downtime.
+				sum.CarriedOverSecs += clipped
+				sum.Events = append(sum.Events, EventRow{
+					Time:         cStart.Format(time.RFC3339),
+					Type:         "disconnected",
+					DurationSecs: clipped,
+					Cause:        "carried over from previous month",
+				})
 			}
 		case "degraded":
 			ddur := segmentDuration(events, k, now)
@@ -245,7 +268,7 @@ func Summarize(events []types.Event, samples []types.MetricSample, month string,
 		}
 	}
 	if sum.Disconnections > 0 {
-		sum.MTTRSecs = sum.TotalDowntimeSecs / float64(sum.Disconnections)
+		sum.MTTRSecs = inWindowDowntime / float64(sum.Disconnections)
 		for layer, c := range sum.Causes {
 			c.Pct = float64(c.Outages) / float64(sum.Disconnections) * 100
 			sum.Causes[layer] = c
