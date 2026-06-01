@@ -16,11 +16,6 @@ import (
 
 const notifyAUMID = "InternetMonitor"
 
-// Logf, if set, receives notification-path diagnostics (wired to logger.AppLog
-// by main so they land in logs/app.log; the standard log package is invisible
-// in a -H=windowsgui build).
-var Logf func(format string, args ...interface{})
-
 func notifyLogf(format string, args ...interface{}) {
 	if Logf != nil {
 		Logf(format, args...)

@@ -19,6 +19,12 @@ var (
 	once        sync.Once
 )
 
+// Logf, if set, receives diagnostic lines (wired to logger.AppLog by main so
+// they land in logs/app.log — GUI/tray builds are -H=windowsgui, so the
+// standard log package is invisible). Declared here (not in play_windows.go)
+// so main can wire it on every platform.
+var Logf func(format string, args ...interface{})
+
 // RingtonePath returns the sound file to play: a user-supplied
 // "notification.wav" in the working directory if present, otherwise the
 // embedded default WAV extracted once to a temp file. Returns "" if unavailable.

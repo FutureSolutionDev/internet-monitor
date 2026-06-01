@@ -22,11 +22,6 @@ const (
 	sndFilename = 0x00020000 // lpName is a filename
 )
 
-// Logf, if set, receives diagnostic lines (wired to logger.AppLog by main so
-// they land in logs/app.log — GUI/tray builds are -H=windowsgui, so the
-// standard log package is invisible).
-var Logf func(format string, args ...interface{})
-
 func logf(format string, args ...interface{}) {
 	if Logf != nil {
 		Logf(format, args...)
