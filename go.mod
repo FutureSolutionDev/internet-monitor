@@ -1,14 +1,14 @@
 module internet-monitor
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/getlantern/systray v1.2.2
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/minio/selfupdate v0.6.0
 	github.com/webview/webview_go v0.0.0-20240831120633-6173450d4dd6
-	golang.org/x/net v0.47.0
-	golang.org/x/sys v0.38.0
+	golang.org/x/net v0.55.0
+	golang.org/x/sys v0.45.0
 )
 
 require (
@@ -21,5 +21,5 @@ require (
 	github.com/getlantern/ops v0.0.0-20190325191751-d70cb0d6f85f // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c // indirect
-	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/crypto v0.51.0 // indirect
 )
