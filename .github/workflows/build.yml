@@ -13,13 +13,57 @@ env:
 jobs:
 
   # ══════════════════════════════════════════════════════════════
+  # WEB — React dashboard: typecheck / lint / test / build. The
+  # built web/dist is embedded into every Go binary via go:embed.
+  # ══════════════════════════════════════════════════════════════
+  web:
+    name: "🧩 Web UI (typecheck / lint / test / build)"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Test
+        run: bun run test
+
+      - name: Build
+        run: bun run build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: web-dist
+          path: web/dist
+          if-no-files-found: error
+
+  # ══════════════════════════════════════════════════════════════
   # QUALITY — gofmt / vet / tests (must pass before build/release)
   # ══════════════════════════════════════════════════════════════
   quality:
     name: "✅ Quality (fmt / vet / test)"
     runs-on: ubuntu-22.04
+    needs: [web]
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-dist
+          path: web/dist
 
       - uses: actions/setup-go@v7
         with:
@@ -92,10 +136,15 @@ jobs:
   windows-tray:
     name: "🪟 Windows Tray (cross-compile)"
     runs-on: ubuntu-latest
-    needs: [version, quality]
-    if: ${{ always() && needs.quality.result == 'success' }}
+    needs: [version, quality, web]
+    if: ${{ always() && needs.quality.result == 'success' && needs.web.result == 'success' }}
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-dist
+          path: web/dist
 
       - uses: actions/setup-go@v7
         with:
@@ -119,10 +168,15 @@ jobs:
   windows-gui:
     name: "🪟 Windows GUI (native)"
     runs-on: windows-latest
-    needs: [version, quality]
-    if: ${{ always() && needs.quality.result == 'success' }}
+    needs: [version, quality, web]
+    if: ${{ always() && needs.quality.result == 'success' && needs.web.result == 'success' }}
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-dist
+          path: web/dist
 
       - uses: actions/setup-go@v7
         with:
@@ -133,7 +187,7 @@ jobs:
         run: |
           go install github.com/tc-hib/go-winres@v0.3.3
           cd cmd/gui
-          go-winres simply --arch amd64 --icon ../../internal/dashboard/assets/favicon.png
+          go-winres simply --arch amd64 --icon ../../internal/assets/favicon.png
 
       - name: Build
         env:
@@ -150,10 +204,15 @@ jobs:
   macos:
     name: "🍎 macOS (arm64 + intel)"
     runs-on: macos-latest
-    needs: [version, quality]
-    if: ${{ always() && needs.quality.result == 'success' }}
+    needs: [version, quality, web]
+    if: ${{ always() && needs.quality.result == 'success' && needs.web.result == 'success' }}
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-dist
+          path: web/dist
 
       - uses: actions/setup-go@v7
         with:
@@ -193,10 +252,15 @@ jobs:
   linux:
     name: "🐧 Linux (ubuntu-22.04)"
     runs-on: ubuntu-22.04
-    needs: [version, quality]
-    if: ${{ always() && needs.quality.result == 'success' }}
+    needs: [version, quality, web]
+    if: ${{ always() && needs.quality.result == 'success' && needs.web.result == 'success' }}
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: web-dist
+          path: web/dist
 
       - uses: actions/setup-go@v7
         with:
@@ -284,7 +348,6 @@ jobs:
             dist/internet-monitor-linux
             dist/internet-monitor-gui-linux
             dist/SHA256SUMS
-            config.json
           body: |
             ## Internet Monitor ${{ needs.version.outputs.new_tag }}
 

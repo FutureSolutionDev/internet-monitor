@@ -9,3 +9,4 @@ tmp
 .playwright-mcp
 *.txt
 Plan
+.session
