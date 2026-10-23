@@ -1,6 +1,9 @@
 package updater
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseChecksums(t *testing.T) {
 	data := []byte(
@@ -56,5 +59,29 @@ func TestTrustedURL(t *testing.T) {
 		if trustedURL(u) == nil {
 			t.Errorf("%s accepted", u)
 		}
+	}
+}
+
+func TestPickAssetSkipsGUIForTray(t *testing.T) {
+	names := []string{
+		"internet-monitor-gui-windows.exe",
+		"internet-monitor-gui-macos-arm64",
+		"internet-monitor-gui-macos-intel",
+		"internet-monitor-gui-linux",
+		"internet-monitor-windows.exe",
+		"internet-monitor-macos-arm64",
+		"internet-monitor-macos-intel",
+		"internet-monitor-linux",
+	}
+	assets := make([]ghAsset, 0, len(names))
+	for _, n := range names {
+		assets = append(assets, ghAsset{Name: n, BrowserDownloadURL: "https://github.com/x/y/releases/download/v1/" + n})
+	}
+	got := pickAsset(assets)
+	if got == "" {
+		t.Fatal("no asset picked")
+	}
+	if strings.Contains(got, "gui") {
+		t.Errorf("tray build picked GUI asset %q", got)
 	}
 }

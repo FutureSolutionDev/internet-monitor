@@ -47,6 +47,7 @@ export function createLiveStore(deps: LiveDeps) {
   let attempts = 0;
   let firstBoot: { id: string; version: string } | null = null;
   let stopped = true;
+  let speedPendingSince = 0;
 
   const set = (patch: Partial<LiveState>) => {
     state = { ...state, ...patch };
@@ -64,7 +65,9 @@ export function createLiveStore(deps: LiveDeps) {
     }
     const patch: Partial<LiveState> = { snapshot: snap, receivedAt: deps.now() };
     if (snap.type === "sound") patch.soundRevision = state.soundRevision + 1;
-    if (!snap.speed_test_running && state.speed && !state.speed.done) {
+    if (snap.type === "speed_state" || snap.speed_test_running) speedPendingSince = 0;
+    const pending = speedPendingSince > 0 && deps.now() - speedPendingSince < 10_000;
+    if (!snap.speed_test_running && !pending && state.speed && !state.speed.done) {
       patch.speed = { ...state.speed, done: true, phase: "cancelled", cancelled: true };
     }
     set(patch);
@@ -83,7 +86,11 @@ export function createLiveStore(deps: LiveDeps) {
       const progress = msg as SpeedProgress;
       const prev = state.speed;
       const running = prev && !prev.done;
+      speedPendingSince = 0;
       const merged: SpeedProgress = running ? { ...prev, ...progress } : progress;
+      if (running && progress.phase && progress.phase !== prev.phase) {
+        merged.current_mbps = progress.current_mbps ?? 0;
+      }
       if (running && prev.phase === "download" && progress.phase !== "download" && !progress.download_mbps) {
         merged.download_mbps = prev.current_mbps;
       }
@@ -99,7 +106,7 @@ export function createLiveStore(deps: LiveDeps) {
     attempts++;
     retryTimer = deps.setTimer(() => {
       retryTimer = null;
-      connect();
+      if (!stopped) connect();
     }, delay);
   };
 
@@ -164,13 +171,20 @@ export function createLiveStore(deps: LiveDeps) {
     },
     markUnauthorized() {
       if (state.connection === "unauthorized") return;
+      stopped = true;
+      if (retryTimer !== null) deps.clearTimer(retryTimer);
+      retryTimer = null;
       source?.close();
       source = null;
-      stopped = true;
       set({ connection: "unauthorized" });
     },
     beginSpeedTest() {
+      speedPendingSince = deps.now();
       set({ speed: { type: "speed_test_progress", phase: "ping", done: false } });
+    },
+    abortSpeedTest() {
+      speedPendingSince = 0;
+      if (state.speed && !state.speed.done) set({ speed: null });
     },
   };
 }

@@ -9,11 +9,12 @@ export function useNow(ms = 1000) {
   return now;
 }
 
-export function useAsync<T>(load: (signal: AbortSignal) => Promise<T>, deps: unknown[]) {
-  const [state, setState] = useState<{ data: T | null; error: unknown; loading: boolean }>({
+export function useAsync<T>(load: (signal: AbortSignal) => Promise<T>, deps: unknown[], scope = "") {
+  const [state, setState] = useState<{ data: T | null; error: unknown; loading: boolean; scope: string }>({
     data: null,
     error: null,
     loading: true,
+    scope,
   });
   const [nonce, setNonce] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: callers pass explicit deps
@@ -22,13 +23,19 @@ export function useAsync<T>(load: (signal: AbortSignal) => Promise<T>, deps: unk
     setState((s) => ({ ...s, loading: true, error: null }));
     load(ctrl.signal).then(
       (data) => {
-        if (!ctrl.signal.aborted) setState({ data, error: null, loading: false });
+        if (!ctrl.signal.aborted) setState({ data, error: null, loading: false, scope });
       },
       (error: unknown) => {
-        if (!ctrl.signal.aborted) setState((s) => ({ data: s.data, error, loading: false }));
+        if (!ctrl.signal.aborted) setState((s) => ({ ...s, error, loading: false }));
       },
     );
     return () => ctrl.abort();
-  }, [...deps, nonce]);
-  return { ...state, reload: () => setNonce((n) => n + 1) };
+  }, [...deps, scope, nonce]);
+  const current = state.scope === scope;
+  return {
+    data: current ? state.data : null,
+    error: state.error,
+    loading: state.loading || !current,
+    reload: () => setNonce((n) => n + 1),
+  };
 }

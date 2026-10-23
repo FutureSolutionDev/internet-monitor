@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -106,6 +107,11 @@ func (s *Store) Update(expectRev uint64, fn func(*Config) error) (Config, uint64
 	if err := next.ValidateChanges(prev, false); err != nil {
 		s.mu.Unlock()
 		return Config{}, 0, err
+	}
+	if reflect.DeepEqual(prev, next) && s.loadErr == nil {
+		rev := s.rev
+		s.mu.Unlock()
+		return next, rev, nil
 	}
 	if err := s.write(next); err != nil {
 		s.mu.Unlock()

@@ -5,6 +5,7 @@ import {
   isHostPort,
   isSafeLogDir,
   isSupportedWebhook,
+  rebaseDraft,
   validateDraft,
 } from "./settingsForm";
 import type { ConfigView } from "./types";
@@ -134,5 +135,38 @@ describe("validators", () => {
     expect(isSafeLogDir("/var/log")).toBe(false);
     expect(isSafeLogDir("../logs")).toBe(false);
     expect(isSafeLogDir("a\\..\\..\\b")).toBe(false);
+  });
+});
+
+describe("rebaseDraft", () => {
+  test("a language change elsewhere keeps my edits without conflict", () => {
+    const mine = { ...draftFrom(base), check_interval_sec: "9" };
+    const remote = { ...base, language: "ar" as const };
+    const r = rebaseDraft(mine, base, remote);
+    expect(r.conflicts).toEqual([]);
+    expect(r.draft.check_interval_sec).toBe("9");
+    expect(buildChanges(r.draft, remote)).toEqual({ check_interval_sec: 9 });
+  });
+
+  test("untouched fields follow the remote value", () => {
+    const remote = { ...base, fail_threshold: 7 };
+    const r = rebaseDraft({ ...draftFrom(base), check_interval_sec: "9" }, base, remote);
+    expect(r.draft.fail_threshold).toBe("7");
+  });
+
+  test("the same field changed on both sides is a conflict", () => {
+    const remote = { ...base, check_interval_sec: 30 };
+    const r = rebaseDraft({ ...draftFrom(base), check_interval_sec: "9" }, base, remote);
+    expect(r.conflicts).toEqual(["check_interval_sec"]);
+    expect(r.draft.check_interval_sec).toBe("9");
+  });
+
+  test("a secret replaced here and removed elsewhere is a conflict", () => {
+    const remote = { ...base, secret_set: { webhook_url: false, telegram_bot_token: true } };
+    const mine = {
+      ...draftFrom(base),
+      webhook: { mode: "set" as const, value: "https://discord.com/api/webhooks/1/a" },
+    };
+    expect(rebaseDraft(mine, base, remote).conflicts).toEqual(["webhook"]);
   });
 });

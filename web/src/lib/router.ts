@@ -21,8 +21,22 @@ function emit() {
   for (const fn of listeners) fn();
 }
 
+function onPopState() {
+  const target = window.location.pathname + window.location.search;
+  if (!blocker || target === current) {
+    emit();
+    return;
+  }
+  const proceed = () => {
+    window.history.replaceState(null, "", target);
+    emit();
+  };
+  window.history.pushState(null, "", current);
+  if (!blocker(proceed)) proceed();
+}
+
 if (typeof window !== "undefined") {
-  window.addEventListener("popstate", emit);
+  window.addEventListener("popstate", onPopState);
 }
 
 export function routeOf(pathname: string): Route {

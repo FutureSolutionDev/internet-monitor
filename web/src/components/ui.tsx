@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { LoaderCircle } from "lucide-react";
-import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from "react";
+import type { ButtonHTMLAttributes, CSSProperties, ReactNode, Ref } from "react";
 
 type Variant = "default" | "edge" | "aurora" | "solid" | "ghost" | "danger";
 
@@ -10,6 +10,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: LucideIcon;
   busy?: boolean;
   iconOnly?: boolean;
+  ref?: Ref<HTMLButtonElement>;
 }
 
 export function Button({

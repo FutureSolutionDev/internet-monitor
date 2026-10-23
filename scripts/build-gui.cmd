@@ -122,6 +122,7 @@ echo.
 echo [Building] internet-monitor-gui.exe ...
 echo.
 
+call scripts\build-web.cmd || (pause & exit /b 1)
 set CGO_ENABLED=1
 powershell -NoProfile -Command ^
   "$env:CGO_ENABLED='1'; $env:CC='%CC%'; $env:CXX='%CXX%'; go build -ldflags='-H=windowsgui -s -w' -o internet-monitor-gui.exe ./cmd/gui/ 2>&1" ^

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 const maxSoundUpload = 10 << 20
@@ -21,8 +22,9 @@ func (s *Server) legacyMp3Path() string {
 }
 
 func (s *Server) serveSoundGet(w http.ResponseWriter, r *http.Request) {
-	if _, err := os.Stat(s.customWavPath()); err == nil {
+	if data, err := os.ReadFile(s.customWavPath()); err == nil {
 		w.Header().Set("X-Custom-Sound", "1")
+		w.Header().Set("X-Sound-Duration", strconv.FormatFloat(audio.WAVDuration(data), 'f', 2, 64))
 		w.Header().Set("Content-Type", "audio/wav")
 		http.ServeFile(w, r, s.customWavPath())
 		return

@@ -251,3 +251,20 @@ func TestValidateAllowsDotsInsideNames(t *testing.T) {
 		t.Errorf("my..logs rejected: %v", err)
 	}
 }
+
+func TestStoreNoopUpdateKeepsRevision(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	s.Subscribe(func(Config) { calls++ })
+	lang := s.Get().Language
+	_, rev, err := s.Update(0, func(c *Config) error { c.Language = lang; return nil })
+	if err != nil || rev != 1 {
+		t.Fatalf("no-op update: rev=%d err=%v, want rev 1", rev, err)
+	}
+	if calls != 0 {
+		t.Errorf("subscribers notified %d times for a no-op update", calls)
+	}
+}

@@ -24,6 +24,7 @@ import {
   draftFrom,
   type FieldKey,
   type Issues,
+  rebaseDraft,
   sectionOfField,
   serverFieldToDraft,
   validateDraft,
@@ -63,27 +64,67 @@ export function Settings() {
   const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null);
   const [active, setActive] = useState("monitoring");
   const loading = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
-  const load = useCallback(async () => {
+  const adopt = useCallback((config: ConfigView, revision: number): boolean => {
+    const s = stateRef.current;
+    if (!s) {
+      setState({ base: config, revision, draft: draftFrom(config) });
+      return true;
+    }
+    if (revision <= s.revision) return true;
+    const r = rebaseDraft(s.draft, s.base, config);
+    if (r.conflicts.length) {
+      setRemote({ config, revision });
+      return false;
+    }
+    setState({ base: config, revision, draft: r.draft });
+    setRemote(null);
+    return true;
+  }, []);
+
+  const sync = useCallback(async () => {
     if (loading.current) return;
     loading.current = true;
     try {
       const { config, revision } = await api.config();
-      setState({ base: config, revision, draft: draftFrom(config) });
-      setRemote(null);
+      adopt(config, revision);
       setLoadError(false);
-      setServerIssue({});
-      setSubmitted(false);
     } catch {
       setLoadError(true);
     } finally {
       loading.current = false;
     }
+  }, [adopt]);
+
+  const reset = useCallback(async () => {
+    try {
+      const { config, revision } = await api.config();
+      setState({ base: config, revision, draft: draftFrom(config) });
+      setRemote(null);
+      setServerIssue({});
+      setSubmitted(false);
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
+    }
   }, []);
 
+  const keepMine = () => {
+    const s = stateRef.current;
+    if (!s || !remote) return;
+    setState({
+      base: remote.config,
+      revision: remote.revision,
+      draft: rebaseDraft(s.draft, s.base, remote.config).draft,
+    });
+    setRemote(null);
+  };
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    void sync();
+  }, [sync]);
 
   const changes = useMemo(() => (state ? buildChanges(state.draft, state.base) : {}), [state]);
   const dirty = Object.keys(changes).length > 0;
@@ -93,10 +134,9 @@ export function Settings() {
   );
 
   useEffect(() => {
-    if (!state || serverRevision <= state.revision || saving) return;
-    if (!dirty) void load();
-    else if (!remote) setRemote({ config: state.base, revision: serverRevision });
-  }, [serverRevision, state, dirty, saving, remote, load]);
+    if (!state || serverRevision <= state.revision || saving || remote) return;
+    void sync();
+  }, [serverRevision, state, saving, remote, sync]);
 
   useEffect(() => {
     if (!dirty) {
@@ -177,7 +217,22 @@ export function Settings() {
     }
     setSaving(true);
     try {
-      const r = await api.saveConfig(changes, state.revision);
+      let r: Awaited<ReturnType<typeof api.saveConfig>>;
+      try {
+        r = await api.saveConfig(changes, state.revision);
+      } catch (e) {
+        const cfg =
+          e instanceof ApiError && e.code === "conflict"
+            ? (e.body.config as ConfigView | undefined)
+            : undefined;
+        if (!cfg) throw e;
+        const rebased = rebaseDraft(state.draft, state.base, cfg);
+        if (rebased.conflicts.length) throw e;
+        r = await api.saveConfig(
+          buildChanges(rebased.draft, cfg),
+          Number(e instanceof ApiError ? e.body.revision : 0),
+        );
+      }
       setState({ base: r.config, revision: r.revision, draft: draftFrom(r.config) });
       setSubmitted(false);
       setServerIssue({});
@@ -221,7 +276,7 @@ export function Settings() {
         tone="danger"
         icon={CircleAlert}
         actions={
-          <Button size="sm" icon={RefreshCw} onClick={load}>
+          <Button size="sm" icon={RefreshCw} onClick={reset}>
             {t("retry")}
           </Button>
         }
@@ -265,9 +320,14 @@ export function Settings() {
           tone="warn"
           icon={CircleAlert}
           actions={
-            <Button size="sm" variant="solid" icon={RefreshCw} onClick={load}>
-              {t("load_latest")}
-            </Button>
+            <>
+              <Button size="sm" variant="ghost" onClick={keepMine}>
+                {t("keep_mine")}
+              </Button>
+              <Button size="sm" variant="solid" icon={RefreshCw} onClick={reset}>
+                {t("load_latest")}
+              </Button>
+            </>
           }
         >
           {t("changed_elsewhere")}

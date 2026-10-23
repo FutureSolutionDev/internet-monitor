@@ -10,6 +10,7 @@ import (
 	"internet-monitor/internal/types"
 	"internet-monitor/internal/updater"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -395,5 +396,26 @@ func TestConfigGetMasksSecrets(t *testing.T) {
 	}
 	if r := e.do(t, "POST", "/api/config", `{"check_interval_sec":"x"}`, nil); r.StatusCode != http.StatusBadRequest {
 		t.Errorf("bad type: %d, want 400", r.StatusCode)
+	}
+}
+
+func TestEmbeddedUIServed(t *testing.T) {
+	if _, err := fs.Stat(uiFS, "index.html"); err != nil {
+		if os.Getenv("CI") != "" {
+			t.Fatal("web/dist/index.html missing from the embedded UI; build web/ before go test")
+		}
+		t.Skip("web/dist not built")
+	}
+	e := newTestEnv(t)
+	for _, p := range []string{"/", "/settings", "/report"} {
+		resp := e.do(t, http.MethodGet, p, "", nil)
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `id="root"`) || !strings.Contains(string(body), "/app/") {
+			t.Errorf("GET %s: status %d, SPA shell not served", p, resp.StatusCode)
+		}
+	}
+	if resp := e.do(t, http.MethodGet, "/missing.js", "", nil); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("missing asset: status %d, want 404", resp.StatusCode)
 	}
 }

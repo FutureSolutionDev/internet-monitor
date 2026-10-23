@@ -1483,6 +1483,11 @@ select.input {
     display: inline-flex;
   }
 
+  .topbar .btn {
+    min-width: 44px;
+    height: 44px;
+  }
+
   .topbar {
     padding: 10px 16px;
   }

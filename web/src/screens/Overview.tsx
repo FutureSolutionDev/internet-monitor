@@ -1,20 +1,22 @@
 import {
   Activity,
+  CircleAlert,
   CircleCheck,
   CircleX,
   Clock,
   Globe,
   type LucideIcon,
   Radar,
+  RefreshCw,
   ShieldAlert,
   TriangleAlert,
   Waves,
   Wifi,
   WifiOff,
 } from "lucide-react";
-import type { CSSProperties } from "react";
+import { type CSSProperties, useState } from "react";
 import { LatencyChart } from "../components/LatencyChart";
-import { Card, CardHead, Empty, Ltr, Meter, Skeleton } from "../components/ui";
+import { Banner, Button, Card, CardHead, Empty, Ltr, Meter, Skeleton } from "../components/ui";
 import {
   causeOfEntry,
   describeCause,
@@ -289,6 +291,24 @@ function Events({ snap }: { snap: Snapshot }) {
 }
 
 function LoadingOverview() {
+  const { t } = useI18n();
+  const [started] = useState(() => Date.now());
+  const now = useNow();
+  if (now - started > 8000) {
+    return (
+      <Banner
+        tone="warn"
+        icon={CircleAlert}
+        actions={
+          <Button size="sm" icon={RefreshCw} onClick={() => window.location.reload()}>
+            {t("retry")}
+          </Button>
+        }
+      >
+        {t("gate_offline_body")}
+      </Banner>
+    );
+  }
   return (
     <div className="stack" aria-busy="true">
       <Skeleton height={124} />

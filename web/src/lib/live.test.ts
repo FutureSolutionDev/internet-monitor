@@ -115,7 +115,29 @@ describe("live store", () => {
     const { store, sources } = setup();
     store.beginSpeedTest();
     sources[0]?.send(snap({ type: "tick", speed_test_running: false }));
+    expect(store.getState().speed?.done).toBe(false);
+    sources[0]?.send(snap({ type: "speed_state", speed_test_running: false }));
     expect(store.getState().speed?.done).toBe(true);
+  });
+
+  test("a new phase does not inherit the previous phase's speed", () => {
+    const { store, sources } = setup();
+    store.beginSpeedTest();
+    sources[0]?.send({ type: "speed_test_progress", phase: "download", done: false, current_mbps: 90 });
+    sources[0]?.send({ type: "speed_test_progress", phase: "upload", done: false });
+    expect(store.getState().speed?.current_mbps).toBe(0);
+    expect(store.getState().speed?.download_mbps).toBe(90);
+  });
+
+  test("unauthorized cancels a pending reconnect", async () => {
+    const { store, sources, timers } = setup(503);
+    sources[0]?.open();
+    sources[0]?.fail(true);
+    await vi.waitFor(() => expect(timers).toHaveLength(1));
+    store.markUnauthorized();
+    timers[0]?.();
+    expect(sources).toHaveLength(1);
+    expect(store.getState().connection).toBe("unauthorized");
   });
 
   test("sound frames bump the sound revision", () => {

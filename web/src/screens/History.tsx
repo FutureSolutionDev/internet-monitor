@@ -23,7 +23,7 @@ import {
   monthKey,
 } from "../lib/format";
 import { buildRows, summarize } from "../lib/history";
-import { useAsync } from "../lib/hooks";
+import { useAsync, useNow } from "../lib/hooks";
 import { useI18n } from "../lib/i18n";
 import { useLive } from "../lib/live";
 import { hrefOf, navigate } from "../lib/router";
@@ -34,16 +34,19 @@ type Filter = "all" | "disconnected" | "degraded" | "connected";
 
 export function History() {
   const { t, lang } = useI18n();
-  const today = localDateKey(new Date());
-  const eventCount = useLive((s) => s.snapshot?.events?.length ?? 0);
-  const dates = useAsync(() => api.logDates(), []);
+  const now = useNow(60_000);
+  const today = localDateKey(new Date(now));
+  const latestEvent = useLive((s) => s.snapshot?.events?.[0]?.ts ?? 0);
+  const dates = useAsync(() => api.logDates(), [latestEvent, today]);
   const [picked, setPicked] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [exporting, setExporting] = useState<number | null>(null);
 
-  const available = dates.data ?? [];
-  const date = picked ?? available[0] ?? today;
-  const logs = useAsync((signal) => api.logs(date, 5000, signal), [date, date === today ? eventCount : 0]);
+  const stored = dates.data ?? [];
+  const hasLogs = stored.length > 0;
+  const available = stored.includes(today) ? stored : [today, ...stored];
+  const date = picked ?? today;
+  const logs = useAsync((signal) => api.logs(date, 5000, signal), [date === today ? latestEvent : 0], date);
 
   const rows = useMemo(
     () => buildRows(logs.data ?? [], Date.now(), date === today),
@@ -55,8 +58,10 @@ export function History() {
   const exportDays = async (days: number) => {
     setExporting(days);
     try {
-      const cutoff = localDateKey(new Date(Date.now() - (days - 1) * 86400000));
-      const wanted = days === 1 ? [date] : available.filter((d) => d >= cutoff);
+      const from = new Date();
+      from.setDate(from.getDate() - (days - 1));
+      const cutoff = localDateKey(from);
+      const wanted = days === 1 ? [date] : stored.filter((d) => d >= cutoff);
       let partial = false;
       const all: LogEvent[] = [];
       for (const d of wanted) {
@@ -127,13 +132,7 @@ export function History() {
         <div className="row" style={{ gap: 12 }}>
           <label className="field" style={{ minWidth: 220 }}>
             <span className="field-label">{t("history_date")}</span>
-            <select
-              className="input"
-              value={date}
-              onChange={(e) => setPicked(e.target.value)}
-              disabled={!available.length}
-            >
-              {available.length === 0 ? <option value={today}>{t("history_no_dates")}</option> : null}
+            <select className="input" value={date} onChange={(e) => setPicked(e.target.value)}>
               {available.map((d) => (
                 <option key={d} value={d}>
                   {formatDate(lang, d, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
@@ -171,7 +170,7 @@ export function History() {
               size="sm"
               busy={exporting === 7}
               onClick={() => exportDays(7)}
-              disabled={!available.length}
+              disabled={!hasLogs}
             >
               {t("export_7")}
             </Button>
@@ -180,7 +179,7 @@ export function History() {
               size="sm"
               busy={exporting === 30}
               onClick={() => exportDays(30)}
-              disabled={!available.length}
+              disabled={!hasLogs}
             >
               {t("export_30")}
             </Button>
@@ -241,7 +240,7 @@ export function History() {
             <Skeleton height={44} />
           </div>
         ) : rows.length === 0 ? (
-          <Empty icon={available.length ? CalendarDays : HistoryIcon}>{t("history_empty")}</Empty>
+          <Empty icon={hasLogs ? CalendarDays : HistoryIcon}>{t("history_empty")}</Empty>
         ) : visible.length === 0 ? (
           <Empty icon={HistoryIcon}>{t("history_empty_filter")}</Empty>
         ) : (
@@ -257,7 +256,7 @@ export function History() {
               </thead>
               <tbody>
                 {visible.map((r) => (
-                  <tr key={`${r.ts}-${r.event.event}`}>
+                  <tr key={`${r.ts}-${r.event.event}-${r.event.duration_seconds ?? 0}`}>
                     <td className="num">{formatTime(lang, r.ts)}</td>
                     <td>
                       <span className="row" style={{ gap: 8, flexWrap: "nowrap" }}>

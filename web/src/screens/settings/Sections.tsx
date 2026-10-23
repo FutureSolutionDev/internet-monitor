@@ -155,7 +155,7 @@ export function TargetsSection({ draft, set, err }: SectionProps) {
           error={err("ping_targets")}
           items={draft.ping_targets}
           onChange={(v) => set("ping_targets", v)}
-          placeholder="1.1.1.1:53"
+          placeholder="example.com:443"
         />
         <ListEditor
           {...common}

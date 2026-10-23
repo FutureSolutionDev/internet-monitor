@@ -127,10 +127,15 @@ export const api = {
   testNotification: (lang: "ar" | "en") => post<{ ok: boolean }>(`/api/test-notification?lang=${lang}`),
   testWebhook: (url?: string) => post<{ ok: boolean }>("/api/test-webhook", url ? { url } : {}),
   playSound: () => post<{ ok: boolean }>("/api/play-sound"),
-  async soundIsCustom(): Promise<boolean> {
+  async soundInfo(): Promise<{ custom: boolean; duration: number }> {
     const res = await fetch("/notification-sound", { method: "HEAD", cache: "no-store" });
     if (res.status === 401) for (const fn of unauthorizedListeners) fn();
-    return res.headers.get("X-Custom-Sound") === "1";
+    if (!res.ok) throw new ApiError(res.status, {});
+    const duration = Number(res.headers.get("X-Sound-Duration"));
+    return {
+      custom: res.headers.get("X-Custom-Sound") === "1",
+      duration: Number.isFinite(duration) ? duration : 0,
+    };
   },
   async uploadSound(file: File): Promise<void> {
     const form = new FormData();

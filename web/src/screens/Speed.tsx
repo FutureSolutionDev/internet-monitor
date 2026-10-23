@@ -5,6 +5,7 @@ import {
   Gauge as GaugeIcon,
   type LucideIcon,
   Play,
+  RefreshCw,
   Square,
   Timer,
 } from "lucide-react";
@@ -87,7 +88,10 @@ export function Speed() {
       await api.startSpeedTest();
     } catch (e) {
       if (e instanceof ApiError && e.code === "test_already_running") toast(t("speed_running_elsewhere"));
-      else toast(t("phase_error"), "error");
+      else {
+        live.abortSpeedTest();
+        toast(t("phase_error"), "error");
+      }
     } finally {
       setStarting(false);
     }
@@ -200,7 +204,19 @@ export function Speed() {
 
       <Card labelledBy="speed-history">
         <CardHead id="speed-history" title={t("speed_history")} />
-        {history.loading && !history.data ? (
+        {history.error && !history.data ? (
+          <Banner
+            tone="danger"
+            icon={CircleAlert}
+            actions={
+              <Button size="sm" icon={RefreshCw} onClick={history.reload}>
+                {t("retry")}
+              </Button>
+            }
+          >
+            {t("load_failed")}
+          </Banner>
+        ) : history.loading && !history.data ? (
           <div className="stack">
             <Skeleton height={44} />
             <Skeleton height={44} />

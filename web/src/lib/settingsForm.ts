@@ -254,3 +254,27 @@ export function serverFieldToDraft(field: string | undefined): FieldKey | undefi
       return undefined;
   }
 }
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+export function rebaseDraft(
+  draft: Draft,
+  oldBase: ConfigView,
+  newBase: ConfigView,
+): { draft: Draft; conflicts: (keyof Draft)[] } {
+  const before = draftFrom(oldBase);
+  const after = draftFrom(newBase);
+  const out: Draft = { ...after };
+  const conflicts: (keyof Draft)[] = [];
+  for (const key of Object.keys(draft) as (keyof Draft)[]) {
+    if (same(draft[key], before[key])) continue;
+    let theirs = !same(after[key], before[key]);
+    if (key === "webhook") theirs = oldBase.secret_set.webhook_url !== newBase.secret_set.webhook_url;
+    if (key === "telegram_token") {
+      theirs = oldBase.secret_set.telegram_bot_token !== newBase.secret_set.telegram_bot_token;
+    }
+    if (theirs && !same(draft[key], after[key])) conflicts.push(key);
+    Object.assign(out, { [key]: draft[key] });
+  }
+  return { draft: out, conflicts };
+}

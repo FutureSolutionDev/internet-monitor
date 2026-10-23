@@ -262,6 +262,9 @@ func pickAsset(assets []ghAsset) string {
 
 	for _, asset := range assets {
 		name := strings.ToLower(asset.Name)
+		if !isGUI && strings.Contains(name, "gui") {
+			continue
+		}
 		for _, pat := range patterns {
 			if strings.Contains(name, pat) {
 				return asset.BrowserDownloadURL

@@ -2,7 +2,8 @@
 cd /d "%~dp0.."
 
 echo [Internet Monitor] Building...
-go build -ldflags="-H=windowsgui -s -w" -o internet-monitor.exe .
+call scripts\build-web.cmd || (pause & exit /b 1)
+go build -ldflags="-H=windowsgui -s -w" -o internet-monitor.exe ./cmd/tray
 if %errorlevel% neq 0 (
     echo [ERROR] Build failed!
     pause

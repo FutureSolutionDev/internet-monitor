@@ -15,16 +15,48 @@ const emit = () => {
   for (const fn of listeners) fn();
 };
 
+const timers = new Map<number, ReturnType<typeof setTimeout>>();
+let paused = false;
+const AUTO_MS = 5000;
+
+function arm(item: ToastItem) {
+  if (item.tone === "error" || paused || timers.has(item.id)) return;
+  timers.set(
+    item.id,
+    setTimeout(() => dismissToast(item.id), AUTO_MS),
+  );
+}
+
 export function dismissToast(id: number) {
+  const timer = timers.get(id);
+  if (timer) clearTimeout(timer);
+  timers.delete(id);
   items = items.filter((t) => t.id !== id);
   emit();
 }
 
-export function toast(text: string, tone: ToastTone = "info", ms = tone === "error" ? 7000 : 4000) {
+function setPaused(next: boolean) {
+  paused = next;
+  if (next) {
+    for (const timer of timers.values()) clearTimeout(timer);
+    timers.clear();
+  } else {
+    for (const item of items) arm(item);
+  }
+}
+
+export function toast(text: string, tone: ToastTone = "info") {
   const id = nextId++;
+  const dropped = items.slice(0, -3);
   items = [...items.slice(-3), { id, tone, text }];
+  for (const d of dropped) {
+    const timer = timers.get(d.id);
+    if (timer) clearTimeout(timer);
+    timers.delete(d.id);
+  }
   emit();
-  setTimeout(() => dismissToast(id), ms);
+  const item = items[items.length - 1];
+  if (item) arm(item);
 }
 
 function subscribe(fn: () => void) {
@@ -37,7 +69,16 @@ function subscribe(fn: () => void) {
 export function Toaster({ closeLabel }: { closeLabel: string }) {
   const list = useSyncExternalStore(subscribe, () => items);
   return (
-    <div className="toasts" aria-live="polite" aria-relevant="additions">
+    // biome-ignore lint/a11y/noStaticElementInteractions: hover and focus only pause auto-dismiss; no action is triggered
+    <div
+      className="toasts"
+      aria-live="polite"
+      aria-relevant="additions"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+    >
       {list.map((t) => {
         const Icon = t.tone === "ok" ? CircleCheck : t.tone === "error" ? CircleAlert : Info;
         return (
