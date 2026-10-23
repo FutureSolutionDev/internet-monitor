@@ -1,20 +1,15 @@
 package main
 
 import (
-	"context"
+	"fmt"
+	"internet-monitor/internal/app"
+	"internet-monitor/internal/assets"
 	"internet-monitor/internal/config"
-	"internet-monitor/internal/core"
-	"internet-monitor/internal/dashboard"
-	"internet-monitor/internal/logger"
-	"internet-monitor/internal/monitor"
 	"internet-monitor/internal/notifytext"
-	"internet-monitor/internal/sound"
 	"internet-monitor/internal/tray"
-	"internet-monitor/internal/updater"
 	"log"
 	"os"
 	"path/filepath"
-	"time"
 
 	"fyne.io/systray"
 )
@@ -22,93 +17,36 @@ import (
 var Version = "dev"
 
 func main() {
-	ensureSingleInstance()
-
-	if exePath, err := os.Executable(); err == nil {
-		if resolved, err2 := filepath.EvalSymlinks(exePath); err2 == nil {
-			exePath = resolved
-		}
-		if err := os.Chdir(filepath.Dir(exePath)); err != nil {
-			log.Printf("warning: could not chdir to exe dir: %v — config/logs will use the current working directory", err)
-		}
+	if !app.AcquireSingleInstance() {
+		openRunningDashboard()
+		return
 	}
 
-	cfg, err := config.Load("config.json")
+	a, err := app.New(app.Options{
+		Version: Version,
+		TestNotification: func(lang string) {
+			title, body := notifytext.TestMessage(lang)
+			tray.Notify(title, body)
+		},
+	})
 	if err != nil {
-		log.Printf("config error: %v — using defaults", err)
-		cfg = &config.Default
+		log.Fatalf("startup failed: %v", err)
 	}
 
-	lgr, err := logger.New(cfg)
-	if err != nil {
-		log.Fatalf("failed to init logger: %v", err)
-	}
-
-	tray.Logf = lgr.AppLog
-	sound.Logf = lgr.AppLog
-	notifytext.SetLang(cfg.Language)
-
-	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir, Version, lgr)
-	dash.OnApplyUpdate = updater.Apply
-	dash.OnRestartApp = updater.Restart
-	dash.OnCheckUpdate = func() (*dashboard.UpdateInfo, error) {
-		info, err := updater.Check(Version)
-		if err != nil {
-			return nil, err
-		}
-		return &dashboard.UpdateInfo{
-			HasUpdate:      info.HasUpdate,
-			LatestVersion:  info.LatestVersion,
-			CurrentVersion: info.CurrentVersion,
-			DownloadURL:    info.DownloadURL,
-			ReleaseNotes:   info.ReleaseNotes,
-		}, nil
-	}
-	dash.OnTestWebhook = lgr.SendTestWebhook
-	dash.OnPlaySound = sound.Play
-	dash.SetNativeNotifications(true)
-	dash.Start()
-
-	checker := monitor.NewChecker(cfg)
-	t := tray.New(cfg.LogDir, dash.URL())
-
-	engine := core.New(cfg, checker, lgr, Version)
-	dash.OnConfigChange = engine.ApplyConfig
-	engine.Notifier = core.MultiNotifier{
-		tray.NewNotifier(t),
-		dashboard.NewNotifier(dash),
-	}
-	engine.OnUpdateAvailable = func(info *updater.Info) {
-		dash.SetUpdateInfo(&dashboard.UpdateInfo{
-			HasUpdate:      info.HasUpdate,
-			LatestVersion:  info.LatestVersion,
-			CurrentVersion: info.CurrentVersion,
-			DownloadURL:    info.DownloadURL,
-			ReleaseNotes:   info.ReleaseNotes,
-		})
-	}
-
-	if png := dashboard.FaviconPNG(); len(png) > 0 {
-		tray.SetCustomIcon(png)
-	}
-	dash.OnTestNotification = func(lang string) {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("[notify] tray test notification panic recovered: %v", r)
-			}
-		}()
-		title, body := notifytext.TestMessage(lang)
-		tray.Notify(title, body)
-	}
-
-	engine.Start()
+	tray.SetCustomIcon(assets.FaviconPNG())
+	t := tray.New(filepath.Join(a.Dir, a.Store.Get().LogDir), a.Server.URL())
+	a.Run(tray.NewNotifier(t))
 	systray.Run(t.OnReady, t.OnExit)
-	engine.Stop()
-
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	if err := dash.Shutdown(shutdownCtx); err != nil {
-		log.Printf("dashboard shutdown error: %v", err)
-	}
+	a.Stop()
 	os.Exit(0)
+}
+
+func openRunningDashboard() {
+	cfg := config.Default()
+	if data, err := os.ReadFile(filepath.Join(app.Dir(), "config.json")); err == nil {
+		if parsed, perr := config.Parse(data); perr == nil {
+			cfg = parsed
+		}
+	}
+	tray.OpenURL(fmt.Sprintf("http://localhost:%d", cfg.DashboardPort))
 }

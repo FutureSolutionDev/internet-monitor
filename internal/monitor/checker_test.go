@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"context"
 	"internet-monitor/internal/config"
 	"net"
 	"strings"
@@ -19,7 +20,6 @@ func TestICMPPingLoopback(t *testing.T) {
 }
 
 func TestParseProcRoute(t *testing.T) {
-
 	data := "Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\n" +
 		"eth0\t00010A0A\t00000000\t0001\t0\t0\t0\t00FFFFFF\n" +
 		"eth0\t00000000\t0100A8C0\t0003\t0\t0\t0\t00000000\n"
@@ -38,7 +38,7 @@ func TestParseProcRouteNoDefault(t *testing.T) {
 }
 
 func TestProbePreservesOrderAndResults(t *testing.T) {
-	got := probe("tcp", []string{"a", "b", "c"}, func(target string) (bool, int64) {
+	got := probe(context.Background(), "tcp", []string{"a", "b", "c"}, func(_ context.Context, target string) (bool, int64) {
 		return target == "b", 7
 	})
 	if len(got) != 3 {
@@ -70,8 +70,8 @@ func TestCheckTCPPerTarget(t *testing.T) {
 	closed := closedLn.Addr().String()
 	closedLn.Close()
 
-	c := NewChecker(&config.Config{PingTargets: []string{open, closed}})
-	r := c.Check()
+	c := NewChecker(config.Config{PingTargets: []string{open, closed}})
+	r := c.Check(context.Background())
 
 	if !r.TCPPingOK {
 		t.Fatal("expected TCPPingOK (one target is open)")
@@ -95,5 +95,19 @@ func TestCheckTCPPerTarget(t *testing.T) {
 	}
 	if closedOK == nil || *closedOK {
 		t.Errorf("closed target should not be OK; targets=%+v", r.Targets)
+	}
+}
+
+func TestCheckIsCancellable(t *testing.T) {
+	c := NewChecker(config.Config{HTTPTargets: []string{"http://10.255.255.1/"}, DNSTargets: []string{"example.invalid"}})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	start := time.Now()
+	r := c.Check(ctx)
+	if time.Since(start) > time.Second {
+		t.Errorf("cancelled check took %v", time.Since(start))
+	}
+	if r.HTTPOK {
+		t.Error("cancelled HTTP probe reported OK")
 	}
 }

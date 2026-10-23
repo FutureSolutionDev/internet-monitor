@@ -22,12 +22,6 @@ const (
 	sndFilename = 0x00020000
 )
 
-func logf(format string, args ...interface{}) {
-	if Logf != nil {
-		Logf(format, args...)
-	}
-}
-
 func Play() {
 	path := RingtonePath()
 	if path == "" {
@@ -56,5 +50,4 @@ func Play() {
 		logf("[sound] PlaySound failed for %q", path)
 		return
 	}
-	logf("[sound] PlaySound ok %q", path)
 }

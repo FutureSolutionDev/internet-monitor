@@ -3,6 +3,7 @@ package speedtest
 import (
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -86,5 +87,23 @@ func TestRunCancelledReturnsError(t *testing.T) {
 	if _, err := Run(ctx,
 		Config{Endpoints: []string{srv.URL}, Parallel: 2, Timeout: 2 * time.Second}, nil); err == nil {
 		t.Error("expected error when context is cancelled before any data, got nil")
+	}
+}
+
+func TestRunFailsFastWhenOffline(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	ln.Close()
+
+	start := time.Now()
+	_, err = Run(context.Background(), Config{Endpoints: []string{"http://" + addr + "/down"}, Parallel: 4, Timeout: 30 * time.Second}, nil)
+	if err == nil {
+		t.Fatal("expected an error for an unreachable endpoint")
+	}
+	if d := time.Since(start); d > 10*time.Second {
+		t.Errorf("offline run took %v, want fast failure", d)
 	}
 }

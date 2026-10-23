@@ -13,6 +13,18 @@ var (
 	current *exec.Cmd
 )
 
+func playerCommand(path string) *exec.Cmd {
+	if runtime.GOOS == "darwin" {
+		return exec.Command("afplay", path)
+	}
+	for _, p := range [][]string{{"paplay"}, {"pw-play"}, {"aplay", "-q"}, {"ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet"}} {
+		if _, err := exec.LookPath(p[0]); err == nil {
+			return exec.Command(p[0], append(p[1:], path)...)
+		}
+	}
+	return nil
+}
+
 func Play() {
 	path := RingtonePath()
 	if path == "" {
@@ -26,21 +38,15 @@ func Play() {
 		current = nil
 	}
 
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.Command("afplay", path)
-	default:
-		if _, err := exec.LookPath("mpg123"); err == nil {
-			cmd = exec.Command("mpg123", "-q", path)
-		} else {
-			cmd = exec.Command("ffplay", "-nodisp", "-autoexit", path)
-		}
+	cmd := playerCommand(path)
+	if cmd == nil {
+		logf("[sound] no audio player found (install pulseaudio-utils, pipewire or alsa-utils)")
+		return
 	}
 	if err := cmd.Start(); err != nil {
+		logf("[sound] player failed: %v", err)
 		return
 	}
 	current = cmd
-
 	go func(c *exec.Cmd) { _ = c.Wait() }(cmd)
 }

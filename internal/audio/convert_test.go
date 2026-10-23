@@ -10,7 +10,7 @@ import (
 
 func loadDefaultMP3(t *testing.T) []byte {
 	t.Helper()
-	data, err := os.ReadFile("../dashboard/assets/Ringtone.mp3")
+	data, err := os.ReadFile("../assets/Ringtone.mp3")
 	if err != nil {
 		t.Fatalf("read default ringtone: %v", err)
 	}

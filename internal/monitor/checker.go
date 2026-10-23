@@ -10,21 +10,27 @@ import (
 	"time"
 )
 
+const (
+	tcpTimeout  = 2 * time.Second
+	httpTimeout = 5 * time.Second
+	dnsTimeout  = 3 * time.Second
+)
+
 type Checker struct {
-	cfg        *config.Config
+	mu         sync.Mutex
+	cfg        config.Config
 	httpClient *http.Client
 	history    []bool
 	histSize   int
 }
 
-func NewChecker(cfg *config.Config) *Checker {
+func NewChecker(cfg config.Config) *Checker {
 	return &Checker{
-		cfg:      cfg,
+		cfg:      cfg.Clone(),
 		histSize: 10,
 		history:  make([]bool, 0, 10),
 		httpClient: &http.Client{
-			Timeout: 5 * time.Second,
-
+			Timeout: httpTimeout,
 			CheckRedirect: func(*http.Request, []*http.Request) error {
 				return http.ErrUseLastResponse
 			},
@@ -37,47 +43,65 @@ func NewChecker(cfg *config.Config) *Checker {
 	}
 }
 
-func (c *Checker) SetConfig(cfg *config.Config) {
-	c.cfg = cfg
+func (c *Checker) SetConfig(cfg config.Config) {
+	c.mu.Lock()
+	c.cfg = cfg.Clone()
+	c.mu.Unlock()
 }
 
-func probe(layer string, targets []string, fn func(string) (bool, int64)) []types.TargetResult {
+func probe(ctx context.Context, layer string, targets []string, fn func(context.Context, string) (bool, int64)) []types.TargetResult {
 	results := make([]types.TargetResult, len(targets))
 	var wg sync.WaitGroup
 	for i, target := range targets {
 		wg.Add(1)
-		go func(i int, target string) {
+		go func() {
 			defer wg.Done()
-			ok, lat := fn(target)
+			ok, lat := fn(ctx, target)
 			results[i] = types.TargetResult{Layer: layer, Target: target, OK: ok, LatencyMs: lat}
-		}(i, target)
+		}()
 	}
 	wg.Wait()
 	return results
 }
 
-func (c *Checker) Check() CheckResult {
-	result := CheckResult{Timestamp: time.Now()}
+func (c *Checker) Check(ctx context.Context) CheckResult {
+	c.mu.Lock()
+	cfg := c.cfg
+	c.mu.Unlock()
 
-	useICMP := c.cfg.UseICMP
-	tcp := probe("tcp", c.cfg.PingTargets, func(target string) (bool, int64) {
-		host := target
-		if h, _, err := net.SplitHostPort(target); err == nil {
-			host = h
-		}
-		if useICMP {
-			if lat, ok := icmpPing(host, 2*time.Second); ok {
-				return true, lat
+	result := CheckResult{Timestamp: time.Now()}
+	var tcp, httpRes, dnsRes []types.TargetResult
+	var gateway string
+	var gatewayOK bool
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		tcp = probe(ctx, "tcp", cfg.PingTargets, func(ctx context.Context, target string) (bool, int64) {
+			return c.pingTCP(ctx, target, cfg.UseICMP)
+		})
+	}()
+	go func() {
+		defer wg.Done()
+		httpRes = probe(ctx, "http", cfg.HTTPTargets, c.probeHTTP)
+	}()
+	go func() {
+		defer wg.Done()
+		dnsRes = probe(ctx, "dns", cfg.DNSTargets, probeDNS)
+	}()
+	if cfg.UseICMP {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if gw, ok := defaultGatewayIPv4(); ok {
+				gateway = gw
+				_, gatewayOK = icmpPing(gw, time.Second)
 			}
-		}
-		start := time.Now()
-		conn, err := net.DialTimeout("tcp", target, 2*time.Second)
-		if err != nil {
-			return false, 0
-		}
-		conn.Close()
-		return true, time.Since(start).Milliseconds()
-	})
+		}()
+	}
+	wg.Wait()
+
 	for _, r := range tcp {
 		if r.OK {
 			result.TCPPingOK = true
@@ -86,63 +110,83 @@ func (c *Checker) Check() CheckResult {
 			}
 		}
 	}
-	result.Targets = append(result.Targets, tcp...)
+	result.HTTPOK = anyOK(httpRes)
+	result.DNSOK = anyOK(dnsRes)
+	result.Targets = append(append(append(result.Targets, tcp...), httpRes...), dnsRes...)
+	result.Gateway, result.GatewayOK = gateway, gatewayOK
+	result.PacketLoss = c.recordTCP(result.TCPPingOK)
+	return result
+}
 
-	c.history = append(c.history, result.TCPPingOK)
+func anyOK(rs []types.TargetResult) bool {
+	for _, r := range rs {
+		if r.OK {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Checker) recordTCP(ok bool) float64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.history = append(c.history, ok)
 	if len(c.history) > c.histSize {
 		c.history = c.history[1:]
 	}
 	failures := 0
-	for _, ok := range c.history {
-		if !ok {
+	for _, v := range c.history {
+		if !v {
 			failures++
 		}
 	}
-	if len(c.history) > 0 {
-		result.PacketLoss = float64(failures) / float64(len(c.history)) * 100
-	}
+	return float64(failures) / float64(len(c.history)) * 100
+}
 
-	httpRes := probe("http", c.cfg.HTTPTargets, func(target string) (bool, int64) {
-		start := time.Now()
-		resp, err := c.httpClient.Get(target)
-		if err != nil {
-			return false, 0
-		}
-		resp.Body.Close()
-		if resp.StatusCode == 200 || resp.StatusCode == 204 {
-			return true, time.Since(start).Milliseconds()
-		}
-		return false, 0
-	})
-	for _, r := range httpRes {
-		if r.OK {
-			result.HTTPOK = true
-		}
-	}
-	result.Targets = append(result.Targets, httpRes...)
-
-	dnsRes := probe("dns", c.cfg.DNSTargets, func(target string) (bool, int64) {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		start := time.Now()
-		if _, err := net.DefaultResolver.LookupHost(ctx, target); err != nil {
-			return false, 0
-		}
-		return true, time.Since(start).Milliseconds()
-	})
-	for _, r := range dnsRes {
-		if r.OK {
-			result.DNSOK = true
-		}
-	}
-	result.Targets = append(result.Targets, dnsRes...)
-
+func (c *Checker) pingTCP(ctx context.Context, target string, useICMP bool) (bool, int64) {
 	if useICMP {
-		if gw, ok := defaultGatewayIPv4(); ok {
-			result.Gateway = gw
-			_, result.GatewayOK = icmpPing(gw, time.Second)
+		host := target
+		if h, _, err := net.SplitHostPort(target); err == nil {
+			host = h
+		}
+		if lat, ok := icmpPing(host, tcpTimeout); ok {
+			return true, lat
 		}
 	}
+	dctx, cancel := context.WithTimeout(ctx, tcpTimeout)
+	defer cancel()
+	start := time.Now()
+	conn, err := (&net.Dialer{}).DialContext(dctx, "tcp", target)
+	if err != nil {
+		return false, 0
+	}
+	conn.Close()
+	return true, max(time.Since(start).Milliseconds(), 1)
+}
 
-	return result
+func (c *Checker) probeHTTP(ctx context.Context, target string) (bool, int64) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		return false, 0
+	}
+	start := time.Now()
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return false, 0
+	}
+	resp.Body.Close()
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
+		return true, max(time.Since(start).Milliseconds(), 1)
+	}
+	return false, 0
+}
+
+func probeDNS(ctx context.Context, target string) (bool, int64) {
+	dctx, cancel := context.WithTimeout(ctx, dnsTimeout)
+	defer cancel()
+	start := time.Now()
+	if _, err := net.DefaultResolver.LookupHost(dctx, target); err != nil {
+		return false, 0
+	}
+	return true, max(time.Since(start).Milliseconds(), 1)
 }

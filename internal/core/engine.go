@@ -1,12 +1,12 @@
 package core
 
 import (
+	"context"
 	"internet-monitor/internal/config"
 	"internet-monitor/internal/logger"
 	"internet-monitor/internal/monitor"
 	"internet-monitor/internal/notifytext"
 	"internet-monitor/internal/types"
-	"internet-monitor/internal/updater"
 	"log"
 	"sync"
 	"time"
@@ -67,13 +67,15 @@ func DetermineStatus(result types.CheckResult, consecFails *int, cfg *config.Con
 }
 
 type Engine struct {
-	cfg     *config.Config
+	cfg     config.Config
 	checker *monitor.Checker
 	lgr     *logger.Logger
 	version string
 
-	Notifier          Notifier
-	OnUpdateAvailable func(*updater.Info)
+	Notifier Notifier
+
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	currentStatus *types.Status
 	statusSince   time.Time
@@ -81,7 +83,7 @@ type Engine struct {
 
 	agg minuteAgg
 
-	reload chan *config.Config
+	reload chan config.Config
 	stop   chan struct{}
 	done   chan struct{}
 	once   sync.Once
@@ -106,22 +108,22 @@ type minuteAgg struct {
 	jitterN   int
 }
 
-func New(cfg *config.Config, checker *monitor.Checker, lgr *logger.Logger, version string) *Engine {
+func New(cfg config.Config, checker *monitor.Checker, lgr *logger.Logger, version string) *Engine {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Engine{
-		cfg:     cfg,
+		cfg:     cfg.Clone(),
 		checker: checker,
 		lgr:     lgr,
 		version: version,
-		reload:  make(chan *config.Config, 1),
+		ctx:     ctx,
+		cancel:  cancel,
+		reload:  make(chan config.Config, 1),
 		stop:    make(chan struct{}),
 		done:    make(chan struct{}),
 	}
 }
 
-func (e *Engine) ApplyConfig(cfg *config.Config) {
-	if cfg == nil {
-		return
-	}
+func (e *Engine) ApplyConfig(cfg config.Config) {
 	select {
 	case <-e.reload:
 	default:
@@ -168,33 +170,16 @@ func (e *Engine) Start() {
 		}
 	}()
 
-	go func() {
-		select {
-		case <-time.After(30 * time.Second):
-		case <-e.stop:
-			return
-		}
-		for {
-			if info, err := updater.Check(e.version); err == nil && info.HasUpdate {
-				e.lgr.AppLog("UPDATE available: %s (current: %s)", info.LatestVersion, info.CurrentVersion)
-				if e.OnUpdateAvailable != nil {
-					e.OnUpdateAvailable(info)
-				}
-			}
-			select {
-			case <-time.After(6 * time.Hour):
-			case <-e.stop:
-				return
-			}
-		}
-	}()
 }
 
 func (e *Engine) Stop() {
-	e.once.Do(func() { close(e.stop) })
+	e.once.Do(func() {
+		close(e.stop)
+		e.cancel()
+	})
 	select {
 	case <-e.done:
-	case <-time.After(2 * time.Second):
+	case <-time.After(5 * time.Second):
 	}
 }
 
@@ -269,8 +254,11 @@ func (e *Engine) safeNotify(fn func()) {
 }
 
 func (e *Engine) runCheck() {
-	result := e.checker.Check()
-	newStatus := DetermineStatus(result, &e.consecFails, e.cfg)
+	result := e.checker.Check(e.ctx)
+	if e.ctx.Err() != nil {
+		return
+	}
+	newStatus := DetermineStatus(result, &e.consecFails, &e.cfg)
 
 	e.accumulate(result, newStatus)
 

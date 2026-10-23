@@ -32,6 +32,43 @@ type Config struct {
 	UploadTarget string
 }
 
+const maxConsecutiveFailures = 6
+
+func newClient() *http.Client {
+	return &http.Client{Transport: &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		MaxIdleConnsPerHost:   maxParallel,
+		IdleConnTimeout:       30 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 15 * time.Second,
+	}}
+}
+
+type failGate struct {
+	consecutive atomic.Int64
+	transferred *atomic.Int64
+	errors      *atomic.Int64
+	abort       context.CancelFunc
+}
+
+func (g *failGate) fail(ctx context.Context) bool {
+	g.errors.Add(1)
+	n := g.consecutive.Add(1)
+	if n >= maxConsecutiveFailures && g.transferred.Load() == 0 {
+		g.abort()
+		return false
+	}
+	backoff := min(time.Duration(n)*200*time.Millisecond, 2*time.Second)
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(backoff):
+		return true
+	}
+}
+
+func (g *failGate) ok() { g.consecutive.Store(0) }
+
 var chunkSizes = []int64{
 	1_000_000,
 	5_000_000,
@@ -54,7 +91,8 @@ func Run(ctx context.Context, cfg Config, progress func(float64, time.Duration))
 		cfg.Timeout = 10 * time.Second
 	}
 
-	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: false}}
+	client := newClient()
+	defer client.CloseIdleConnections()
 
 	latencyMs := measureLatency(ctx, client, cfg.Endpoints[0])
 
@@ -64,6 +102,7 @@ func Run(ctx context.Context, cfg Config, progress func(float64, time.Duration))
 	var totalBytes atomic.Int64
 	var errCount atomic.Int64
 	var chunkIdx atomic.Int64
+	gate := &failGate{transferred: &totalBytes, errors: &errCount, abort: cancel}
 	start := time.Now()
 
 	var wg sync.WaitGroup
@@ -79,12 +118,22 @@ func Run(ctx context.Context, cfg Config, progress func(float64, time.Duration))
 			}
 			resp, err := client.Do(req)
 			if err != nil {
-				errCount.Add(1)
+				if !gate.fail(tctx) {
+					return
+				}
+				continue
+			}
+			if resp.StatusCode < 200 || resp.StatusCode > 299 {
+				resp.Body.Close()
+				if !gate.fail(tctx) {
+					return
+				}
 				continue
 			}
 			n, _ := io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
 			totalBytes.Add(n)
+			gate.ok()
 		}
 	}
 	for i := 0; i < cfg.Parallel; i++ {
@@ -164,9 +213,11 @@ func MeasureUpload(ctx context.Context, cfg Config, progress func(float64, time.
 
 	var totalBytes atomic.Int64
 	var errCount atomic.Int64
+	gate := &failGate{transferred: &totalBytes, errors: &errCount, abort: cancel}
 	start := time.Now()
 
-	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: false}}
+	client := newClient()
+	defer client.CloseIdleConnections()
 
 	var wg sync.WaitGroup
 	worker := func() {
@@ -181,12 +232,21 @@ func MeasureUpload(ctx context.Context, cfg Config, progress func(float64, time.
 			req.Header.Set("Content-Type", "application/octet-stream")
 			resp, err := client.Do(req)
 			if err != nil {
-				errCount.Add(1)
+				if !gate.fail(tctx) {
+					return
+				}
 				continue
 			}
-			io.Copy(io.Discard, resp.Body)
+			_, _ = io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
+			if resp.StatusCode < 200 || resp.StatusCode > 299 {
+				if !gate.fail(tctx) {
+					return
+				}
+				continue
+			}
 			totalBytes.Add(int64(len(payload)))
+			gate.ok()
 		}
 	}
 	for i := 0; i < cfg.Parallel; i++ {
@@ -241,7 +301,7 @@ func measureLatency(ctx context.Context, client *http.Client, endpoint string) i
 	if err != nil {
 		return 0
 	}
-	io.Copy(io.Discard, resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
 	return time.Since(t0).Milliseconds()
 }

@@ -18,48 +18,68 @@ import (
 )
 
 type Logger struct {
-	cfg    *config.Config
-	mu     sync.Mutex
-	appLog *log.Logger
+	cfg     config.Config
+	mu      sync.Mutex
+	appMu   sync.Mutex
+	appLog  *log.Logger
+	appFile *os.File
 }
 
-func New(cfg *config.Config) (*Logger, error) {
-	if err := os.MkdirAll(cfg.LogDir, 0755); err != nil {
+const maxAppLogSize = 5 << 20
+
+func New(cfg config.Config) (*Logger, error) {
+	if err := os.MkdirAll(cfg.LogDir, 0o755); err != nil {
 		return nil, err
 	}
 
 	appLogFile := filepath.Join(cfg.LogDir, "app.log")
-	f, err := os.OpenFile(appLogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if info, err := os.Stat(appLogFile); err == nil && info.Size() > maxAppLogSize {
+		_ = os.Rename(appLogFile, appLogFile+".1")
+	}
+	f, err := os.OpenFile(appLogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	var appLog *log.Logger
 	if err == nil {
 		appLog = log.New(f, "", log.LstdFlags)
+	} else {
+		f = nil
 	}
 
-	return &Logger{cfg: cfg, appLog: appLog}, nil
+	return &Logger{cfg: cfg.Clone(), appLog: appLog, appFile: f}, nil
 }
 
-func (l *Logger) ReadFile(path string) ([]byte, error) {
+func (l *Logger) Close() error {
+	l.appMu.Lock()
+	defer l.appMu.Unlock()
+	if l.appFile == nil {
+		return nil
+	}
+	err := l.appFile.Close()
+	l.appFile = nil
+	l.appLog = nil
+	return err
+}
+
+func (l *Logger) LogDir() string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return os.ReadFile(path)
+	return l.cfg.LogDir
 }
 
-func (l *Logger) SetConfig(cfg *config.Config) {
-	if cfg == nil {
-		return
-	}
+func (l *Logger) SetConfig(cfg config.Config) {
 	if cfg.LogDir != "" {
-		if err := os.MkdirAll(cfg.LogDir, 0755); err != nil {
+		if err := os.MkdirAll(cfg.LogDir, 0o755); err != nil {
 			l.AppLog("ERROR create log dir on config reload: %v", err)
 			return
 		}
 	}
 	l.mu.Lock()
-	l.cfg = cfg
+	l.cfg = cfg.Clone()
 	l.mu.Unlock()
 }
 
 func (l *Logger) AppLog(format string, args ...interface{}) {
+	l.appMu.Lock()
+	defer l.appMu.Unlock()
 	if l.appLog != nil {
 		l.appLog.Printf(format, args...)
 	}
@@ -227,7 +247,7 @@ func (l *Logger) sendTelegram(token, chatID, text string) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
-		l.AppLog("TELEGRAM send error: %v", err)
+		l.AppLog("TELEGRAM send error: %s", RedactSecret(err.Error(), token))
 		return
 	}
 	resp.Body.Close()
@@ -249,7 +269,7 @@ func (l *Logger) sendWebhook(url string, payload interface{}) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
-		l.AppLog("WEBHOOK send error: %v", err)
+		l.AppLog("WEBHOOK send error: %s", RedactSecret(err.Error(), url))
 		return
 	}
 	defer resp.Body.Close()
@@ -288,8 +308,9 @@ func (l *Logger) SendTestWebhook(url string) string {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
-		l.AppLog("WEBHOOK TEST error: %v", err)
-		return err.Error()
+		msg := RedactSecret(err.Error(), url)
+		l.AppLog("WEBHOOK TEST error: %s", msg)
+		return msg
 	}
 	defer resp.Body.Close()
 
@@ -301,4 +322,11 @@ func (l *Logger) SendTestWebhook(url string) string {
 	}
 	l.AppLog("WEBHOOK TEST OK HTTP %d", resp.StatusCode)
 	return ""
+}
+
+func RedactSecret(msg, secret string) string {
+	if secret == "" {
+		return msg
+	}
+	return strings.ReplaceAll(msg, secret, "<redacted>")
 }
