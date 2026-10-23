@@ -14,7 +14,7 @@ import (
 
 	webview "github.com/webview/webview_go"
 
-	"github.com/getlantern/systray"
+	"fyne.io/systray"
 )
 
 var (

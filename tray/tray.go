@@ -5,7 +5,7 @@ import (
 	"internet-monitor/monitor"
 	"time"
 
-	"github.com/getlantern/systray"
+	"fyne.io/systray"
 )
 
 type Tray struct {

@@ -16,7 +16,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/getlantern/systray"
+	"fyne.io/systray"
 )
 
 // Version is embedded at build time via: -ldflags "-X main.Version=v1.x.x"
