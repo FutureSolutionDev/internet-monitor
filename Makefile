@@ -5,11 +5,11 @@ GUI_BINARY   = internet-monitor-gui.exe
 DEBUG_BINARY = internet-monitor-debug.exe
 
 build:
-	go build -ldflags="-H=windowsgui -s -w" -o $(BINARY) .
+	go build -ldflags="-H=windowsgui -s -w" -o $(BINARY) ./cmd/tray
 	@echo Built: $(BINARY)
 
 build-debug:
-	go build -o $(DEBUG_BINARY) .
+	go build -o $(DEBUG_BINARY) ./cmd/tray
 	@echo Built: $(DEBUG_BINARY)
 
 run: build

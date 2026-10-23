@@ -1,12 +1,11 @@
 package main
 
 import (
-	"internet-monitor/monitor"
-	"internet-monitor/notifytext"
-	"internet-monitor/types"
+	"internet-monitor/internal/monitor"
+	"internet-monitor/internal/notifytext"
+	"internet-monitor/internal/types"
 )
 
-// guiNotifier updates the background tray icon and sends OS notifications.
 type guiNotifier struct{}
 
 func (g *guiNotifier) OnTick(_ types.CheckResult, status types.Status) {

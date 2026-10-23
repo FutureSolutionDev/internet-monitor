@@ -1,6 +1,6 @@
 # 🌐 Internet Monitor
 
-![Logo](dashboard/assets/favicon.png)
+![Logo](internal/dashboard/assets/favicon.png)
 
 [![Build & Release](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml/badge.svg)](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -122,7 +122,7 @@ Open the dashboard at **<http://localhost:8765>**
 git clone https://github.com/FutureSolutionDev/internet-monitor.git
 cd internet-monitor
 go mod tidy
-go run .
+go run ./cmd/tray
 ```
 
 ### Option B — [Air](https://github.com/air-verse/air) (auto-rebuild on file change)

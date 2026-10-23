@@ -1,18 +1,18 @@
-//go:generate go-winres simply --arch amd64 --icon ../../dashboard/assets/favicon.png
+//go:generate go-winres simply --arch amd64 --icon ../../internal/dashboard/assets/favicon.png
 
 package main
 
 import (
 	"context"
-	"internet-monitor/config"
-	"internet-monitor/core"
-	"internet-monitor/dashboard"
-	"internet-monitor/logger"
-	"internet-monitor/monitor"
-	"internet-monitor/notifytext"
-	"internet-monitor/sound"
-	"internet-monitor/tray"
-	"internet-monitor/updater"
+	"internet-monitor/internal/config"
+	"internet-monitor/internal/core"
+	"internet-monitor/internal/dashboard"
+	"internet-monitor/internal/logger"
+	"internet-monitor/internal/monitor"
+	"internet-monitor/internal/notifytext"
+	"internet-monitor/internal/sound"
+	"internet-monitor/internal/tray"
+	"internet-monitor/internal/updater"
 	"log"
 	"os"
 	"path/filepath"
@@ -45,11 +45,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to init logger: %v", err)
 	}
-	// Route notification/sound diagnostics to logs/app.log (invisible otherwise
-	// in a -H=windowsgui build).
+
 	tray.Logf = lgr.AppLog
 	sound.Logf = lgr.AppLog
-	notifytext.SetLang(cfg.Language) // OS notifications use the configured language
+	notifytext.SetLang(cfg.Language)
 
 	dash := dashboard.NewServer(cfg.DashboardPort, "config.json", cfg.LogDir, Version, lgr)
 	dash.OnTestNotification = TestNotification
@@ -70,7 +69,7 @@ func main() {
 		}, nil
 	}
 	dash.OnPlaySound = sound.Play
-	dash.SetNativeNotifications(true) // GUI build shows native notifications
+	dash.SetNativeNotifications(true)
 	dash.Start()
 
 	checker := monitor.NewChecker(cfg)
@@ -93,7 +92,7 @@ func main() {
 	w := webview.New(false)
 	defer w.Destroy()
 	w.SetTitle("مراقب الإنترنت — Internet Monitor")
-	// HintNone: initial size only — no minimum or maximum constraints.
+
 	w.SetSize(1100, 750, webview.HintNone)
 
 	hwnd := uintptr(w.Window())
@@ -102,7 +101,7 @@ func main() {
 	if png := dashboard.FaviconPNG(); len(png) > 0 {
 		tray.SetCustomIcon(png)
 	}
-	// Set window icon from the favicon (no go-winres .syso in dev environment).
+
 	setWindowIcon(hwnd)
 
 	stopTray := initTray(w, hwnd)

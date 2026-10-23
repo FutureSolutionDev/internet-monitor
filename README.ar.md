@@ -1,6 +1,6 @@
 # 🌐 مراقب الإنترنت
 
-![Logo](dashboard/assets/favicon.png)
+![Logo](internal/dashboard/assets/favicon.png)
 
 [![Build & Release](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml/badge.svg)](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -122,7 +122,7 @@ chmod +x internet-monitor-*
 git clone https://github.com/FutureSolutionDev/internet-monitor.git
 cd internet-monitor
 go mod tidy
-go run .
+go run ./cmd/tray
 ```
 
 ### الخيار الثاني — [Air](https://github.com/air-verse/air) (إعادة بناء تلقائية عند تغيير الملفات)

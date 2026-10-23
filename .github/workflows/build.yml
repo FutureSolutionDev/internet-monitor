@@ -53,7 +53,7 @@ jobs:
         run: |
           go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
           golangci-lint run ./...
-          GOOS=windows CGO_ENABLED=0 golangci-lint run . ./tray/... ./sound/...
+          GOOS=windows CGO_ENABLED=0 golangci-lint run ./cmd/tray ./internal/...
 
   # ══════════════════════════════════════════════════════════════
   # VERSION — COMPUTES the next semver (push only) WITHOUT creating
@@ -108,7 +108,7 @@ jobs:
           GOOS: windows
           GOARCH: amd64
           VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
-        run: go build -ldflags="-H=windowsgui -s -w -X main.Version=$VERSION" -o internet-monitor-windows.exe .
+        run: go build -ldflags="-H=windowsgui -s -w -X main.Version=$VERSION" -o internet-monitor-windows.exe ./cmd/tray
 
       - uses: actions/upload-artifact@v7
         with:
@@ -133,7 +133,7 @@ jobs:
         run: |
           go install github.com/tc-hib/go-winres@v0.3.3
           cd cmd/gui
-          go-winres simply --arch amd64 --icon ../../dashboard/assets/favicon.png
+          go-winres simply --arch amd64 --icon ../../internal/dashboard/assets/favicon.png
 
       - name: Build
         env:
@@ -166,7 +166,7 @@ jobs:
           GOARCH: arm64
           VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
         run: |
-          go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-macos-arm64 .
+          go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-macos-arm64 ./cmd/tray
           go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-gui-macos-arm64 ./cmd/gui/
 
       - name: Build Intel/amd64 (cross-compile via Xcode)
@@ -177,7 +177,7 @@ jobs:
           CGO_LDFLAGS: "-arch x86_64"
           VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
         run: |
-          go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-macos-intel .
+          go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-macos-intel ./cmd/tray
           go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-gui-macos-intel ./cmd/gui/
 
       - uses: actions/upload-artifact@v7
@@ -214,7 +214,7 @@ jobs:
         env:
           CGO_ENABLED: 1
           VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
-        run: go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-linux .
+        run: go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-linux ./cmd/tray
 
       - name: Build GUI
         env:

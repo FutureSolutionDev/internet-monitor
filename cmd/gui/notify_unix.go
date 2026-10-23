@@ -4,15 +4,13 @@ package main
 
 import (
 	"fmt"
-	"internet-monitor/monitor"
-	"internet-monitor/notifytext"
-	"internet-monitor/sound"
+	"internet-monitor/internal/monitor"
+	"internet-monitor/internal/notifytext"
+	"internet-monitor/internal/sound"
 	"os/exec"
 	"runtime"
 )
 
-// playRingtone plays the ringtone via the shared player, which stops any
-// previous sound first so rapid notifications never overlap.
 func playRingtone() { sound.Play() }
 
 func sendNotification(status monitor.Status, result monitor.CheckResult) {
@@ -31,8 +29,6 @@ func sendNotification(status monitor.Status, result monitor.CheckResult) {
 	}
 }
 
-// TestNotification plays the ringtone and shows a sample notification in the
-// given UI language.
 func TestNotification(lang string) {
 	playRingtone()
 	title, body := notifytext.TestMessage(lang)

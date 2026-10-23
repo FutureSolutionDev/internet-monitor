@@ -3,8 +3,8 @@
 package main
 
 import (
-	"internet-monitor/monitor"
-	"internet-monitor/tray"
+	"internet-monitor/internal/monitor"
+	"internet-monitor/internal/tray"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -42,10 +42,6 @@ func restoreWindow(hwnd uintptr) {
 	procSetForegroundWindow.Call(hwnd)
 }
 
-// setWindowIcon loads the favicon ICO from a temp file and applies it to
-// the WebView2 window via WM_SETICON (title bar, Alt+Tab, taskbar button).
-// This is needed because go-winres is not in the dev environment, so the
-// exe has no embedded icon resource.
 func setWindowIcon(hwnd uintptr) {
 	icoData := tray.GrayIcon()
 	if len(icoData) == 0 {
@@ -77,8 +73,6 @@ func setWindowIcon(hwnd uintptr) {
 	procSendMessageW.Call(hwnd, wmSetIcon, iconSmall, hIcon)
 }
 
-// setWindowIconFromExe loads the icon from the running exe's embedded resources.
-// Used after go-winres is run and a release build is produced.
 func setWindowIconFromExe(hwnd uintptr) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -103,8 +97,6 @@ func setWindowIconFromExe(hwnd uintptr) {
 	procSendMessageW.Call(hwnd, wmSetIcon, iconSmall, hIcon)
 }
 
-// initTray starts systray in a locked OS thread.
-// The returned stop func blocks until systray has fully exited — prevents zombie processes.
 func initTray(w webview.WebView, hwnd uintptr) func() {
 	quit := make(chan struct{})
 	done := make(chan struct{})
@@ -126,9 +118,7 @@ func initTray(w webview.WebView, hwnd uintptr) func() {
 						restoreWindow(hwnd)
 					case <-mExit.ClickedCh:
 						systray.Quit()
-						// Dispatch Terminate to the main thread — PostQuitMessage(0)
-						// must run on the same thread as w.Run() or WM_QUIT goes
-						// to the wrong queue and the process becomes a zombie.
+
 						w.Dispatch(func() { w.Terminate() })
 					case <-quit:
 						systray.Quit()
