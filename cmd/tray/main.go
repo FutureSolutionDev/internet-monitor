@@ -1,15 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"internet-monitor/internal/app"
 	"internet-monitor/internal/assets"
-	"internet-monitor/internal/config"
 	"internet-monitor/internal/notifytext"
+	"internet-monitor/internal/server"
 	"internet-monitor/internal/tray"
 	"log"
 	"os"
-	"path/filepath"
 
 	"fyne.io/systray"
 )
@@ -34,7 +32,7 @@ func main() {
 	}
 
 	tray.SetCustomIcon(assets.FaviconPNG())
-	t := tray.New(filepath.Join(a.Dir, a.Store.Get().LogDir), a.Server.URL())
+	t := tray.New(a.LogDir(), a.Server.LaunchURL())
 	a.Run(tray.NewNotifier(t))
 	systray.Run(t.OnReady, t.OnExit)
 	a.Stop()
@@ -42,11 +40,7 @@ func main() {
 }
 
 func openRunningDashboard() {
-	cfg := config.Default()
-	if data, err := os.ReadFile(filepath.Join(app.Dir(), "config.json")); err == nil {
-		if parsed, perr := config.Parse(data); perr == nil {
-			cfg = parsed
-		}
+	if info, ok := server.ReadSession(app.Dir()); ok {
+		tray.OpenURL(info.LaunchURL())
 	}
-	tray.OpenURL(fmt.Sprintf("http://localhost:%d", cfg.DashboardPort))
 }

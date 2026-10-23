@@ -7,7 +7,6 @@ import (
 	"internet-monitor/internal/config"
 	"internet-monitor/internal/monitor"
 	"internet-monitor/internal/types"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -244,7 +243,7 @@ func (l *Logger) sendTelegram(token, chatID, text string) {
 		"parse_mode": "Markdown",
 	})
 	url := "https://api.telegram.org/bot" + token + "/sendMessage"
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := NoRedirectClient(10 * time.Second)
 	resp, err := client.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
 		l.AppLog("TELEGRAM send error: %s", RedactSecret(err.Error(), token))
@@ -266,7 +265,7 @@ func (l *Logger) sendWebhook(url string, payload interface{}) {
 		return
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := NoRedirectClient(10 * time.Second)
 	resp, err := client.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
 		l.AppLog("WEBHOOK send error: %s", RedactSecret(err.Error(), url))
@@ -275,8 +274,7 @@ func (l *Logger) sendWebhook(url string, payload interface{}) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		l.AppLog("WEBHOOK HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+		l.AppLog("WEBHOOK HTTP %d", resp.StatusCode)
 	} else {
 		l.AppLog("WEBHOOK OK HTTP %d", resp.StatusCode)
 	}
@@ -305,7 +303,7 @@ func (l *Logger) SendTestWebhook(url string) string {
 	}
 
 	body, _ := json.Marshal(payload)
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := NoRedirectClient(10 * time.Second)
 	resp, err := client.Post(url, "application/json", bytes.NewReader(body))
 	if err != nil {
 		msg := RedactSecret(err.Error(), url)
@@ -315,8 +313,7 @@ func (l *Logger) SendTestWebhook(url string) string {
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= 400 {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		msg := fmt.Sprintf("HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+		msg := fmt.Sprintf("the webhook service answered HTTP %d", resp.StatusCode)
 		l.AppLog("WEBHOOK TEST %s", msg)
 		return msg
 	}
@@ -329,4 +326,11 @@ func RedactSecret(msg, secret string) string {
 		return msg
 	}
 	return strings.ReplaceAll(msg, secret, "<redacted>")
+}
+
+func NoRedirectClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout:       timeout,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
 }

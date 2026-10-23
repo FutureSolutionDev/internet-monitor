@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const contentSecurityPolicy = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+const contentSecurityPolicy = "default-src 'self'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
 
 func (s *Server) allowedHost(host string) bool {
 	host = strings.ToLower(host)
@@ -66,6 +66,13 @@ func (s *Server) guard(next http.Handler) http.Handler {
 		}
 		if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
 			http.Error(w, "cross-site request denied", http.StatusForbidden)
+			return
+		}
+		if s.handleSessionLaunch(w, r) {
+			return
+		}
+		if protectedPath(r.URL.Path) && !s.authenticated(r) {
+			writeError(w, http.StatusUnauthorized, "unauthorized", "open the dashboard from the Internet Monitor tray icon or window")
 			return
 		}
 		if isStateChanging(r.Method) && !acceptableBody(r) {

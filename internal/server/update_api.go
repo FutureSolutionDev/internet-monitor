@@ -35,6 +35,20 @@ func (u *updateState) get() (*updater.Info, string, string) {
 	return &cp, status, u.err
 }
 
+func (u *updateState) begin() (*updater.Info, string) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	switch {
+	case u.info == nil || !u.info.HasUpdate:
+		return nil, "no_update"
+	case u.status == updateDownloading || u.status == updateRestarting:
+		return nil, "in_progress"
+	}
+	u.status, u.err = updateDownloading, ""
+	cp := *u.info
+	return &cp, ""
+}
+
 func (u *updateState) set(status, errMsg string) {
 	u.mu.Lock()
 	u.status, u.err = status, errMsg
@@ -80,20 +94,19 @@ func (s *Server) serveUpdateCheck(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) serveUpdateApply(w http.ResponseWriter, _ *http.Request) {
-	info, status, _ := s.update.get()
-	switch {
-	case info == nil || !info.HasUpdate:
-		writeError(w, http.StatusBadRequest, "no_update", "no update available")
-		return
-	case s.hooks.ApplyUpdate == nil:
+	if s.hooks.ApplyUpdate == nil {
 		writeError(w, http.StatusNotImplemented, "unavailable", "updater not configured")
 		return
-	case status == updateDownloading || status == updateRestarting:
-		writeError(w, http.StatusConflict, "in_progress", "update already in progress")
+	}
+	info, code := s.update.begin()
+	switch code {
+	case "no_update":
+		writeError(w, http.StatusBadRequest, code, "no update available")
+		return
+	case "in_progress":
+		writeError(w, http.StatusConflict, code, "update already in progress")
 		return
 	}
-
-	s.update.set(updateDownloading, "")
 	s.broadcast("update")
 	go func() {
 		if err := s.hooks.ApplyUpdate(info.DownloadURL); err != nil {
@@ -109,5 +122,5 @@ func (s *Server) serveUpdateApply(w http.ResponseWriter, _ *http.Request) {
 			s.hooks.Restart()
 		}
 	}()
-	writeJSON(w, http.StatusAccepted, map[string]interface{}{"ok": true, "restart": true, "status": updateDownloading})
+	writeJSON(w, http.StatusAccepted, map[string]interface{}{"ok": true, "status": updateDownloading})
 }

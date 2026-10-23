@@ -8,6 +8,7 @@ import (
 	"internet-monitor/internal/config"
 	"internet-monitor/internal/logger"
 	"internet-monitor/internal/types"
+	"internet-monitor/internal/updater"
 	"io"
 	"net/http"
 	"os"
@@ -58,6 +59,7 @@ func (e *testEnv) do(t *testing.T, method, path, body string, headers map[string
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	req.Header.Set(sessionHeader, e.s.token)
 	for k, v := range headers {
 		if k == "Host" {
 			req.Host = v
@@ -110,6 +112,7 @@ func TestGuardRejectsCrossOriginAndBadContentType(t *testing.T) {
 	}
 	req, _ := http.NewRequest("POST", e.base+"/api/config", strings.NewReader(`{"language":"ar"}`))
 	req.Header.Set("Content-Type", "text/plain")
+	req.Header.Set(sessionHeader, e.s.token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -166,6 +169,7 @@ func TestSSEStreamsInitAndTicks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	req, _ := http.NewRequestWithContext(ctx, "GET", e.base+"/events", nil)
+	req.Header.Set(sessionHeader, e.s.token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -246,10 +250,31 @@ func TestLogsValidateDateAndLimit(t *testing.T) {
 	}
 }
 
-func TestUpdateApplyWithoutUpdate(t *testing.T) {
+func TestUpdateApplyIsSingleFlight(t *testing.T) {
 	e := newTestEnv(t)
+	release := make(chan struct{})
+	calls := make(chan string, 4)
+	e.s.hooks.ApplyUpdate = func(u string) error {
+		calls <- u
+		<-release
+		return fmt.Errorf("stop here")
+	}
 	if r := e.do(t, "POST", "/api/update", "", nil); r.StatusCode != http.StatusBadRequest {
-		t.Errorf("status %d, want 400", r.StatusCode)
+		t.Errorf("no update: status %d, want 400", r.StatusCode)
+	}
+	e.s.SetUpdateInfo(&updater.Info{HasUpdate: true, LatestVersion: "v10", DownloadURL: "https://github.com/x"})
+	if r := e.do(t, "POST", "/api/update", "", nil); r.StatusCode != http.StatusAccepted {
+		t.Fatalf("first apply: %d", r.StatusCode)
+	}
+	if r := e.do(t, "POST", "/api/update", "", nil); r.StatusCode != http.StatusConflict {
+		t.Errorf("second apply: %d, want 409", r.StatusCode)
+	}
+	close(release)
+	<-calls
+	select {
+	case <-calls:
+		t.Error("ApplyUpdate ran twice")
+	case <-time.After(100 * time.Millisecond):
 	}
 }
 
@@ -288,5 +313,87 @@ func TestShutdownIsIdempotent(t *testing.T) {
 	}
 	if err := e.s.Shutdown(context.Background()); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSessionRequiredForAPIAndLaunchSetsCookie(t *testing.T) {
+	e := newTestEnv(t)
+	for _, p := range []string{"/api/config", "/events", "/notification-sound"} {
+		resp, err := http.Get(e.base + p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("%s without session: %d, want 401", p, resp.StatusCode)
+		}
+	}
+	if resp, err := http.Get(e.base + "/"); err != nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("index without session: %v %v", resp, err)
+	}
+
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, err := client.Get(e.s.LaunchURL())
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/" {
+		t.Fatalf("launch: %d location=%q", resp.StatusCode, resp.Header.Get("Location"))
+	}
+	var cookie *http.Cookie
+	for _, c := range resp.Cookies() {
+		if c.Name == e.s.cookieName() {
+			cookie = c
+		}
+	}
+	if cookie == nil || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode {
+		t.Fatalf("session cookie = %+v", cookie)
+	}
+	req, _ := http.NewRequest("GET", e.base+"/api/config", nil)
+	req.AddCookie(cookie)
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("api with cookie: %d", resp.StatusCode)
+	}
+
+	resp, err = client.Get(e.base + "/?session=wrong")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if len(resp.Cookies()) != 0 {
+		t.Error("wrong token must not set a cookie")
+	}
+	if info, ok := ReadSession(e.dir); !ok || info.Token != e.s.token || info.Port != e.s.Port() {
+		t.Errorf("session file = %+v ok=%v", info, ok)
+	}
+}
+
+func TestConfigGetMasksSecrets(t *testing.T) {
+	e := newTestEnv(t)
+	secret := "https://hooks.slack.com/services/T000/B000/SECRETSECRET"
+	if r := e.do(t, "POST", "/api/config", `{"webhook_url":"`+secret+`","telegram_bot_token":"123:abc"}`, nil); r.StatusCode != http.StatusOK {
+		t.Fatalf("save secrets: %d", r.StatusCode)
+	}
+	body, _ := io.ReadAll(e.do(t, "GET", "/api/config", "", nil).Body)
+	if strings.Contains(string(body), "SECRETSECRET") || strings.Contains(string(body), "123:abc") {
+		t.Fatalf("secrets leaked: %s", body)
+	}
+	if !strings.Contains(string(body), `"secret_set":{"telegram_bot_token":true,"webhook_url":true}`) {
+		t.Errorf("secret_set missing: %s", body)
+	}
+	if r := e.do(t, "POST", "/api/config", `{"check_interval_sec":9}`, nil); r.StatusCode != http.StatusOK {
+		t.Fatal("save without secrets failed")
+	}
+	if got := e.s.store.Get().WebhookURL; got != secret {
+		t.Errorf("secret lost on unrelated save: %q", got)
+	}
+	if r := e.do(t, "POST", "/api/config", `{"check_interval_sec":"x"}`, nil); r.StatusCode != http.StatusBadRequest {
+		t.Errorf("bad type: %d, want 400", r.StatusCode)
 	}
 }

@@ -39,6 +39,7 @@ type Server struct {
 	version string
 	appDir  string
 	bootID  string
+	token   string
 	native  bool
 	hooks   Hooks
 
@@ -62,6 +63,7 @@ func New(opts Options) *Server {
 		version:  opts.Version,
 		appDir:   opts.AppDir,
 		bootID:   newBootID(),
+		token:    newToken(),
 		native:   opts.NativeNotifications,
 		hooks:    opts.Hooks,
 		shutdown: make(chan struct{}),
@@ -106,9 +108,7 @@ func (s *Server) logDir() string {
 
 func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
-	mux.Handle("GET /assets/", staticHandler())
-	mux.HandleFunc("GET /{$}", s.serveIndex)
-	mux.HandleFunc("GET /report", s.serveReportPage)
+	mux.HandleFunc("GET /", s.serveUI)
 	mux.HandleFunc("GET /events", s.serveSSE)
 	mux.HandleFunc("GET /metrics", s.serveMetrics)
 
@@ -148,13 +148,13 @@ func (s *Server) routes() http.Handler {
 func (s *Server) Start(port int) error {
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
-		s.logf("FATAL dashboard listen on 127.0.0.1:%d: %v", port, err)
 		return fmt.Errorf("dashboard port %d is unavailable: %w", port, err)
 	}
 	s.port = ln.Addr().(*net.TCPAddr).Port
 	s.srv = &http.Server{
 		Handler:           s.routes(),
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
 		IdleTimeout:       2 * time.Minute,
 		MaxHeaderBytes:    64 << 10,
 	}
@@ -163,6 +163,7 @@ func (s *Server) Start(port int) error {
 			s.logf("dashboard server stopped: %v", err)
 		}
 	}()
+	s.writeSessionFile()
 	go s.speed.schedule(s.shutdown)
 	go s.avail.loop(s.shutdown)
 	return nil
@@ -170,10 +171,13 @@ func (s *Server) Start(port int) error {
 
 func (s *Server) Port() int { return s.port }
 
-func (s *Server) URL() string { return fmt.Sprintf("http://localhost:%d", s.port) }
+func (s *Server) URL() string { return fmt.Sprintf("http://127.0.0.1:%d", s.port) }
 
 func (s *Server) Shutdown(ctx context.Context) error {
-	s.once.Do(func() { close(s.shutdown) })
+	s.once.Do(func() {
+		close(s.shutdown)
+		s.removeSessionFile()
+	})
 	s.speed.cancel()
 	if s.srv != nil {
 		return s.srv.Shutdown(ctx)

@@ -13,13 +13,23 @@ import (
 var ErrConflict = errors.New("configuration was changed elsewhere; reload and try again")
 
 type Store struct {
-	mu      sync.RWMutex
-	path    string
-	cfg     Config
-	rev     uint64
-	loadErr error
-	subs    []func(Config)
+	mu       sync.RWMutex
+	notifyMu sync.Mutex
+	path     string
+	cfg      Config
+	rev      uint64
+	loadErr  error
+	readOnly bool
+	subs     []func(Config)
 }
+
+var ErrReadOnly = errors.New("config.json could not be read; fix the file and restart before saving")
+
+type DecodeError struct{ Err error }
+
+func (e *DecodeError) Error() string { return "invalid configuration value: " + e.Err.Error() }
+
+func (e *DecodeError) Unwrap() error { return ErrInvalid }
 
 func Open(path string) (*Store, error) {
 	s := &Store{path: path, cfg: Default(), rev: 1}
@@ -28,6 +38,8 @@ func Open(path string) (*Store, error) {
 	case errors.Is(err, os.ErrNotExist):
 		return s, s.write(s.cfg)
 	case err != nil:
+		s.loadErr = fmt.Errorf("config.json could not be read (%v); defaults are in use and saving is disabled", err)
+		s.readOnly = true
 		return s, err
 	}
 	cfg, perr := Parse(data)
@@ -75,18 +87,23 @@ func (s *Store) Subscribe(fn func(Config)) {
 
 func (s *Store) Update(expectRev uint64, fn func(*Config) error) (Config, uint64, error) {
 	s.mu.Lock()
+	if s.readOnly {
+		s.mu.Unlock()
+		return Config{}, 0, ErrReadOnly
+	}
 	if expectRev != 0 && expectRev != s.rev {
 		cur, rev := s.cfg.Clone(), s.rev
 		s.mu.Unlock()
 		return cur, rev, ErrConflict
 	}
+	prev := s.cfg.Clone()
 	next := s.cfg.Clone()
 	if err := fn(&next); err != nil {
 		s.mu.Unlock()
 		return Config{}, 0, err
 	}
 	next.Sanitize()
-	if err := next.Validate(); err != nil {
+	if err := next.ValidateChanges(prev, false); err != nil {
 		s.mu.Unlock()
 		return Config{}, 0, err
 	}
@@ -99,12 +116,19 @@ func (s *Store) Update(expectRev uint64, fn func(*Config) error) (Config, uint64
 	s.loadErr = nil
 	rev := s.rev
 	subs := append([]func(Config){}, s.subs...)
+	s.notifyMu.Lock()
 	s.mu.Unlock()
 
+	defer s.notifyMu.Unlock()
 	for _, sub := range subs {
-		sub(next.Clone())
+		s.deliver(sub, next.Clone())
 	}
 	return next.Clone(), rev, nil
+}
+
+func (s *Store) deliver(sub func(Config), cfg Config) {
+	defer func() { _ = recover() }()
+	sub(cfg)
 }
 
 func (s *Store) write(cfg Config) error {

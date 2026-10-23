@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"internet-monitor/internal/config"
 	"fmt"
 	"internet-monitor/internal/monitor"
 	"strings"
@@ -17,19 +18,11 @@ func capitalize(s string) string {
 	return string(r)
 }
 
-func IsDiscord(url string) bool {
-	return strings.Contains(url, "discord.com/api/webhooks") ||
-		strings.Contains(url, "discordapp.com/api/webhooks")
-}
+func IsDiscord(url string) bool { return config.IsDiscordWebhook(url) }
 
-func IsSlack(url string) bool {
-	return strings.Contains(url, "hooks.slack.com") ||
-		strings.Contains(url, "slack.com/services/")
-}
+func IsSlack(url string) bool { return config.IsSlackWebhook(url) }
 
-func IsSupportedWebhook(url string) bool {
-	return IsDiscord(url) || IsSlack(url)
-}
+func IsSupportedWebhook(url string) bool { return config.IsSupportedWebhook(url) }
 
 func BuildEventPayload(event monitor.Event, url string) interface{} {
 	if IsDiscord(url) {

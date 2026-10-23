@@ -53,3 +53,14 @@ func TestDecode(t *testing.T) {
 		t.Fatalf("sum = %d err=%v", sum, err)
 	}
 }
+
+func TestScanSkipsOversizedLineAndContinues(t *testing.T) {
+	huge := `{"x":"` + strings.Repeat("a", maxLine+10) + `"}`
+	got, err := Tail(writeLines(t, `{"n":1}`, huge, `{"n":2}`), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || string(got[0]) != `{"n":2}` {
+		t.Fatalf("got %d entries, first=%s", len(got), got[0])
+	}
+}

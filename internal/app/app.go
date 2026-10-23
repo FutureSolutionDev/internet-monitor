@@ -88,16 +88,16 @@ func New(opts Options) (*App, error) {
 			Restart:          updater.Restart,
 		},
 	})
+	engine := core.New(cfg, monitor.NewChecker(cfg), lgr, opts.Version)
+	store.Subscribe(engine.ApplyConfig)
+
 	if err := srv.Start(cfg.DashboardPort); err != nil {
-		lgr.AppLog("%v — falling back to a free port", err)
+		lgr.AppLog("port %d unavailable (%v); using a free port instead", cfg.DashboardPort, err)
 		if err := srv.Start(0); err != nil {
 			return nil, err
 		}
 	}
 	lgr.AppLog("dashboard listening on %s", srv.URL())
-
-	engine := core.New(cfg, monitor.NewChecker(cfg), lgr, opts.Version)
-	store.Subscribe(engine.ApplyConfig)
 
 	return &App{
 		Dir:     dir,
@@ -108,6 +108,14 @@ func New(opts Options) (*App, error) {
 		Engine:  engine,
 		stop:    make(chan struct{}),
 	}, nil
+}
+
+func (a *App) LogDir() string {
+	dir := a.Store.Get().LogDir
+	if filepath.IsAbs(dir) {
+		return dir
+	}
+	return filepath.Join(a.Dir, dir)
 }
 
 func (a *App) Run(notifiers ...core.Notifier) {

@@ -133,7 +133,7 @@ func (c *Config) Sanitize() {
 	if c.LatencyThreshold < 0 {
 		c.LatencyThreshold = def.LatencyThreshold
 	}
-	if c.DashboardPort < 1024 || c.DashboardPort > 65535 {
+	if c.DashboardPort < 1 || c.DashboardPort > 65535 {
 		c.DashboardPort = def.DashboardPort
 	}
 	if strings.TrimSpace(c.LogDir) == "" {
@@ -186,16 +186,33 @@ func cleanTargets(in []string) []string {
 	return out
 }
 
-func (c Config) Validate() error {
-	dir := filepath.Clean(c.LogDir)
-	if filepath.IsAbs(c.LogDir) || filepath.VolumeName(c.LogDir) != "" || strings.HasPrefix(c.LogDir, "/") || strings.HasPrefix(c.LogDir, `\`) {
-		return fieldError("log_dir", "must be a folder inside the app directory")
+func (c Config) Validate() error { return c.ValidateChanges(Config{}, true) }
+
+func (c Config) ValidateChanges(prev Config, all bool) error {
+	if all || c.LogDir != prev.LogDir {
+		if err := validateLogDir(c.LogDir); err != nil {
+			return err
+		}
 	}
-	if dir == ".." || strings.HasPrefix(dir, ".."+string(filepath.Separator)) || strings.Contains(c.LogDir, "..") {
-		return fieldError("log_dir", "must not leave the app directory")
+	if all || c.WebhookURL != prev.WebhookURL {
+		if c.WebhookURL != "" && !IsSupportedWebhook(c.WebhookURL) {
+			return fieldError("webhook_url", "only https Discord or Slack webhook URLs are supported")
+		}
 	}
 	if len(c.PingTargets) == 0 && len(c.HTTPTargets) == 0 && len(c.DNSTargets) == 0 {
 		return fieldError("targets", "at least one target is required")
+	}
+	return nil
+}
+
+func validateLogDir(dir string) error {
+	if filepath.IsAbs(dir) || filepath.VolumeName(dir) != "" || strings.HasPrefix(dir, "/") || strings.HasPrefix(dir, `\`) {
+		return fieldError("log_dir", "must be a folder inside the app directory")
+	}
+	for _, part := range strings.FieldsFunc(dir, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if part == ".." {
+			return fieldError("log_dir", "must not leave the app directory")
+		}
 	}
 	return nil
 }

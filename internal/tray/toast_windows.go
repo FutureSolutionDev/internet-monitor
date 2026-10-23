@@ -4,7 +4,9 @@ package tray
 
 import (
 	"fmt"
+	"internet-monitor/internal/assets"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"syscall"
@@ -36,6 +38,22 @@ var (
 	registerAppIDErr         error
 )
 
+func toastIconPath() string {
+	base, err := os.UserCacheDir()
+	if err != nil {
+		return ""
+	}
+	dir := filepath.Join(base, "InternetMonitor")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return ""
+	}
+	path := filepath.Join(dir, "toast-icon.png")
+	if err := os.WriteFile(path, assets.FaviconPNG(), 0o644); err != nil {
+		return ""
+	}
+	return path
+}
+
 func registerAppID() error {
 	registerAppIDOnce.Do(func() {
 		k, _, err := registry.CreateKey(registry.CURRENT_USER, aumidRegistryRoot+notifyAUMID, registry.SET_VALUE)
@@ -48,9 +66,9 @@ func registerAppID() error {
 			registerAppIDErr = fmt.Errorf("set DisplayName: %w", err)
 			return
 		}
-		if exe, err := os.Executable(); err == nil {
-			if err := k.SetStringValue("IconUri", exe); err != nil {
-				registerAppIDErr = fmt.Errorf("set IconUri: %w", err)
+		if icon := toastIconPath(); icon != "" {
+			if err := k.SetStringValue("IconUri", icon); err != nil && Logf != nil {
+				Logf("[notify] set IconUri: %v", err)
 			}
 		}
 	})

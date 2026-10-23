@@ -12,6 +12,7 @@ const (
 	clientBuffer   = 32
 	maxSSEClients  = 16
 	heartbeatEvery = 15 * time.Second
+	writeTimeout   = 10 * time.Second
 )
 
 type sseClient struct {
@@ -88,11 +89,6 @@ func (s *Server) broadcastJSON(v interface{}) {
 }
 
 func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
-		return
-	}
 	c, ok := s.hub.subscribe()
 	if !ok {
 		http.Error(w, "too many live connections", http.StatusServiceUnavailable)
@@ -106,29 +102,32 @@ func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {
 	h.Set("Connection", "keep-alive")
 	h.Set("X-Accel-Buffering", "no")
 
+	rc := http.NewResponseController(w)
+	write := func(format string, args ...interface{}) bool {
+		_ = rc.SetWriteDeadline(time.Now().Add(writeTimeout))
+		if _, err := fmt.Fprintf(w, format, args...); err != nil {
+			return false
+		}
+		return rc.Flush() == nil
+	}
+
 	init, err := json.Marshal(s.snapshot("init"))
-	if err != nil {
+	if err != nil || !write("retry: 2000\ndata: %s\n\n", init) {
 		return
 	}
-	if _, err := fmt.Fprintf(w, "retry: 2000\ndata: %s\n\n", init); err != nil {
-		return
-	}
-	flusher.Flush()
 
 	heartbeat := time.NewTicker(heartbeatEvery)
 	defer heartbeat.Stop()
 	for {
 		select {
 		case msg := <-c.ch:
-			if _, err := fmt.Fprintf(w, "data: %s\n\n", msg); err != nil {
+			if !write("data: %s\n\n", msg) {
 				return
 			}
-			flusher.Flush()
 		case <-heartbeat.C:
-			if _, err := fmt.Fprint(w, ": ping\n\n"); err != nil {
+			if !write(": ping\n\n") {
 				return
 			}
-			flusher.Flush()
 		case <-c.evicted:
 			return
 		case <-r.Context().Done():

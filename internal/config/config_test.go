@@ -195,3 +195,59 @@ func TestStoreConcurrentUpdatesAreSerialized(t *testing.T) {
 		t.Errorf("revision = %d, want 21", s.Revision())
 	}
 }
+
+func TestStoreKeepsLegacyAbsoluteLogDirWritable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"log_dir":"D:\monitor-logs"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.Update(0, func(c *Config) error { c.Language = "ar"; return nil }); err != nil {
+		t.Fatalf("unrelated save blocked by legacy log_dir: %v", err)
+	}
+	if _, _, err := s.Update(0, func(c *Config) error { c.LogDir = `E:\monitor`; return nil }); !errors.Is(err, ErrInvalid) {
+		t.Errorf("changing to a new absolute log_dir: err = %v, want ErrInvalid", err)
+	}
+}
+
+func TestWebhookValidation(t *testing.T) {
+	good := []string{
+		"https://discord.com/api/webhooks/1/abc",
+		"https://hooks.slack.com/services/T/B/x",
+	}
+	bad := []string{
+		"https://evil.example/?x=discord.com/api/webhooks",
+		"http://discord.com/api/webhooks/1/abc",
+		"https://discord.com.evil.example/api/webhooks/1",
+		"https://user@hooks.slack.com/services/T",
+		"https://hooks.slack.com/",
+	}
+	for _, u := range good {
+		if !IsSupportedWebhook(u) {
+			t.Errorf("%q rejected", u)
+		}
+	}
+	for _, u := range bad {
+		if IsSupportedWebhook(u) {
+			t.Errorf("%q accepted", u)
+		}
+	}
+	s, err := Open(filepath.Join(t.TempDir(), "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.Update(0, func(c *Config) error { c.WebhookURL = bad[0]; return nil }); !errors.Is(err, ErrInvalid) {
+		t.Errorf("unsupported webhook saved: err = %v", err)
+	}
+}
+
+func TestValidateAllowsDotsInsideNames(t *testing.T) {
+	c := Default()
+	c.LogDir = "my..logs"
+	if err := c.Validate(); err != nil {
+		t.Errorf("my..logs rejected: %v", err)
+	}
+}

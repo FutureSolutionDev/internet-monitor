@@ -27,6 +27,18 @@ func setRevisionHeaders(w http.ResponseWriter, rev uint64) {
 	w.Header().Set("X-Config-Revision", strconv.FormatUint(rev, 10))
 }
 
+type configView struct {
+	config.Config
+	SecretSet map[string]bool `json:"secret_set"`
+}
+
+func viewOf(c config.Config) configView {
+	set := map[string]bool{"webhook_url": c.WebhookURL != "", "telegram_bot_token": c.TelegramBotToken != ""}
+	c.WebhookURL = ""
+	c.TelegramBotToken = ""
+	return configView{Config: c, SecretSet: set}
+}
+
 func (s *Server) serveConfigGet(w http.ResponseWriter, _ *http.Request) {
 	if s.store == nil {
 		writeError(w, http.StatusServiceUnavailable, "unavailable", "configuration store not ready")
@@ -34,18 +46,23 @@ func (s *Server) serveConfigGet(w http.ResponseWriter, _ *http.Request) {
 	}
 	cfg, rev := s.store.Snapshot()
 	setRevisionHeaders(w, rev)
-	writeJSON(w, http.StatusOK, cfg)
+	writeJSON(w, http.StatusOK, viewOf(cfg))
 }
 
 func (s *Server) writeConfigError(w http.ResponseWriter, err error) {
 	var fe *config.FieldError
+	var de *config.DecodeError
 	switch {
+	case errors.As(err, &de):
+		writeError(w, http.StatusBadRequest, "invalid", de.Error())
+	case errors.Is(err, config.ErrReadOnly):
+		writeError(w, http.StatusConflict, "read_only", err.Error())
 	case errors.As(err, &fe):
 		writeJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "code": "invalid", "field": fe.Field, "error": fe.Message})
 	case errors.Is(err, config.ErrConflict):
 		cfg, rev := s.store.Snapshot()
 		setRevisionHeaders(w, rev)
-		writeJSON(w, http.StatusConflict, map[string]interface{}{"ok": false, "code": "conflict", "error": err.Error(), "revision": rev, "config": cfg})
+		writeJSON(w, http.StatusConflict, map[string]interface{}{"ok": false, "code": "conflict", "error": err.Error(), "revision": rev, "config": viewOf(cfg)})
 	default:
 		s.logf("CONFIG save failed: %v", err)
 		writeError(w, http.StatusInternalServerError, "save_failed", "could not save configuration")
@@ -64,7 +81,10 @@ func (s *Server) serveConfigPost(w http.ResponseWriter, r *http.Request) {
 	}
 	prevPort := s.store.Get().DashboardPort
 	cfg, rev, err := s.store.Update(revisionFrom(r), func(c *config.Config) error {
-		return json.Unmarshal(body, c)
+		if err := json.Unmarshal(body, c); err != nil {
+			return &config.DecodeError{Err: err}
+		}
+		return nil
 	})
 	if err != nil {
 		s.writeConfigError(w, err)
@@ -75,7 +95,7 @@ func (s *Server) serveConfigPost(w http.ResponseWriter, r *http.Request) {
 		s.logf("CONFIG dashboard_port changed to %d — restart required", cfg.DashboardPort)
 	}
 	setRevisionHeaders(w, rev)
-	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "revision": rev, "restart_required": restart, "config": cfg})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "revision": rev, "restart_required": restart, "config": viewOf(cfg)})
 }
 
 func (s *Server) serveLanguage(w http.ResponseWriter, r *http.Request) {

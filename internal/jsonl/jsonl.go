@@ -21,21 +21,35 @@ func Scan(path string, fn func(line []byte) bool) error {
 }
 
 func scanReader(r io.Reader, fn func(line []byte) bool) error {
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 64*1024), maxLine)
-	for sc.Scan() {
-		line := bytes.TrimSpace(sc.Bytes())
-		if len(line) == 0 || !json.Valid(line) {
+	br := bufio.NewReaderSize(r, 64*1024)
+	var buf []byte
+	skipping := false
+	for {
+		chunk, err := br.ReadSlice('\n')
+		if !skipping {
+			if len(buf)+len(chunk) > maxLine {
+				skipping, buf = true, buf[:0]
+			} else {
+				buf = append(buf, chunk...)
+			}
+		}
+		if errors.Is(err, bufio.ErrBufferFull) {
 			continue
 		}
-		if !fn(line) {
+		if !skipping {
+			line := bytes.TrimSpace(buf)
+			if len(line) > 0 && json.Valid(line) && !fn(line) {
+				return nil
+			}
+		}
+		buf, skipping = buf[:0], false
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
+		if err != nil {
+			return err
+		}
 	}
-	if err := sc.Err(); err != nil && !errors.Is(err, bufio.ErrTooLong) {
-		return err
-	}
-	return nil
 }
 
 func Tail(path string, limit int) ([]json.RawMessage, error) {

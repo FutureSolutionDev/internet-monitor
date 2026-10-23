@@ -45,20 +45,18 @@ func newClient() *http.Client {
 }
 
 type failGate struct {
-	consecutive atomic.Int64
+	consecutive int
 	transferred *atomic.Int64
 	errors      *atomic.Int64
-	abort       context.CancelFunc
 }
 
 func (g *failGate) fail(ctx context.Context) bool {
 	g.errors.Add(1)
-	n := g.consecutive.Add(1)
-	if n >= maxConsecutiveFailures && g.transferred.Load() == 0 {
-		g.abort()
+	g.consecutive++
+	if g.consecutive >= maxConsecutiveFailures && g.transferred.Load() == 0 {
 		return false
 	}
-	backoff := min(time.Duration(n)*200*time.Millisecond, 2*time.Second)
+	backoff := min(time.Duration(g.consecutive)*200*time.Millisecond, 2*time.Second)
 	select {
 	case <-ctx.Done():
 		return false
@@ -67,7 +65,20 @@ func (g *failGate) fail(ctx context.Context) bool {
 	}
 }
 
-func (g *failGate) ok() { g.consecutive.Store(0) }
+func (g *failGate) ok() { g.consecutive = 0 }
+
+func waitWorkers(ctx context.Context, wg *sync.WaitGroup) {
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-ctx.Done():
+		<-done
+	case <-done:
+	}
+}
 
 var chunkSizes = []int64{
 	1_000_000,
@@ -102,12 +113,12 @@ func Run(ctx context.Context, cfg Config, progress func(float64, time.Duration))
 	var totalBytes atomic.Int64
 	var errCount atomic.Int64
 	var chunkIdx atomic.Int64
-	gate := &failGate{transferred: &totalBytes, errors: &errCount, abort: cancel}
 	start := time.Now()
 
 	var wg sync.WaitGroup
 	worker := func(id int) {
 		defer wg.Done()
+		gate := &failGate{transferred: &totalBytes, errors: &errCount}
 		for tctx.Err() == nil {
 			endpoint := cfg.Endpoints[id%len(cfg.Endpoints)]
 			url := endpoint + "?bytes=" + strconv.FormatInt(chunkSizes[chunkIdx.Load()], 10)
@@ -166,8 +177,8 @@ func Run(ctx context.Context, cfg Config, progress func(float64, time.Duration))
 		}
 	}()
 
-	<-tctx.Done()
-	wg.Wait()
+	waitWorkers(tctx, &wg)
+	cancel()
 
 	elapsed := time.Since(start)
 	bytes := totalBytes.Load()
@@ -213,7 +224,6 @@ func MeasureUpload(ctx context.Context, cfg Config, progress func(float64, time.
 
 	var totalBytes atomic.Int64
 	var errCount atomic.Int64
-	gate := &failGate{transferred: &totalBytes, errors: &errCount, abort: cancel}
 	start := time.Now()
 
 	client := newClient()
@@ -222,6 +232,7 @@ func MeasureUpload(ctx context.Context, cfg Config, progress func(float64, time.
 	var wg sync.WaitGroup
 	worker := func() {
 		defer wg.Done()
+		gate := &failGate{transferred: &totalBytes, errors: &errCount}
 		payload := make([]byte, uploadChunk)
 		for tctx.Err() == nil {
 			req, err := http.NewRequestWithContext(tctx, "POST", cfg.UploadTarget, bytes.NewReader(payload))
@@ -270,8 +281,8 @@ func MeasureUpload(ctx context.Context, cfg Config, progress func(float64, time.
 		}
 	}()
 
-	<-tctx.Done()
-	wg.Wait()
+	waitWorkers(tctx, &wg)
+	cancel()
 
 	elapsed := time.Since(start)
 	sent := totalBytes.Load()

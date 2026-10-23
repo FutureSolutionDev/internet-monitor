@@ -25,7 +25,12 @@ func main() {
 	}
 
 	w := webview.New(false)
-	defer w.Destroy()
+	if w == nil {
+		a.Log.AppLog("webview unavailable; opening the dashboard in the browser instead")
+		tray.OpenURL(a.Server.LaunchURL())
+		a.Run()
+		select {}
+	}
 	w.SetTitle("Internet Monitor")
 	w.SetSize(1180, 780, webview.HintNone)
 
@@ -40,10 +45,11 @@ func main() {
 	stopTray := initTray(w, hwnd)
 	a.Run(&guiNotifier{})
 
-	w.Navigate(a.Server.URL())
+	w.Navigate(a.Server.LaunchURL())
 	w.Run()
 
 	a.Stop()
 	stopTray()
+	w.Destroy()
 	os.Exit(0)
 }

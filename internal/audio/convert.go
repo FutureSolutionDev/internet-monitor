@@ -9,11 +9,15 @@ import (
 	"github.com/hajimehoshi/go-mp3"
 )
 
-const targetRate = 22050
+const (
+	targetRate     = 22050
+	maxClipSeconds = 30
+)
 
 var (
 	ErrNoFrames      = errors.New("no decodable MP3 audio frames found")
 	ErrUnsupported   = errors.New("unsupported audio format: upload an MP3 or WAV file")
+	ErrTooLong       = errors.New("sound is too long: keep it under 30 seconds")
 	bitratesMPEG1    = [16]int{0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0}
 	bitratesMPEG2    = [16]int{0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0}
 	sampleRatesMPEG1 = [3]int{44100, 48000, 32000}
@@ -21,6 +25,9 @@ var (
 
 func ToWAV(data []byte) ([]byte, error) {
 	if IsWAV(data) {
+		if WAVDuration(data) > maxClipSeconds {
+			return nil, ErrTooLong
+		}
 		return data, nil
 	}
 	wav, err := ConvertMP3ToWAV(data)
@@ -31,7 +38,62 @@ func ToWAV(data []byte) ([]byte, error) {
 }
 
 func IsWAV(data []byte) bool {
-	return len(data) >= 44 && string(data[0:4]) == "RIFF" && string(data[8:12]) == "WAVE"
+	if len(data) < 44 || string(data[0:4]) != "RIFF" || string(data[8:12]) != "WAVE" {
+		return false
+	}
+	var haveFmt, haveData bool
+	for off := 12; off+8 <= len(data); {
+		id := string(data[off : off+4])
+		size := int(binary.LittleEndian.Uint32(data[off+4 : off+8]))
+		body := off + 8
+		if size < 0 || body+size > len(data) {
+			if id == "data" && haveFmt {
+				return true
+			}
+			return false
+		}
+		switch id {
+		case "fmt ":
+			if size < 16 {
+				return false
+			}
+			format := binary.LittleEndian.Uint16(data[body:])
+			channels := binary.LittleEndian.Uint16(data[body+2:])
+			rate := binary.LittleEndian.Uint32(data[body+4:])
+			bits := binary.LittleEndian.Uint16(data[body+14:])
+			if (format != 1 && format != 3 && format != 0xFFFE) || channels < 1 || channels > 2 || rate < 8000 || rate > 192000 || bits == 0 || bits > 32 {
+				return false
+			}
+			haveFmt = true
+		case "data":
+			haveData = true
+		}
+		off = body + size + size%2
+	}
+	return haveFmt && haveData
+}
+
+func WAVDuration(data []byte) float64 {
+	if !IsWAV(data) {
+		return 0
+	}
+	var byteRate uint32
+	for off := 12; off+8 <= len(data); {
+		id := string(data[off : off+4])
+		size := int(binary.LittleEndian.Uint32(data[off+4 : off+8]))
+		body := off + 8
+		switch id {
+		case "fmt ":
+			byteRate = binary.LittleEndian.Uint32(data[body+8:])
+		case "data":
+			if byteRate == 0 {
+				return 0
+			}
+			return float64(min(size, len(data)-body)) / float64(byteRate)
+		}
+		off = body + size + size%2
+	}
+	return 0
 }
 
 func ConvertMP3ToWAV(mp3Data []byte) ([]byte, error) {
@@ -43,12 +105,12 @@ func ConvertMP3ToWAV(mp3Data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	raw, err := io.ReadAll(dec)
+	rate := dec.SampleRate()
+	raw, err := io.ReadAll(io.LimitReader(dec, int64(rate)*4*maxClipSeconds))
 	if err != nil && len(raw) == 0 {
 		return nil, err
 	}
 
-	rate := dec.SampleRate()
 	step := rate / targetRate
 	if step < 1 {
 		step = 1

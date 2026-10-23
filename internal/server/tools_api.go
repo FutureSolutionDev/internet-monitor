@@ -183,7 +183,7 @@ func (s *Server) sendTestWebhook(results testTargetsResponse) {
 	if err != nil {
 		return
 	}
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := logger.NoRedirectClient(10 * time.Second)
 	resp, err := client.Post(cfg.WebhookURL, "application/json", bytes.NewReader(body))
 	if err != nil {
 		s.logf("WEBHOOK test-targets error: %s", logger.RedactSecret(err.Error(), cfg.WebhookURL))

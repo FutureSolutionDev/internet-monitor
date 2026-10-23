@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,8 +45,39 @@ type ghAsset struct {
 	Size               int64  `json:"size"`
 }
 
+var trustedHosts = map[string]bool{
+	"api.github.com":                        true,
+	"github.com":                            true,
+	"objects.githubusercontent.com":         true,
+	"release-assets.githubusercontent.com":  true,
+	"github-releases.githubusercontent.com": true,
+}
+
+func trustedURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	if u.Scheme != "https" || !trustedHosts[strings.ToLower(u.Hostname())] {
+		return fmt.Errorf("untrusted update location %s://%s", u.Scheme, u.Hostname())
+	}
+	return nil
+}
+
+func pinnedClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout: timeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return fmt.Errorf("too many redirects")
+			}
+			return trustedURL(req.URL.String())
+		},
+	}
+}
+
 func Check(currentVersion string) (*Info, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := pinnedClient(10 * time.Second)
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
 		return nil, err
@@ -77,17 +109,21 @@ func Check(currentVersion string) (*Info, error) {
 
 	if info.HasUpdate {
 		info.DownloadURL = pickAsset(rel.Assets)
+		if info.DownloadURL == "" || trustedURL(info.DownloadURL) != nil {
+			info.HasUpdate = false
+			info.DownloadURL = ""
+		}
 	}
 
 	return info, nil
 }
 
 func Apply(downloadURL string) error {
-	if !strings.HasPrefix(strings.ToLower(downloadURL), "https://") {
-		return fmt.Errorf("refusing non-HTTPS update URL")
+	if err := trustedURL(downloadURL); err != nil {
+		return err
 	}
 
-	client := &http.Client{Timeout: 10 * time.Minute}
+	client := pinnedClient(10 * time.Minute)
 	resp, err := client.Get(downloadURL)
 	if err != nil {
 		return fmt.Errorf("download failed: %w", err)
@@ -98,7 +134,7 @@ func Apply(downloadURL string) error {
 		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
 	}
 
-	const maxUpdateSize = 500 * 1024 * 1024
+	const maxUpdateSize = 150 * 1024 * 1024
 	if resp.ContentLength > maxUpdateSize {
 		return fmt.Errorf("update too large: %d bytes", resp.ContentLength)
 	}
@@ -136,7 +172,7 @@ func fetchChecksum(downloadURL string) (string, error) {
 	checksumURL := downloadURL[:idx+1] + "SHA256SUMS"
 	asset := downloadURL[idx+1:]
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := pinnedClient(30 * time.Second)
 	resp, err := client.Get(checksumURL)
 	if err != nil {
 		return "", err

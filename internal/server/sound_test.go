@@ -22,6 +22,7 @@ func soundUpload(t *testing.T, e *testEnv, payload []byte) *http.Response {
 	_ = mw.Close()
 	req, _ := http.NewRequest(http.MethodPost, e.base+"/notification-sound", &body)
 	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set(sessionHeader, e.s.token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)

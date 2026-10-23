@@ -116,6 +116,11 @@ func (sr *speedRunner) start(triggeredBy string) bool {
 			}
 		}
 
+		if ctx.Err() != nil {
+			sr.emit(speedProgress{Phase: "cancelled", Done: true, Cancelled: true})
+			return
+		}
+
 		event := logger.SpeedTestEvent{
 			Timestamp:       time.Now().UTC(),
 			Event:           "speed_test",
