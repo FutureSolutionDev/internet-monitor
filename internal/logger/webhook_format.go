@@ -1,8 +1,8 @@
 package logger
 
 import (
-	"internet-monitor/internal/config"
 	"fmt"
+	"internet-monitor/internal/config"
 	"internet-monitor/internal/monitor"
 	"strings"
 	"time"
