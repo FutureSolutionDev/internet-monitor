@@ -1129,7 +1129,7 @@ async function loadSoundState() {
     const resetBtn = document.getElementById("sound-reset-btn");
     const fileLabel = document.getElementById("sound-filename");
     if (resetBtn) resetBtn.style.display = custom ? "" : "none";
-    if (fileLabel) fileLabel.textContent = custom ? t("sound_current") + " notification.mp3" : "";
+    if (fileLabel) fileLabel.textContent = custom ? t("sound_custom_active") : "";
   } catch (_) {}
 }
 
@@ -1148,8 +1148,9 @@ async function uploadSound(input) {
       if (fileLabel) fileLabel.textContent = t("sound_current") + " " + file.name;
       const resetBtn = document.getElementById("sound-reset-btn");
       if (resetBtn) resetBtn.style.display = "";
+      playAlert();
     } else {
-      if (status) status.textContent = t("sound_err");
+      if (status) status.textContent = t(data.code === "unsupported" ? "sound_err_format" : "sound_err");
     }
   } catch (_) {
     if (status) status.textContent = t("sound_err");

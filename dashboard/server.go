@@ -1526,87 +1526,72 @@ func (s *Server) broadcastRaw(msg string) {
 	s.mu.Unlock()
 }
 
-// ── Custom notification sound ─────────────────────────────────
-
-func (s *Server) customSoundPath() string {
+func (s *Server) legacyMp3Path() string {
 	return filepath.Join(filepath.Dir(s.configPath), "notification.mp3")
 }
 
-// customWavPath is where the native player (sound.RingtonePath) looks for a
-// user override. The uploaded MP3 is transcoded here so the OS notification
-// sound matches the browser-preview sound.
 func (s *Server) customWavPath() string {
 	return filepath.Join(filepath.Dir(s.configPath), "notification.wav")
 }
 
-// serveNotificationSound handles GET (serve sound) and POST (upload) and DELETE (reset).
-func (s *Server) serveNotificationSound(w http.ResponseWriter, r *http.Request) {
-	customPath := s.customSoundPath()
+func writeSoundJSON(w http.ResponseWriter, status int, body map[string]interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(body)
+}
 
-	customExists := false
-	if _, err := os.Stat(customPath); err == nil {
-		customExists = true
-	}
+func (s *Server) serveNotificationSound(w http.ResponseWriter, r *http.Request) {
+	wavPath := s.customWavPath()
+	_, statErr := os.Stat(wavPath)
+	customExists := statErr == nil
 
 	switch r.Method {
-	case http.MethodHead:
-		w.Header().Set("Content-Type", "audio/mpeg")
+	case http.MethodHead, http.MethodGet:
 		if customExists {
 			w.Header().Set("X-Custom-Sound", "1")
-		}
-		w.WriteHeader(http.StatusOK)
-
-	case http.MethodGet:
-		if customExists {
-			w.Header().Set("Content-Type", "audio/mpeg")
-			w.Header().Set("X-Custom-Sound", "1")
-			http.ServeFile(w, r, customPath)
+			http.ServeFile(w, r, wavPath)
 			return
 		}
-		// Fall back to embedded default
-		data := RingtoneMp3()
 		w.Header().Set("Content-Type", "audio/mpeg")
-		w.Write(data)
+		if r.Method == http.MethodGet {
+			_, _ = w.Write(RingtoneMp3())
+		}
 
 	case http.MethodPost:
-		r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10 MB limit
+		r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
 		file, _, err := r.FormFile("sound")
 		if err != nil {
-			http.Error(w, `{"error":"invalid file"}`, http.StatusBadRequest)
+			writeSoundJSON(w, http.StatusBadRequest, map[string]interface{}{"error": "invalid file"})
 			return
 		}
 		defer file.Close()
 		data, err := io.ReadAll(file)
 		if err != nil || len(data) == 0 {
-			http.Error(w, `{"error":"read failed"}`, http.StatusBadRequest)
+			writeSoundJSON(w, http.StatusBadRequest, map[string]interface{}{"error": "read failed"})
 			return
 		}
-		if err := os.WriteFile(customPath, data, 0644); err != nil {
-			http.Error(w, `{"error":"save failed"}`, http.StatusInternalServerError)
-			return
-		}
-		// Transcode to WAV for the native player (winmm PlaySound is WAV-only),
-		// so the OS notification sound matches the uploaded MP3. If conversion
-		// fails, keep the MP3 for the browser but drop any stale WAV so the
-		// native player falls back to the embedded default instead of an old one.
-		if wav, cerr := audio.ConvertMP3ToWAV(data); cerr == nil {
-			if werr := os.WriteFile(s.customWavPath(), wav, 0644); werr != nil && s.lgr != nil {
-				s.lgr.AppLog("custom sound: WAV save failed: %v", werr)
-			}
-		} else {
-			os.Remove(s.customWavPath())
+		wav, err := audio.ToWAV(data)
+		if err != nil {
 			if s.lgr != nil {
-				s.lgr.AppLog("custom sound: MP3->WAV conversion failed: %v", cerr)
+				s.lgr.AppLog("custom sound: rejected upload: %v", err)
 			}
+			writeSoundJSON(w, http.StatusUnprocessableEntity, map[string]interface{}{"error": err.Error(), "code": "unsupported"})
+			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"ok":true}`))
+		if err := os.WriteFile(wavPath, wav, 0644); err != nil {
+			if s.lgr != nil {
+				s.lgr.AppLog("custom sound: WAV save failed: %v", err)
+			}
+			writeSoundJSON(w, http.StatusInternalServerError, map[string]interface{}{"error": "save failed"})
+			return
+		}
+		_ = os.Remove(s.legacyMp3Path())
+		writeSoundJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
 
 	case http.MethodDelete:
-		os.Remove(customPath)
-		os.Remove(s.customWavPath())
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"ok":true}`))
+		_ = os.Remove(s.legacyMp3Path())
+		_ = os.Remove(wavPath)
+		writeSoundJSON(w, http.StatusOK, map[string]interface{}{"ok": true})
 
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
