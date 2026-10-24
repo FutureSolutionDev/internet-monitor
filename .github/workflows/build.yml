@@ -357,7 +357,7 @@ jobs:
           name: "Internet Monitor ${{ needs.version.outputs.new_tag }}"
           generate_release_notes: true
           fail_on_unmatched_files: true
-          prerelease: false
+          prerelease: true
           files: |
             dist/internet-monitor-windows.exe
             dist/internet-monitor-gui-windows.exe
