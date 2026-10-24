@@ -34,7 +34,7 @@ describe("SmartSelect", () => {
   test("opens, moves with the keyboard and commits", async () => {
     const onChange = vi.fn();
     render(<SmartSelect label="Fruit" value="apple" onChange={onChange} options={fruits.slice(0, 3)} />);
-    const trigger = screen.getByRole("button", { name: "Fruit" });
+    const trigger = screen.getByRole("button", { name: /^Fruit:/ });
     fireEvent.click(trigger);
     await settle();
     const list = screen.getByRole("listbox", { name: "Fruit" });
@@ -56,7 +56,7 @@ describe("SmartSelect", () => {
   test("escape closes without changing and returns focus", async () => {
     const onChange = vi.fn();
     render(<SmartSelect label="Fruit" value="apple" onChange={onChange} options={fruits.slice(0, 3)} />);
-    const trigger = screen.getByRole("button", { name: "Fruit" });
+    const trigger = screen.getByRole("button", { name: /^Fruit:/ });
     fireEvent.keyDown(trigger, { key: "ArrowDown" });
     await settle();
     fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
@@ -68,8 +68,8 @@ describe("SmartSelect", () => {
   test("long lists get a search box that filters", async () => {
     const onChange = vi.fn();
     render(<SmartSelect label="Fruit" value={null} onChange={onChange} options={fruits} />);
-    expect(screen.getByRole("button", { name: "Fruit" }).textContent).toContain("Choose");
-    fireEvent.click(screen.getByRole("button", { name: "Fruit" }));
+    expect(screen.getByRole("button", { name: /^Fruit:/ }).textContent).toContain("Choose");
+    fireEvent.click(screen.getByRole("button", { name: /^Fruit:/ }));
     await settle();
     const search = screen.getByRole("combobox");
     expect(document.activeElement).toBe(search);
@@ -78,7 +78,7 @@ describe("SmartSelect", () => {
     fireEvent.keyDown(search, { key: "Enter" });
     expect(onChange).toHaveBeenCalledWith("grape");
 
-    fireEvent.click(screen.getByRole("button", { name: "Fruit" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Fruit:/ }));
     await settle();
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "zzz" } });
     expect(screen.queryAllByRole("option")).toHaveLength(0);
@@ -87,7 +87,7 @@ describe("SmartSelect", () => {
 
   test("typeahead jumps to a matching option", async () => {
     render(<SmartSelect label="Fruit" value="apple" onChange={() => {}} options={fruits.slice(0, 5)} />);
-    fireEvent.click(screen.getByRole("button", { name: "Fruit" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Fruit:/ }));
     await settle();
     const list = screen.getByRole("listbox");
     fireEvent.keyDown(list, { key: "d" });
@@ -98,13 +98,13 @@ describe("SmartSelect", () => {
     const { rerender } = render(
       <SmartSelect label="Fruit" value="apple" onChange={() => {}} options={fruits.slice(0, 3)} />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Fruit" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Fruit:/ }));
     await settle();
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole("listbox")).toBeNull();
 
     rerender(<SmartSelect label="Fruit" value="apple" onChange={() => {}} options={fruits} disabled />);
-    fireEvent.click(screen.getByRole("button", { name: "Fruit" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Fruit:/ }));
     await settle();
     expect(screen.queryByRole("listbox")).toBeNull();
   });

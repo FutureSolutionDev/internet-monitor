@@ -89,7 +89,7 @@ export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height =
   const n = values.length;
   const timeOf = (i: number) => lastCheck - (n - 1 - i) * intervalSec * 1000;
 
-  const pick = (e: PointerEvent<SVGSVGElement>) => {
+  const pick = (e: PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     let p = rtl ? PAD.end + geo.plotW - x : x - PAD.start;
@@ -97,7 +97,7 @@ export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height =
     setActive(n <= 1 ? 0 : Math.round((p / geo.plotW) * (n - 1)));
   };
 
-  const onKey = (e: KeyboardEvent<SVGSVGElement>) => {
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (n === 0) return;
     const forward = rtl ? "ArrowLeft" : "ArrowRight";
     const back = rtl ? "ArrowRight" : "ArrowLeft";
@@ -120,87 +120,105 @@ export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height =
   const summary = `${t("chart_latency")}: ${formatNumber(lang, geo.min)}–${formatNumber(lang, geo.peak)} ${ms}, ${t("stat_avg", { value: `${formatNumber(lang, geo.avg)} ${ms}` })}`;
   const activeValue = active !== null ? values[active] : undefined;
   const tipX = active !== null ? geo.xAt(active) : 0;
+  const valueAt = (i: number) => {
+    const v = values[i];
+    if (v === undefined) return "";
+    return `${formatTime(lang, timeOf(i))}: ${v > 0 ? `${formatNumber(lang, v)} ${ms}` : t("chart_failed")}`;
+  };
+  const valueText = valueAt(active ?? n - 1);
+
   const tipY = activeValue !== undefined && activeValue > 0 ? geo.yAt(activeValue) : PAD.top + geo.plotH - 10;
 
   return (
     <div className="chart" ref={wrap}>
-      <svg
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
-        role="img"
-        aria-label={summary}
-        aria-describedby={active !== null ? tipId : undefined}
+      <span id={`${tipId}-summary`} className="sr-only">
+        {summary}
+      </span>
+      <div
+        className="chart-plot"
+        role="slider"
+        aria-label={t("chart_latency")}
+        aria-describedby={`${tipId}-summary`}
+        aria-valuemin={0}
+        aria-valuemax={Math.max(0, n - 1)}
+        aria-valuenow={active ?? Math.max(0, n - 1)}
+        aria-valuetext={valueText}
         tabIndex={n ? 0 : -1}
+        onPointerDown={pick}
         onPointerMove={pick}
-        onPointerLeave={() => setActive(null)}
+        onPointerLeave={(e) => {
+          if (e.pointerType === "mouse") setActive(null);
+        }}
         onKeyDown={onKey}
         onFocus={() => setActive((a) => a ?? (n ? n - 1 : null))}
         onBlur={() => setActive(null)}
       >
-        {geo.ticks.map((tick) => (
-          <g key={tick}>
-            <line
-              className="chart-grid"
-              x1={rtl ? PAD.end : PAD.start}
-              x2={rtl ? PAD.end + geo.plotW : PAD.start + geo.plotW}
-              y1={geo.yAt(tick)}
-              y2={geo.yAt(tick)}
-            />
-            <text
-              className="chart-axis num"
-              x={rtl ? width - 4 : PAD.start - 8}
-              y={geo.yAt(tick) + 4}
-              textAnchor="end"
-            >
-              {formatNumber(lang, tick)}
-            </text>
-          </g>
-        ))}
-        {geo.areas.map((d) => (
-          <path key={`a${d}`} className="chart-area" d={d} />
-        ))}
-        {geo.segments.map((d) => (
-          <path key={`l${d}`} className="chart-line" d={d} />
-        ))}
-        {values.map((v, i) =>
-          v <= 0 ? (
-            <rect
-              // biome-ignore lint/suspicious/noArrayIndexKey: one marker per check slot
-              key={i}
-              className="chart-fail"
-              x={geo.xAt(i) - 2}
-              y={PAD.top + geo.plotH - 10}
-              width={4}
-              height={10}
-              rx={2}
-            />
-          ) : null,
-        )}
-        {active !== null ? (
-          <>
-            <line className="chart-cursor" x1={tipX} x2={tipX} y1={PAD.top} y2={PAD.top + geo.plotH} />
-            {activeValue && activeValue > 0 ? (
-              <circle className="chart-dot" cx={tipX} cy={geo.yAt(activeValue)} r={5} />
-            ) : null}
-          </>
-        ) : null}
-        <text
-          className="chart-axis"
-          x={rtl ? PAD.end + geo.plotW : PAD.start}
-          y={height - 4}
-          textAnchor={rtl ? "end" : "start"}
-        >
-          {n ? formatTime(lang, timeOf(0), false) : ""}
-        </text>
-        <text
-          className="chart-axis"
-          x={rtl ? PAD.end : PAD.start + geo.plotW}
-          y={height - 4}
-          textAnchor={rtl ? "start" : "end"}
-        >
-          {n ? formatTime(lang, timeOf(n - 1), false) : ""}
-        </text>
-      </svg>
+        <svg height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden>
+          {geo.ticks.map((tick) => (
+            <g key={tick}>
+              <line
+                className="chart-grid"
+                x1={rtl ? PAD.end : PAD.start}
+                x2={rtl ? PAD.end + geo.plotW : PAD.start + geo.plotW}
+                y1={geo.yAt(tick)}
+                y2={geo.yAt(tick)}
+              />
+              <text
+                className="chart-axis num"
+                x={rtl ? width - 4 : PAD.start - 8}
+                y={geo.yAt(tick) + 4}
+                textAnchor="end"
+              >
+                {formatNumber(lang, tick)}
+              </text>
+            </g>
+          ))}
+          {geo.areas.map((d) => (
+            <path key={`a${d}`} className="chart-area" d={d} />
+          ))}
+          {geo.segments.map((d) => (
+            <path key={`l${d}`} className="chart-line" d={d} />
+          ))}
+          {values.map((v, i) =>
+            v <= 0 ? (
+              <rect
+                // biome-ignore lint/suspicious/noArrayIndexKey: one marker per check slot
+                key={i}
+                className="chart-fail"
+                x={geo.xAt(i) - 2}
+                y={PAD.top + geo.plotH - 10}
+                width={4}
+                height={10}
+                rx={2}
+              />
+            ) : null,
+          )}
+          {active !== null ? (
+            <>
+              <line className="chart-cursor" x1={tipX} x2={tipX} y1={PAD.top} y2={PAD.top + geo.plotH} />
+              {activeValue && activeValue > 0 ? (
+                <circle className="chart-dot" cx={tipX} cy={geo.yAt(activeValue)} r={5} />
+              ) : null}
+            </>
+          ) : null}
+          <text
+            className="chart-axis"
+            x={rtl ? PAD.end + geo.plotW : PAD.start}
+            y={height - 4}
+            textAnchor={rtl ? "end" : "start"}
+          >
+            {n ? formatTime(lang, timeOf(0), false) : ""}
+          </text>
+          <text
+            className="chart-axis"
+            x={rtl ? PAD.end : PAD.start + geo.plotW}
+            y={height - 4}
+            textAnchor={rtl ? "start" : "end"}
+          >
+            {n ? formatTime(lang, timeOf(n - 1), false) : ""}
+          </text>
+        </svg>
+      </div>
       {active !== null && activeValue !== undefined ? (
         <ChartTooltip
           id={tipId}

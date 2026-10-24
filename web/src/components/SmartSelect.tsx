@@ -146,7 +146,8 @@ export function SmartSelect<T extends string>({
 
   useEffect(() => {
     if (!open || !pos) return;
-    (withSearch ? search.current : list.current)?.focus({ preventScroll: true });
+    const coarse = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+    (withSearch && !coarse ? search.current : list.current)?.focus({ preventScroll: true });
   }, [open, pos, withSearch]);
 
   useEffect(() => {
@@ -217,7 +218,7 @@ export function SmartSelect<T extends string>({
         close(true);
         break;
       case "Tab":
-        close(false);
+        close(true);
         break;
       default:
         if (!withSearch && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) typeahead(e.key);
@@ -254,11 +255,11 @@ export function SmartSelect<T extends string>({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
-        aria-label={label}
         aria-describedby={describedBy}
-        onClick={() => (open ? close(false) : openList())}
+        onClick={() => (open ? close(true) : openList())}
         onKeyDown={onTriggerKey}
       >
+        <span className="sr-only">{label}: </span>
         {leading ? <span className="ss-leading">{leading}</span> : null}
         {current?.icon ? <span className="ss-icon">{current.icon}</span> : null}
         <span className={current ? "ss-value" : "ss-value ss-placeholder"} lang={current?.lang}>

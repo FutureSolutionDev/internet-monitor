@@ -803,6 +803,7 @@ h3 {
   display: block;
   width: 100%;
   overflow: visible;
+  touch-action: pan-y;
 }
 
 .chart-grid {
@@ -875,6 +876,7 @@ svg text {
 
 .chart-tip-title {
   color: var(--text-secondary);
+  white-space: normal;
 }
 
 .chart-tip-row {
@@ -894,7 +896,11 @@ svg text {
   font-weight: 500;
 }
 
-.chart svg:focus-visible {
+.chart-plot {
+  touch-action: pan-y;
+}
+
+.chart-plot:focus-visible {
   outline: 2px solid var(--accent-blue);
   outline-offset: 4px;
   border-radius: var(--radius-sm);
@@ -3116,5 +3122,32 @@ select.input {
 
   .table-wrap {
     overflow: visible;
+  }
+}
+
+@media (max-width: 767px) {
+  .ss-compact .ss-value {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .ss-compact .ss-trigger {
+    padding-inline: 10px 8px;
+  }
+}
+
+@media (pointer: coarse) {
+  .ss-pill .ss-trigger,
+  .ss-field .ss-trigger {
+    min-height: 44px;
+  }
+
+  .ss-option {
+    min-height: 44px;
+    align-items: center;
   }
 }

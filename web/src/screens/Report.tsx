@@ -8,7 +8,7 @@ import {
   Printer,
   RefreshCw,
 } from "lucide-react";
-import { type CSSProperties, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { ChartTooltip } from "../components/ChartTooltip";
 import { Banner, Button, Card, CardHead, Empty, Meter, Skeleton } from "../components/ui";
 import { api } from "../lib/api";
@@ -47,6 +47,26 @@ function DailyChart({ report }: { report: MonthlyReport }) {
   const tipId = useId();
   const [active, setActive] = useState<{ i: number; x: number; y: number; w: number } | null>(null);
   const days = useMemo(() => daysOf(report.month, report.days ?? []), [report]);
+  const [focusIdx, setFocusIdx] = useState(() => {
+    const last = days.findLastIndex((d) => !("empty" in d));
+    return Math.max(last, 0);
+  });
+  const rtl = isRtl(lang);
+
+  const onBarKey = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
+    const next = rtl ? "ArrowLeft" : "ArrowRight";
+    const prev = rtl ? "ArrowRight" : "ArrowLeft";
+    let to: number | null = null;
+    if (e.key === next) to = Math.min(days.length - 1, i + 1);
+    else if (e.key === prev) to = Math.max(0, i - 1);
+    else if (e.key === "Home") to = 0;
+    else if (e.key === "End") to = days.length - 1;
+    if (to === null) return;
+    e.preventDefault();
+    setFocusIdx(to);
+    const target = e.currentTarget.parentElement?.children[to];
+    if (target instanceof HTMLElement) target.focus();
+  };
   const max = Math.max(60, ...days.map((d) => ("empty" in d ? 0 : d.downtime_seconds)));
   const current = active !== null ? days[active.i] : undefined;
 
@@ -76,7 +96,12 @@ function DailyChart({ report }: { report: MonthlyReport }) {
 
   return (
     <div className="chart" ref={wrap}>
-      <div className="bars" onPointerLeave={() => setActive(null)}>
+      <div
+        className="bars"
+        onPointerLeave={(e) => {
+          if (e.pointerType === "mouse") setActive(null);
+        }}
+      >
         {days.map((d, i) => {
           const empty = "empty" in d;
           const down = empty ? 0 : d.downtime_seconds;
@@ -90,11 +115,15 @@ function DailyChart({ report }: { report: MonthlyReport }) {
               key={d.date}
               className="bar"
               aria-label={label}
-              aria-describedby={active?.i === i ? tipId : undefined}
+              tabIndex={focusIdx === i ? 0 : -1}
+              onKeyDown={(e) => onBarKey(e, i)}
               data-active={active?.i === i || undefined}
               data-dim={(active !== null && active.i !== i) || undefined}
               onPointerEnter={(e) => show(i, e.currentTarget)}
-              onFocus={(e) => show(i, e.currentTarget)}
+              onFocus={(e) => {
+                setFocusIdx(i);
+                show(i, e.currentTarget);
+              }}
               onBlur={() => setActive(null)}
               style={
                 {
