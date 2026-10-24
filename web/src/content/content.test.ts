@@ -1,21 +1,24 @@
 import { describe, expect, test } from "vitest";
+import { LOCALES, type MessageKey, translate } from "../lib/i18n";
 import { ABOUT_STORY, PRINCIPLES } from "./about";
 import { compareVersions, RELEASES, releaseOfVersion } from "./changelog";
 import { CHANNELS } from "./contact";
 import { FAQ } from "./faq";
 import { PRIVACY, TERMS } from "./legal";
-import type { Text } from "./text";
 
-function filled(text: Text) {
-  return text.en.trim().length > 0 && text.ar.trim().length > 0;
+function expectTranslated(key: MessageKey) {
+  for (const l of LOCALES) {
+    const text = l.messages[key];
+    expect(text?.trim().length ?? 0, `${l.code}: ${key}`).toBeGreaterThan(0);
+  }
 }
 
 describe("changelog", () => {
-  test("every release and item is written in both languages", () => {
+  test("every release and item is translated", () => {
     for (const r of RELEASES) {
-      expect(filled(r.title), r.id).toBe(true);
+      expectTranslated(r.title);
       expect(r.items.length, r.id).toBeGreaterThan(0);
-      for (const i of r.items) expect(filled(i.text), `${r.id}: ${i.text.en}`).toBe(true);
+      for (const i of r.items) expectTranslated(i.text);
     }
   });
 
@@ -36,7 +39,7 @@ describe("changelog", () => {
 
   test("item keys are unique inside a release", () => {
     for (const r of RELEASES) {
-      const keys = r.items.map((i) => i.text.en);
+      const keys = r.items.map((i) => i.text);
       expect(new Set(keys).size, r.id).toBe(keys.length);
     }
   });
@@ -51,14 +54,15 @@ describe("changelog", () => {
 });
 
 describe("faq", () => {
-  test("questions and answers exist in both languages with unique ids", () => {
+  test("questions and answers are translated with unique ids", () => {
     const ids = new Set<string>();
     for (const s of FAQ) {
-      expect(filled(s.title), s.id).toBe(true);
+      expectTranslated(s.title);
       for (const item of s.items) {
         expect(ids.has(item.id), item.id).toBe(false);
         ids.add(item.id);
-        expect(filled(item.q) && filled(item.a), item.id).toBe(true);
+        expectTranslated(item.q);
+        expectTranslated(item.a);
       }
     }
     expect(ids.size).toBeGreaterThan(10);
@@ -73,36 +77,42 @@ describe("legal pages", () => {
   test.each([
     ["privacy", PRIVACY],
     ["terms", TERMS],
-  ] as const)("%s is complete in both languages", (_, doc) => {
+  ] as const)("%s is complete", (_, doc) => {
     expect(Number.isNaN(Date.parse(doc.updated))).toBe(false);
-    expect(filled(doc.intro)).toBe(true);
+    expectTranslated(doc.intro);
     const ids = doc.sections.map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).toContain("contact");
     for (const s of doc.sections) {
-      expect(filled(s.title), s.id).toBe(true);
-      const parts = [...s.body, ...(s.list ?? [])];
-      for (const p of [...parts, ...(s.quote ? [s.quote] : [])]) {
-        expect(filled(p), s.id).toBe(true);
-      }
-      expect(new Set(parts.map((p) => p.en)).size, s.id).toBe(parts.length);
+      expectTranslated(s.title);
+      const parts = [...s.body, ...(s.list ?? []), ...(s.quote ? [s.quote] : [])];
+      for (const p of parts) expectTranslated(p);
+      expect(new Set(parts).size, s.id).toBe(parts.length);
     }
   });
 });
 
 describe("about and contact", () => {
-  test("about copy exists in both languages", () => {
-    for (const p of ABOUT_STORY) expect(filled(p)).toBe(true);
-    for (const p of PRINCIPLES) expect(filled(p.title) && filled(p.body), p.id).toBe(true);
+  test("about copy is translated", () => {
+    for (const p of ABOUT_STORY) expectTranslated(p);
+    for (const p of PRINCIPLES) {
+      expectTranslated(p.title);
+      expectTranslated(p.body);
+    }
   });
 
-  test("every contact channel has a safe link and copy in both languages", () => {
+  test("every contact channel has a safe link and translated copy", () => {
     const ids = CHANNELS.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const c of CHANNELS) {
       expect(c.href, c.id).toMatch(/^(https:\/\/|mailto:)/);
       expect(c.handle.trim().length, c.id).toBeGreaterThan(0);
-      expect(filled(c.name) && filled(c.best), c.id).toBe(true);
+      expectTranslated(c.name);
+      expectTranslated(c.best);
     }
+  });
+
+  test("translate falls back to English for a missing key", () => {
+    expect(translate("xx", "app_name")).toBe("Internet Monitor");
   });
 });

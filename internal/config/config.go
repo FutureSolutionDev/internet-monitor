@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"errors"
+	"internet-monitor/internal/i18n"
 	"path/filepath"
 	"strings"
 	"time"
@@ -139,9 +140,7 @@ func (c *Config) Sanitize() {
 	if strings.TrimSpace(c.LogDir) == "" {
 		c.LogDir = def.LogDir
 	}
-	if c.Language != "ar" && c.Language != "en" {
-		c.Language = "en"
-	}
+	c.Language = i18n.Normalize(c.Language)
 	c.PingTargets = cleanTargets(c.PingTargets)
 	c.HTTPTargets = cleanTargets(c.HTTPTargets)
 	c.DNSTargets = cleanTargets(c.DNSTargets)

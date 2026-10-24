@@ -15,7 +15,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { toast } from "../../components/Toast";
 import { Banner, Button, Skeleton } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
-import { useI18n } from "../../lib/i18n";
+import { type MessageKey, useI18n } from "../../lib/i18n";
 import { useLive } from "../../lib/live";
 import { setNavigationBlocker } from "../../lib/router";
 import {
@@ -29,7 +29,6 @@ import {
   serverFieldToDraft,
   validateDraft,
 } from "../../lib/settingsForm";
-import type { MessageKey } from "../../lib/strings";
 import type { ConfigView } from "../../lib/types";
 import { AppSection } from "./AppSection";
 import { AlertsSection, MonitoringSection, SpeedSection, TargetsSection } from "./Sections";

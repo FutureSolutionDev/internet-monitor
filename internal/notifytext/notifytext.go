@@ -2,6 +2,7 @@ package notifytext
 
 import (
 	"fmt"
+	"internet-monitor/internal/i18n"
 	"internet-monitor/internal/types"
 	"strings"
 	"sync/atomic"
@@ -10,24 +11,18 @@ import (
 var lang atomic.Value
 
 func SetLang(l string) {
-	if l != "ar" {
-		l = "en"
-	}
-	lang.Store(l)
+	lang.Store(i18n.Normalize(l))
 }
 
 func Lang() string {
 	if v, ok := lang.Load().(string); ok && v != "" {
 		return v
 	}
-	return "en"
+	return i18n.Default
 }
 
 func TestMessage(lang string) (title, body string) {
-	if lang == "ar" {
-		return "اختبار الإشعار", "🔔 الإشعار والصوت يعملان بشكل صحيح"
-	}
-	return "Test Notification", "🔔 Notifications and sound are working"
+	return i18n.T(lang, "notify.test.title", nil), i18n.T(lang, "notify.test.body", nil)
 }
 
 func StatusFromEventType(eventType string) types.Status {
@@ -42,27 +37,17 @@ func StatusFromEventType(eventType string) types.Status {
 }
 
 func Build(lang string, status types.Status, r types.CheckResult) (title, body string) {
-	ar := lang == "ar"
 	switch status {
 	case types.StatusConnected:
-		if ar {
-			title = "✅ عاد الإنترنت"
-			if r.LatencyMs > 0 {
-				return title, fmt.Sprintf("زمن الاستجابة: %dms", r.LatencyMs)
-			}
-			return title, "جميع الفحوصات ناجحة"
-		}
-		title = "✅ Internet Restored"
+		title = i18n.T(lang, "notify.restored.title", nil)
 		if r.LatencyMs > 0 {
-			return title, fmt.Sprintf("Latency: %dms", r.LatencyMs)
+			return title, i18n.T(lang, "notify.restored.latency", i18n.Vars{"ms": r.LatencyMs})
 		}
-		return title, "All checks passing"
+		return title, i18n.T(lang, "notify.restored.ok", nil)
 
 	case types.StatusDegraded:
-		if ar {
-			return "⚠️ الإنترنت ضعيف", fmt.Sprintf("فقدان: %.0f%% — زمن: %dms", r.PacketLoss, r.LatencyMs)
-		}
-		return "⚠️ Internet Degraded", fmt.Sprintf("Loss: %.0f%% — latency: %dms", r.PacketLoss, r.LatencyMs)
+		return i18n.T(lang, "notify.degraded.title", nil),
+			i18n.T(lang, "notify.degraded.body", i18n.Vars{"loss": fmt.Sprintf("%.0f", r.PacketLoss), "ms": r.LatencyMs})
 
 	default:
 		var parts []string
@@ -75,18 +60,11 @@ func Build(lang string, status types.Status, r types.CheckResult) (title, body s
 		if !r.DNSOK {
 			parts = append(parts, "DNS")
 		}
-		if ar {
-			title = "🔴 انقطع الإنترنت"
-			if len(parts) > 0 {
-				return title, "فشل: " + strings.Join(parts, " + ")
-			}
-			return title, "فقدان الاتصال"
-		}
-		title = "🔴 Internet Disconnected"
+		title = i18n.T(lang, "notify.down.title", nil)
 		if len(parts) > 0 {
-			return title, "Failed: " + strings.Join(parts, " + ")
+			return title, i18n.T(lang, "notify.down.failed", i18n.Vars{"layers": strings.Join(parts, " + ")})
 		}
-		return title, "Connection lost"
+		return title, i18n.T(lang, "notify.down.lost", nil)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"internet-monitor/internal/config"
+	"internet-monitor/internal/i18n"
 	"io"
 	"net/http"
 	"strconv"
@@ -103,10 +104,7 @@ func (s *Server) serveLanguage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "unavailable", "configuration store not ready")
 		return
 	}
-	lang := r.URL.Query().Get("lang")
-	if lang != "ar" {
-		lang = "en"
-	}
+	lang := i18n.Normalize(r.URL.Query().Get("lang"))
 	_, rev, err := s.store.Update(0, func(c *config.Config) error {
 		c.Language = lang
 		return nil

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"internet-monitor/internal/config"
+	"internet-monitor/internal/i18n"
 	"internet-monitor/internal/logger"
 	"internet-monitor/internal/startup"
 	"io"
@@ -193,10 +194,7 @@ func (s *Server) sendTestWebhook(results testTargetsResponse) {
 }
 
 func (s *Server) serveTestNotification(w http.ResponseWriter, r *http.Request) {
-	lang := r.URL.Query().Get("lang")
-	if lang != "ar" {
-		lang = "en"
-	}
+	lang := i18n.Normalize(r.URL.Query().Get("lang"))
 	s.logf("NOTIFICATION test triggered by user (lang=%s)", lang)
 	if s.hooks.TestNotification != nil {
 		go s.hooks.TestNotification(lang)

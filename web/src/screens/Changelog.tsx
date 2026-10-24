@@ -1,10 +1,8 @@
 import { useMemo, useState } from "react";
 import { type ChangeKind, KINDS, RELEASES, type Release, releaseOfVersion } from "../content/changelog";
-import { pick } from "../content/text";
 import { formatDate, formatNumber } from "../lib/format";
-import { useI18n } from "../lib/i18n";
+import { type MessageKey, useI18n } from "../lib/i18n";
 import { useLive } from "../lib/live";
-import type { MessageKey } from "../lib/strings";
 
 type Filter = ChangeKind | "all";
 
@@ -87,14 +85,14 @@ export function Changelog() {
                 {mine ? <span className="tag cl-current">{t("cl_installed")}</span> : null}
               </div>
               <article className="card cl-card" aria-labelledby={`${r.id}-title`}>
-                <h2 id={`${r.id}-title`}>{pick(r.title, lang)}</h2>
+                <h2 id={`${r.id}-title`}>{t(r.title)}</h2>
                 <ul className="cl-items">
                   {items.map((i) => (
-                    <li key={i.text.en}>
+                    <li key={i.text}>
                       <span className="cl-kind" data-kind={i.kind}>
                         {t(KIND_LABEL[i.kind])}
                       </span>
-                      <span>{pick(i.text, lang)}</span>
+                      <span>{t(i.text)}</span>
                     </li>
                   ))}
                 </ul>

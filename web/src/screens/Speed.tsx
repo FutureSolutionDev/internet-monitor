@@ -16,9 +16,8 @@ import { Banner, Button, Card, CardHead, Empty, Skeleton } from "../components/u
 import { ApiError, api } from "../lib/api";
 import { formatNumber, formatTime, localDateKey } from "../lib/format";
 import { useAsync } from "../lib/hooks";
-import { useI18n } from "../lib/i18n";
+import { type MessageKey, useI18n } from "../lib/i18n";
 import { live, useLive } from "../lib/live";
-import type { MessageKey } from "../lib/strings";
 import type { SpeedProgress } from "../lib/types";
 import { tone } from "../styles/categories";
 

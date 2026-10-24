@@ -3,7 +3,6 @@ import type { CSSProperties } from "react";
 import { toast } from "../components/Toast";
 import { Banner, Button } from "../components/ui";
 import { CHANNELS, type ContactAccent } from "../content/contact";
-import { pick } from "../content/text";
 import { useI18n } from "../lib/i18n";
 
 const TONE: Record<ContactAccent, string> = {
@@ -14,7 +13,7 @@ const TONE: Record<ContactAccent, string> = {
 };
 
 export function Contact() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
 
   const copy = async (text: string) => {
     try {
@@ -36,7 +35,7 @@ export function Contact() {
       <ul className="contact-grid">
         {CHANNELS.map((c) => {
           const Icon = c.icon;
-          const name = pick(c.name, lang);
+          const name = t(c.name);
           const external = !c.href.startsWith("mailto:");
           return (
             <li
@@ -51,7 +50,7 @@ export function Contact() {
               <p className="contact-handle ltr" dir="ltr">
                 {c.handle}
               </p>
-              <p className="contact-best">{pick(c.best, lang)}</p>
+              <p className="contact-best">{t(c.best)}</p>
               <div className="contact-actions">
                 <a
                   className="btn btn-edge btn-sm"

@@ -24,9 +24,8 @@ import {
   shiftMonth,
 } from "../lib/format";
 import { useAsync } from "../lib/hooks";
-import { useI18n } from "../lib/i18n";
+import { isRtl, type MessageKey, useI18n } from "../lib/i18n";
 import { navigate } from "../lib/router";
-import type { MessageKey } from "../lib/strings";
 import type { MonthlyReport, ReportDay } from "../lib/types";
 import { availabilityTone, statusTone, tone } from "../styles/categories";
 
@@ -113,7 +112,7 @@ export function Report({ month: initial }: { month: string | null }) {
   const month = initial && /^\d{4}-\d{2}$/.test(initial) ? initial : monthKey(new Date());
   const report = useAsync((signal) => api.report(month, signal), [month]);
   const thisMonth = monthKey(new Date());
-  const rtl = lang === "ar";
+  const rtl = isRtl(lang);
 
   useEffect(() => {
     document.title = `${t("report_title")} — ${formatMonth(lang, month)}`;

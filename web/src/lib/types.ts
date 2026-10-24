@@ -53,7 +53,7 @@ export interface Snapshot {
   server_time: number;
   config_revision: number;
   config_error?: string;
-  language: "ar" | "en";
+  language: string;
   check_interval_sec: number;
   status: Status;
   status_since: number;
@@ -131,7 +131,7 @@ export interface Config {
   telegram_chat_id: string;
   dashboard_port: number;
   use_icmp: boolean;
-  language: "ar" | "en";
+  language: string;
   speed_test: SpeedTestConfig;
 }
 

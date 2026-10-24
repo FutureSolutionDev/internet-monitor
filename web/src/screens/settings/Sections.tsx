@@ -5,9 +5,8 @@ import { toast } from "../../components/Toast";
 import { Button, Card, CardHead, Switch } from "../../components/ui";
 import { ApiError, api } from "../../lib/api";
 import { formatNumber } from "../../lib/format";
-import { type Lang, type Translate, useI18n } from "../../lib/i18n";
+import { type Lang, type MessageKey, type Translate, useI18n } from "../../lib/i18n";
 import { type Draft, type FieldKey, MAX_TARGETS } from "../../lib/settingsForm";
-import type { MessageKey } from "../../lib/strings";
 import type { ConfigView, TestTargetResult } from "../../lib/types";
 import { SecretField } from "./SecretField";
 

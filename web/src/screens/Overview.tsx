@@ -29,10 +29,9 @@ import {
   statusKey,
 } from "../lib/format";
 import { useNow } from "../lib/hooks";
-import { useI18n } from "../lib/i18n";
+import { type MessageKey, useI18n } from "../lib/i18n";
 import { useLive } from "../lib/live";
 import { hrefOf, navigate } from "../lib/router";
-import type { MessageKey } from "../lib/strings";
 import type { Diagnosis, Snapshot, Status } from "../lib/types";
 import { availabilityTone, statusTone, tone } from "../styles/categories";
 

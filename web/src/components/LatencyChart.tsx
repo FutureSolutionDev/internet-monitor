@@ -1,6 +1,6 @@
 import { type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { formatNumber, formatTime } from "../lib/format";
-import type { Lang, Translate } from "../lib/i18n";
+import { isRtl, type Lang, type Translate } from "../lib/i18n";
 
 interface Props {
   values: number[];
@@ -26,7 +26,7 @@ export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height =
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(600);
   const [active, setActive] = useState<number | null>(null);
-  const rtl = lang === "ar";
+  const rtl = isRtl(lang);
 
   useEffect(() => {
     const el = wrap.current;

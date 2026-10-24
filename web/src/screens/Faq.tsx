@@ -2,7 +2,6 @@ import { MessagesSquare } from "lucide-react";
 import { Fragment } from "react";
 import { RouteLink } from "../components/RouteLink";
 import { FAQ } from "../content/faq";
-import { pick } from "../content/text";
 import { formatNumber } from "../lib/format";
 import { useI18n } from "../lib/i18n";
 
@@ -28,7 +27,7 @@ export function Faq() {
                   <span className="faq-seg-icon">
                     <Icon size={16} aria-hidden />
                   </span>
-                  {pick(section.title, lang)}
+                  {t(section.title)}
                 </span>
               </h2>
               {section.items.map((item) => {
@@ -40,9 +39,9 @@ export function Faq() {
                     <article className="faq-card" aria-labelledby={`faq-q-${item.id}`}>
                       <div className="faq-q">
                         <span className="faq-idx num">{t("faq_q", { n: formatNumber(lang, index) })}</span>
-                        <h3 id={`faq-q-${item.id}`}>{pick(item.q, lang)}</h3>
+                        <h3 id={`faq-q-${item.id}`}>{t(item.q)}</h3>
                       </div>
-                      <p className="faq-a">{pick(item.a, lang)}</p>
+                      <p className="faq-a">{t(item.a)}</p>
                     </article>
                   </div>
                 );

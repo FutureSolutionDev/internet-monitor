@@ -472,6 +472,25 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) — commit t
 - Per-target latency history charts
 - Additional language support
 
+### Adding a language
+
+All text lives in one JSON file per language in `web/locales/`. The dashboard,
+the monthly report, the FAQ and the desktop notifications all read from these
+same files.
+
+1. Copy `web/locales/en.json` to `web/locales/<code>.json`, for example `fr.json`.
+2. Set `meta`:
+   - `name`: the language's own name, such as `Français`.
+   - `dir`: `ltr` or `rtl`.
+   - `intl`: the locale used for dates and numbers, such as `fr-FR`.
+3. Translate every value in `messages`. Keep each `{placeholder}` exactly as it
+   is in English.
+4. Run `bun run test` in `web/`. It fails if a key is missing, a key isn't in
+   English, or a placeholder doesn't match.
+
+No code changes are needed. The new language appears in the language menu and
+in Settings automatically.
+
 ---
 
 ## 🗺️ Roadmap

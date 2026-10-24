@@ -29,13 +29,13 @@ import {
 import { api } from "../lib/api";
 import { formatAgo } from "../lib/format";
 import { useNow } from "../lib/hooks";
-import { setLangOverride, useI18n } from "../lib/i18n";
+import { type MessageKey, useI18n } from "../lib/i18n";
 import { useLive } from "../lib/live";
 import { hrefOf, navigate, type Route } from "../lib/router";
-import type { MessageKey } from "../lib/strings";
 import { useTheme } from "../lib/theme";
 import { changeThemeWithTransition } from "../lib/themeTransition";
 import { statusTone } from "../styles/categories";
+import { LanguageSelect } from "./LanguagePicker";
 import { toast } from "./Toast";
 import { Banner, Button } from "./ui";
 
@@ -169,7 +169,7 @@ function usePhone(): boolean {
 }
 
 export function Shell({ route, children }: { route: Route; children: ReactNode }) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const theme = useTheme();
   const version = useLive((s) => s.snapshot?.version);
   const connection = useLive((s) => s.connection);
@@ -215,17 +215,6 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [drawer]);
-
-  const switchLang = async () => {
-    const next = lang === "ar" ? "en" : "ar";
-    setLangOverride(next);
-    try {
-      await api.setLanguage(next);
-    } catch {
-      setLangOverride(null);
-      toast(t("save_failed"), "error");
-    }
-  };
 
   const go = (e: MouseEvent<HTMLAnchorElement>, r: Route) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
@@ -308,15 +297,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
           </div>
           <div className="topbar-actions">
             <ConnectionPill />
-            <Button
-              variant="edge"
-              size="sm"
-              onClick={switchLang}
-              aria-label={t("lang_toggle_label")}
-              lang={lang === "ar" ? "en" : "ar"}
-            >
-              {t("lang_toggle")}
-            </Button>
+            <LanguageSelect compact />
             <Button
               variant="edge"
               size="sm"

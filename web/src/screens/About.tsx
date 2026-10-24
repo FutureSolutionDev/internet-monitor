@@ -1,11 +1,10 @@
 import { ExternalLink, MessagesSquare } from "lucide-react";
 import { RouteLink } from "../components/RouteLink";
 import { ABOUT_STORY, DEVELOPER, PRINCIPLES, PUBLISHER, PUBLISHER_URL } from "../content/about";
-import { pick, REPO_URL } from "../content/text";
-import { useI18n } from "../lib/i18n";
+import { REPO_URL } from "../content/text";
+import { type MessageKey, useI18n } from "../lib/i18n";
 import { useLive } from "../lib/live";
 import type { Route } from "../lib/router";
-import type { MessageKey } from "../lib/strings";
 
 const LINKS: { route: Route; key: MessageKey }[] = [
   { route: "changelog", key: "nav_changelog" },
@@ -15,7 +14,7 @@ const LINKS: { route: Route; key: MessageKey }[] = [
 ];
 
 export function About() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const version = useLive((s) => s.snapshot?.version);
 
   return (
@@ -28,7 +27,7 @@ export function About() {
 
       <section className="card about-story" aria-label={t("about_eyebrow")}>
         {ABOUT_STORY.map((p) => (
-          <p key={p.en}>{pick(p, lang)}</p>
+          <p key={p}>{t(p)}</p>
         ))}
       </section>
 
@@ -44,8 +43,8 @@ export function About() {
                 <span className="icon-well">
                   <Icon size={18} aria-hidden />
                 </span>
-                <h3>{pick(p.title, lang)}</h3>
-                <p>{pick(p.body, lang)}</p>
+                <h3>{t(p.title)}</h3>
+                <p>{t(p.body)}</p>
               </li>
             );
           })}

@@ -111,7 +111,7 @@ export const api = {
     });
     return data;
   },
-  setLanguage: (lang: "ar" | "en") => post<{ ok: boolean }>(`/api/language?lang=${lang}`),
+  setLanguage: (lang: string) => post<{ ok: boolean }>(`/api/language?lang=${lang}`),
   logs: (date: string, limit = 5000, signal?: AbortSignal) =>
     get<LogEvent[]>(`/api/logs?date=${encodeURIComponent(date)}&limit=${limit}`, signal),
   logDates: () => get<string[]>("/api/log-dates"),
@@ -124,7 +124,7 @@ export const api = {
   cancelSpeedTest: () => post<{ ok: boolean }>("/api/speed-test/cancel"),
   testTargets: (targets: { ping_targets: string[]; http_targets: string[]; dns_targets: string[] }) =>
     post<TestTargetsResponse>("/api/test-targets", { ...targets, notify: false }),
-  testNotification: (lang: "ar" | "en") => post<{ ok: boolean }>(`/api/test-notification?lang=${lang}`),
+  testNotification: (lang: string) => post<{ ok: boolean }>(`/api/test-notification?lang=${lang}`),
   testWebhook: (url?: string) => post<{ ok: boolean }>("/api/test-webhook", url ? { url } : {}),
   playSound: () => post<{ ok: boolean }>("/api/play-sound"),
   async soundInfo(): Promise<{ custom: boolean; duration: number }> {

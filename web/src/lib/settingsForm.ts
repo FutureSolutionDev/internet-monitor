@@ -1,5 +1,4 @@
-import type { Vars } from "./i18n";
-import type { MessageKey } from "./strings";
+import type { MessageKey, Vars } from "./i18n";
 import type { ConfigView } from "./types";
 
 export const MAX_TARGETS = 10;

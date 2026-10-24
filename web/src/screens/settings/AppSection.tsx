@@ -1,10 +1,11 @@
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { TextField } from "../../components/Field";
+import { LanguageField } from "../../components/LanguagePicker";
 import { toast } from "../../components/Toast";
 import { Button, Card, CardHead, Segmented, Switch } from "../../components/ui";
 import { api } from "../../lib/api";
-import { type Lang, setLangOverride, useI18n } from "../../lib/i18n";
+import { useI18n } from "../../lib/i18n";
 import { useLive } from "../../lib/live";
 import { type Theme, useTheme } from "../../lib/theme";
 import { changeThemeWithTransition } from "../../lib/themeTransition";
@@ -84,19 +85,8 @@ function UpdatesRow() {
 }
 
 export function AppSection({ draft, set, err }: SectionProps) {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const theme = useTheme();
-
-  const changeLang = async (next: Lang) => {
-    if (next === lang) return;
-    setLangOverride(next);
-    try {
-      await api.setLanguage(next);
-    } catch {
-      setLangOverride(null);
-      toast(t("save_failed"), "error");
-    }
-  };
 
   return (
     <Card id="app" className="settings-section" labelledBy="app-title">
@@ -104,15 +94,7 @@ export function AppSection({ draft, set, err }: SectionProps) {
       <div className="form-grid">
         <div className="field">
           <span className="field-label">{t("f_language")}</span>
-          <Segmented<Lang>
-            label={t("f_language")}
-            value={lang}
-            onChange={changeLang}
-            options={[
-              { value: "ar", label: "العربية" },
-              { value: "en", label: "English" },
-            ]}
-          />
+          <LanguageField />
         </div>
         <div className="field">
           <span className="field-label">{t("f_theme")}</span>

@@ -2,9 +2,8 @@ import { MessagesSquare } from "lucide-react";
 import { useEffect } from "react";
 import { RouteLink } from "../components/RouteLink";
 import { PRIVACY, TERMS } from "../content/legal";
-import { pick } from "../content/text";
 import { formatDate } from "../lib/format";
-import { useI18n } from "../lib/i18n";
+import { DEFAULT_LANG, translate, useI18n } from "../lib/i18n";
 
 const DATE_OPTS: Intl.DateTimeFormatOptions = { year: "numeric", month: "long", day: "numeric" };
 
@@ -22,7 +21,7 @@ export function Legal({ kind }: { kind: "privacy" | "terms" }) {
     <div className="doc-page legal">
       <header className="doc-hero">
         <h1>{t(kind === "privacy" ? "privacy_title" : "terms_title")}</h1>
-        <p className="secondary">{pick(doc.intro, lang)}</p>
+        <p className="secondary">{t(doc.intro)}</p>
         <p className="legal-updated">
           {t("legal_updated", { date: formatDate(lang, doc.updated, DATE_OPTS) })}
         </p>
@@ -33,28 +32,28 @@ export function Legal({ kind }: { kind: "privacy" | "terms" }) {
           <span className="legal-toc-title">{t("legal_toc")}</span>
           {doc.sections.map((s) => (
             <a key={s.id} href={`#${prefix}${s.id}`}>
-              {pick(s.title, lang)}
+              {t(s.title)}
             </a>
           ))}
         </nav>
         <article className="card legal-body">
           {doc.sections.map((s) => (
             <section key={s.id} id={`${prefix}${s.id}`} aria-labelledby={`${prefix}${s.id}-h`}>
-              <h2 id={`${prefix}${s.id}-h`}>{pick(s.title, lang)}</h2>
+              <h2 id={`${prefix}${s.id}-h`}>{t(s.title)}</h2>
               {s.body.map((p) => (
-                <p key={p.en}>{pick(p, lang)}</p>
+                <p key={p}>{t(p)}</p>
               ))}
               {s.list ? (
                 <ul>
                   {s.list.map((li) => (
-                    <li key={li.en}>{pick(li, lang)}</li>
+                    <li key={li}>{t(li)}</li>
                   ))}
                 </ul>
               ) : null}
-              {s.quote ? <blockquote>{pick(s.quote, lang)}</blockquote> : null}
-              {s.quote && lang === "ar" ? (
-                <blockquote lang="en" dir="ltr">
-                  {s.quote.en}
+              {s.quote ? <blockquote>{t(s.quote)}</blockquote> : null}
+              {s.quote && lang !== DEFAULT_LANG ? (
+                <blockquote lang={DEFAULT_LANG} dir="ltr">
+                  {translate(DEFAULT_LANG, s.quote)}
                 </blockquote>
               ) : null}
               {s.id === "contact" ? (
