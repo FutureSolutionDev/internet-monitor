@@ -4,6 +4,7 @@ import type { MessageKey } from "../lib/i18n";
 export interface DonateConfig {
   paypal: string;
   vodafoneCash: string;
+  vodafoneCashLink: string;
   instapay: string;
   instapayLink: string;
 }
@@ -11,6 +12,7 @@ export interface DonateConfig {
 export const DONATE: DonateConfig = {
   paypal: "https://www.paypal.com/ncp/payment/9T8REJA5D7Z4U",
   vodafoneCash: "01069017890",
+  vodafoneCashLink: "https://vf.eg/vfcash?id=mt&qrId=DJMHw5",
   instapay: "01069017890",
   instapayLink: "https://ipn.eg/S/sabryadawood/instapay/6APpJc",
 };
@@ -30,6 +32,7 @@ export interface DonateMethod {
 
 const PAYPAL_HOSTS = new Set(["paypal.me", "www.paypal.me", "paypal.com", "www.paypal.com"]);
 const INSTAPAY_HOSTS = new Set(["ipn.eg"]);
+const VODAFONE_CASH_HOSTS = new Set(["vf.eg"]);
 
 function httpsOn(raw: string, hosts: Set<string>): boolean {
   try {
@@ -42,6 +45,7 @@ function httpsOn(raw: string, hosts: Set<string>): boolean {
 
 export const isPaypalLink = (raw: string) => httpsOn(raw, PAYPAL_HOSTS);
 export const isInstapayLink = (raw: string) => httpsOn(raw, INSTAPAY_HOSTS);
+export const isVodafoneCashLink = (raw: string) => httpsOn(raw, VODAFONE_CASH_HOSTS);
 export const isVodafoneCash = (raw: string) => /^010\d{8}$/.test(raw);
 export const isInstapayAddress = (raw: string) =>
   /^[a-z0-9._-]+@instapay$/i.test(raw) || /^01[0125]\d{8}$/.test(raw);
@@ -64,6 +68,7 @@ export function donateMethods(cfg: DonateConfig = DONATE): DonateMethod[] {
     });
   }
   const phone = cfg.vodafoneCash.replace(/[\s-]/g, "");
+  const vfLink = cfg.vodafoneCashLink.trim();
   if (isVodafoneCash(phone)) {
     out.push({
       id: "vodafone-cash",
@@ -72,7 +77,8 @@ export function donateMethods(cfg: DonateConfig = DONATE): DonateMethod[] {
       name: "support.vodafone.name",
       how: "support.vodafone.how",
       handle: groupPhone(phone),
-      copy: phone,
+      copy: isVodafoneCashLink(vfLink) ? vfLink : phone,
+      href: isVodafoneCashLink(vfLink) ? vfLink : undefined,
     });
   }
   const address = cfg.instapay.replace(/[\s-]/g, "");

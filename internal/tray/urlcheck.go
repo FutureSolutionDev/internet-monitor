@@ -34,6 +34,7 @@ var externalHosts = map[string]bool{
 	"paypal.com":        true,
 	"www.paypal.com":    true,
 	"ipn.eg":            true,
+	"vf.eg":             true,
 }
 
 func ValidateExternalURL(raw string) (string, error) {

@@ -42,6 +42,8 @@ func TestValidateExternalURL(t *testing.T) {
 		{"https://paypal.me/example", true},
 		{"https://www.paypal.com/donate/?hosted_button_id=X", true},
 		{"https://ipn.eg/S/example/instapay/abc", true},
+		{"https://vf.eg/vfcash?id=mt&qrId=example", true},
+		{"http://vf.eg/vfcash", false},
 		{"https://paypal.me.evil.example/", false},
 		{"http://github.com/", false},
 		{"https://github.com.evil.example/", false},

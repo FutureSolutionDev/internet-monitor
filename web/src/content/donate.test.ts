@@ -1,7 +1,15 @@
 import { describe, expect, test } from "vitest";
 import { DONATE, type DonateConfig, donateMethods } from "./donate";
 
-const EMPTY: DonateConfig = { paypal: "", vodafoneCash: "", instapay: "", instapayLink: "" };
+const VF_LINK = "https://vf.eg/vfcash?id=mt&qrId=example";
+
+const EMPTY: DonateConfig = {
+  paypal: "",
+  vodafoneCash: "",
+  vodafoneCashLink: "",
+  instapay: "",
+  instapayLink: "",
+};
 
 describe("donation methods", () => {
   test("nothing is shown until details are filled in", () => {
@@ -12,12 +20,13 @@ describe("donation methods", () => {
     const methods = donateMethods({
       paypal: "https://paypal.me/example/",
       vodafoneCash: "010 1234 5678",
+      vodafoneCashLink: VF_LINK,
       instapay: "example@instapay",
       instapayLink: "https://ipn.eg/S/example/instapay/abc",
     });
     expect(methods.map((m) => [m.id, m.handle, m.copy, m.href])).toEqual([
       ["paypal", "paypal.me", "https://paypal.me/example/", "https://paypal.me/example/"],
-      ["vodafone-cash", "010 1234 5678", "01012345678", undefined],
+      ["vodafone-cash", "010 1234 5678", VF_LINK, VF_LINK],
       [
         "instapay",
         "example@instapay",
@@ -46,6 +55,13 @@ describe("donation methods", () => {
     expect(donateMethods({ ...EMPTY, instapay: "01312345678" })).toEqual([]);
   });
 
+  test("Vodafone Cash without a usable link copies the bare number", () => {
+    for (const vodafoneCashLink of ["", "http://vf.eg/x", "https://vf.eg.evil.example/x"]) {
+      const [m] = donateMethods({ ...EMPTY, vodafoneCash: "01012345678", vodafoneCashLink });
+      expect([m?.copy, m?.href], vodafoneCashLink).toEqual(["01012345678", undefined]);
+    }
+  });
+
   test("an InstaPay link on another host is dropped but the address stays", () => {
     const [m] = donateMethods({ ...EMPTY, instapay: "x@instapay", instapayLink: "https://evil.example/pay" });
     expect(m?.href).toBeUndefined();
@@ -56,6 +72,8 @@ describe("donation methods", () => {
     if (DONATE.paypal.trim()) expect(shown.has("paypal"), "paypal").toBe(true);
     if (DONATE.vodafoneCash.trim()) expect(shown.has("vodafone-cash"), "vodafoneCash").toBe(true);
     if (DONATE.instapay.trim()) expect(shown.has("instapay"), "instapay").toBe(true);
+    if (DONATE.vodafoneCashLink.trim())
+      expect(donateMethods().find((m) => m.id === "vodafone-cash")?.href, "vodafoneCashLink").toBeTruthy();
     if (DONATE.instapayLink.trim())
       expect(donateMethods().find((m) => m.id === "instapay")?.href).toBeTruthy();
   });
