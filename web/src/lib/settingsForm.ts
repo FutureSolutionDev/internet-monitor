@@ -98,8 +98,8 @@ function notificationDraft(n: NotificationSettings) {
     sound_enabled: n.sound.enabled,
     sound_volume: n.sound.volume,
     quiet_enabled: n.quiet_hours.enabled,
-    quiet_start: n.quiet_hours.start,
-    quiet_end: n.quiet_hours.end,
+    quiet_start: padClock(n.quiet_hours.start),
+    quiet_end: padClock(n.quiet_hours.end),
     quiet_days: [...(n.quiet_hours.days ?? [])].sort((a, b) => a - b),
     quiet_mode: n.quiet_hours.mode,
     notify_events: copyEvents(n.events),
@@ -126,6 +126,10 @@ export function notificationsFrom(d: Draft, base: NotificationSettings): Notific
     min_outage_seconds: num(d.min_outage, base.min_outage_seconds),
     reminder_minutes: num(d.reminder, base.reminder_minutes),
   };
+}
+
+function padClock(v: string): string {
+  return /^\d:\d\d$/.test(v) ? `0${v}` : v;
 }
 
 export function isClock(v: string): boolean {
@@ -243,10 +247,12 @@ export function validateDraft(d: Draft): Issues {
   if (!isSafeLogDir(d.log_dir)) issues.log_dir = { key: "err_logdir" };
   put("min_outage", numberIssue(d.min_outage, 0, 3600));
   put("reminder", numberIssue(d.reminder, 0, 1440));
-  if (!isClock(d.quiet_start)) issues.quiet_start = { key: "err_time" };
-  if (!isClock(d.quiet_end)) issues.quiet_end = { key: "err_time" };
-  else if (d.quiet_enabled && d.quiet_start === d.quiet_end) issues.quiet_end = { key: "err_quiet_span" };
-  if (d.quiet_enabled && d.quiet_days.length === 0) issues.quiet_days = { key: "err_days" };
+  if (d.quiet_enabled) {
+    if (!isClock(d.quiet_start)) issues.quiet_start = { key: "err_time" };
+    if (!isClock(d.quiet_end)) issues.quiet_end = { key: "err_time" };
+    else if (d.quiet_start === d.quiet_end) issues.quiet_end = { key: "err_quiet_span" };
+    if (d.quiet_days.length === 0) issues.quiet_days = { key: "err_days" };
+  }
   return issues;
 }
 

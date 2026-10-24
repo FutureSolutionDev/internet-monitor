@@ -14,6 +14,7 @@ import { Gauge } from "../components/Gauge";
 import { toast } from "../components/Toast";
 import { Banner, Button, Card, CardHead, Empty, Skeleton } from "../components/ui";
 import { ApiError, api } from "../lib/api";
+import { speedErrorKey } from "../lib/errors";
 import { formatNumber, formatTime, localDateKey } from "../lib/format";
 import { useAsync } from "../lib/hooks";
 import { type MessageKey, useI18n } from "../lib/i18n";
@@ -155,7 +156,7 @@ export function Speed() {
           />
           <p id="speed-status" className="secondary" role="status" aria-live="polite">
             {statusText}
-            {phase === "error" && speed?.error ? ` — ${speed.error}` : ""}
+            {phase === "error" ? ` — ${t(speedErrorKey(speed?.error))}` : ""}
           </p>
           {busy ? (
             <Button variant="edge" size="lg" icon={Square} onClick={cancel}>

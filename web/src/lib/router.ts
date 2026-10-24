@@ -33,6 +33,7 @@ type Blocker = (proceed: () => void) => boolean;
 
 const listeners = new Set<() => void>();
 let blocker: Blocker | null = null;
+let passThrough = false;
 let current = typeof window === "undefined" ? "/" : window.location.pathname + window.location.search;
 
 function emit() {
@@ -42,13 +43,14 @@ function emit() {
 
 function onPopState() {
   const target = window.location.pathname + window.location.search;
-  if (!blocker || target === current) {
+  if (passThrough || !blocker || target === current) {
+    passThrough = false;
     emit();
     return;
   }
   const proceed = () => {
-    window.history.replaceState(null, "", target);
-    emit();
+    passThrough = true;
+    window.history.back();
   };
   window.history.pushState(null, "", current);
   if (!blocker(proceed)) proceed();

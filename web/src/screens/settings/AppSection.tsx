@@ -5,6 +5,7 @@ import { LanguageField } from "../../components/LanguagePicker";
 import { toast } from "../../components/Toast";
 import { Button, Card, CardHead, Segmented, Switch } from "../../components/ui";
 import { api } from "../../lib/api";
+import { errorKey } from "../../lib/errors";
 import { useI18n } from "../../lib/i18n";
 import { useLive } from "../../lib/live";
 import { type Theme, useTheme } from "../../lib/theme";
@@ -64,8 +65,8 @@ function UpdatesRow() {
       const info = await api.checkUpdate();
       if (info.has_update) toast(t("update_available", { v: info.latest_version }), "info");
       else toast(t("update_latest"), "ok");
-    } catch {
-      toast(t("update_check_failed"), "error");
+    } catch (e) {
+      toast(t(errorKey(e, "update_check_failed")), "error");
     } finally {
       setChecking(false);
     }

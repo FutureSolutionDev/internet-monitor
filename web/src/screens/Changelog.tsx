@@ -1,26 +1,11 @@
-import {
-  ChevronDown,
-  type LucideIcon,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  TrendingUp,
-  Wrench,
-  X,
-} from "lucide-react";
+import { ChevronDown, Search, X } from "lucide-react";
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { CHANGE_KIND as KIND } from "../content/changeKinds";
 import { type ChangeKind, KINDS, RELEASES, type Release, releaseOfVersion } from "../content/changelog";
 import { buildTimeline, type KindFilter, NEXT_MONTH } from "../content/changelogView";
 import { formatDate, formatMonth, formatNumber } from "../lib/format";
 import { type MessageKey, type Translate, useI18n } from "../lib/i18n";
 import { useLive } from "../lib/live";
-
-const KIND: Record<ChangeKind, { label: MessageKey; icon: LucideIcon; tone: string }> = {
-  new: { label: "kind_new", icon: Sparkles, tone: "var(--accent-blue)" },
-  improved: { label: "kind_improved", icon: TrendingUp, tone: "var(--accent-violet)" },
-  fixed: { label: "kind_fixed", icon: Wrench, tone: "var(--accent-green)" },
-  security: { label: "kind_security", icon: ShieldCheck, tone: "var(--accent-amber)" },
-};
 
 const DATE_OPTS: Intl.DateTimeFormatOptions = { year: "numeric", month: "long", day: "numeric" };
 

@@ -39,6 +39,12 @@ func (r *rateLimiter) allow(key string) bool {
 	return true
 }
 
+func (r *rateLimiter) forget(key string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.last, key)
+}
+
 type testTargetResult struct {
 	Target    string `json:"target"`
 	OK        bool   `json:"ok"`
@@ -277,6 +283,7 @@ func (s *Server) serveTestWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.hooks.TestWebhook != nil {
 		if msg := s.hooks.TestWebhook(target); msg != "" {
+			s.tester.forget("test-webhook")
 			writeError(w, http.StatusBadGateway, "webhook_failed", msg)
 			return
 		}

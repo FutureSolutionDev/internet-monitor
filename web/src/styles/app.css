@@ -3577,3 +3577,58 @@ select.input {
 .field > .segmented {
   align-self: flex-start;
 }
+
+.whats-new {
+  width: min(600px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 48px));
+}
+
+.whats-new[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.whats-new .dialog-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.whats-new .dialog-actions {
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.whats-new-eyebrow {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--accent-blue);
+  font-weight: 500;
+}
+
+.whats-new-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.whats-new-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--tone);
+}
+
+.whats-new-group ul {
+  margin: 0;
+  padding-inline-start: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}

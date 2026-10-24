@@ -115,6 +115,7 @@ export function createLiveStore(deps: LiveDeps) {
       set({ speed: merged, receivedAt: deps.now() });
       return;
     }
+    if (typeof (msg as { boot_id?: unknown }).boot_id !== "string") return;
     applySnapshot(msg as Snapshot);
   };
 

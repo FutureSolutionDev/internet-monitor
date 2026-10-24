@@ -28,6 +28,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { api } from "../lib/api";
+import { errorKey } from "../lib/errors";
 import { formatAgo } from "../lib/format";
 import { useNow } from "../lib/hooks";
 import { type MessageKey, useI18n } from "../lib/i18n";
@@ -40,6 +41,7 @@ import { LanguageSelect } from "./LanguagePicker";
 import { NotificationBell } from "./NotificationBell";
 import { toast } from "./Toast";
 import { Banner, Button } from "./ui";
+import { WhatsNew } from "./WhatsNew";
 
 const NAV: {
   route: Route;
@@ -119,7 +121,6 @@ function UpdateBanner() {
   const { t } = useI18n();
   const info = useLive((s) => s.snapshot?.update_info);
   const status = useLive((s) => s.snapshot?.update_status ?? "idle");
-  const error = useLive((s) => s.snapshot?.update_error);
   const [busy, setBusy] = useState(false);
   if (!info?.has_update && status === "idle") return null;
   if (status === "downloading" || status === "restarting") {
@@ -134,7 +135,7 @@ function UpdateBanner() {
     try {
       await api.applyUpdate();
     } catch (e) {
-      toast(t("update_failed", { error: e instanceof Error ? e.message : String(e) }), "error");
+      toast(t(errorKey(e, "update_failed_plain")), "error");
     } finally {
       setBusy(false);
     }
@@ -152,7 +153,7 @@ function UpdateBanner() {
       }
     >
       {status === "error"
-        ? t("update_failed", { error: error ?? "" })
+        ? t("update_failed_plain")
         : t("update_available", { v: info?.latest_version ?? "" })}
     </Banner>
   );
@@ -328,6 +329,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
           <UpdateBanner />
           {children}
         </main>
+        <WhatsNew />
       </div>
     </div>
   );

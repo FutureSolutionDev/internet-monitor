@@ -37,11 +37,9 @@ function Gate({ kind }: { kind: "unauthorized" | "busy" | "offline" }) {
         </span>
         <h1>{t(title)}</h1>
         <p className="secondary">{t(body)}</p>
-        {kind !== "unauthorized" ? (
-          <Button variant="edge" icon={RefreshCw} onClick={() => window.location.reload()}>
-            {t("retry")}
-          </Button>
-        ) : null}
+        <Button variant="edge" icon={RefreshCw} onClick={() => window.location.reload()}>
+          {t("retry")}
+        </Button>
       </Card>
     </main>
   );

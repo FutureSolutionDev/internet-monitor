@@ -81,6 +81,7 @@ export function isUnread(r: NotificationRecord, lastReadAt: string | null): bool
 }
 
 const REFRESH_DELAY = 250;
+const RETRY_DELAY = 5_000;
 
 export function useNotifications(limit: number) {
   const revision = useLive((s) => s.notice.revision);
@@ -117,6 +118,21 @@ export function useNotifications(limit: number) {
   }, [limit, revision, nonce]);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: schedule another retry after each failed attempt
+  useEffect(() => {
+    if (!error) return;
+    const id = window.setTimeout(reload, RETRY_DELAY);
+    return () => window.clearTimeout(id);
+  }, [error, nonce, reload]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") reload();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [reload]);
 
   const markAllRead = useCallback(async (): Promise<boolean> => {
     if (!data) return false;

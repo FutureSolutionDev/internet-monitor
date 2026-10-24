@@ -173,7 +173,7 @@ function DailyChart({ report }: { report: MonthlyReport }) {
 export function Report({ month: initial }: { month: string | null }) {
   const { t, lang } = useI18n();
   const month = initial && /^\d{4}-\d{2}$/.test(initial) ? initial : monthKey(new Date());
-  const report = useAsync((signal) => api.report(month, signal), [month]);
+  const report = useAsync((signal) => api.report(month, signal), [month], month);
   const thisMonth = monthKey(new Date());
   const rtl = isRtl(lang);
 
@@ -296,7 +296,7 @@ export function Report({ month: initial }: { month: string | null }) {
 
           <Card labelledBy="daily-title">
             <CardHead id="daily-title" title={t("report_daily")} />
-            <DailyChart report={r} />
+            <DailyChart key={r.month} report={r} />
           </Card>
 
           {causes.length ? (

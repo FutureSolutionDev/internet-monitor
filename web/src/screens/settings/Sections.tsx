@@ -3,7 +3,8 @@ import { useState } from "react";
 import { type ItemResult, ListEditor, TextField } from "../../components/Field";
 import { toast } from "../../components/Toast";
 import { Button, Card, CardHead, Switch } from "../../components/ui";
-import { ApiError, api } from "../../lib/api";
+import { api } from "../../lib/api";
+import { errorKey } from "../../lib/errors";
 import { formatNumber } from "../../lib/format";
 import { type Lang, type MessageKey, type Translate, useI18n } from "../../lib/i18n";
 import { type Draft, type FieldKey, MAX_TARGETS } from "../../lib/settingsForm";
@@ -189,7 +190,7 @@ export function AlertsSection({ draft, set, err, base }: SectionProps & { base: 
       await api.testWebhook(draft.webhook.mode === "set" ? draft.webhook.value.trim() : undefined);
       toast(t("webhook_ok"), "ok");
     } catch (e) {
-      toast(e instanceof ApiError ? e.message : t("probe_error"), "error");
+      toast(t(errorKey(e, "err_webhook_failed")), "error");
     } finally {
       setBusy(null);
     }
@@ -200,8 +201,8 @@ export function AlertsSection({ draft, set, err, base }: SectionProps & { base: 
     try {
       await api.testNotification(lang, draft.sound_enabled ? draft.sound_volume : 0);
       toast(t("notification_sent"), "ok");
-    } catch {
-      toast(t("probe_error"), "error");
+    } catch (e) {
+      toast(t(errorKey(e, "err_notify_failed")), "error");
     } finally {
       setBusy(null);
     }

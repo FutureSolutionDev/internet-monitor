@@ -10,8 +10,10 @@ export function formatNumber(lang: Lang, value: number, digits = 0): string {
 
 export function formatPct(lang: Lang, value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
-  const digits = value >= 99.995 ? 0 : value >= 99 ? 2 : 1;
-  return `${formatNumber(lang, value, digits)}%`;
+  if (value >= 100) return `${formatNumber(lang, 100, 0)}%`;
+  const digits = value >= 99 ? 2 : 1;
+  const scale = 10 ** digits;
+  return `${formatNumber(lang, Math.floor(value * scale) / scale, digits)}%`;
 }
 
 export function formatDuration(t: Translate, seconds: number): string {

@@ -32,6 +32,7 @@ export function dismissToast(id: number) {
   if (timer) clearTimeout(timer);
   timers.delete(id);
   items = items.filter((t) => t.id !== id);
+  if (items.length === 0) paused = false;
   emit();
 }
 

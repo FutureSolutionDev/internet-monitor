@@ -27,7 +27,7 @@ function niceMax(v: number): number {
 export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height = 200 }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(600);
-  const [active, setActive] = useState<number | null>(null);
+  const [fromEnd, setFromEnd] = useState<number | null>(null);
   const tipId = useId();
   const rtl = isRtl(lang);
 
@@ -88,6 +88,8 @@ export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height =
 
   const n = values.length;
   const timeOf = (i: number) => lastCheck - (n - 1 - i) * intervalSec * 1000;
+  const active = fromEnd === null || n === 0 ? null : Math.max(0, n - 1 - fromEnd);
+  const setActive = (i: number | null) => setFromEnd(i === null ? null : n - 1 - i);
 
   const pick = (e: PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -150,7 +152,7 @@ export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height =
           if (e.pointerType === "mouse") setActive(null);
         }}
         onKeyDown={onKey}
-        onFocus={() => setActive((a) => a ?? (n ? n - 1 : null))}
+        onFocus={() => setActive(active ?? (n ? n - 1 : null))}
         onBlur={() => setActive(null)}
       >
         <svg height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden>

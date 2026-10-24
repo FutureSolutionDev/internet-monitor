@@ -15,7 +15,7 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [announce, setAnnounce] = useState("");
-  const { data, error, markAllRead } = useNotifications(open ? PREVIEW : 1);
+  const { data, error, markAllRead } = useNotifications(PREVIEW);
   const now = useNow(30000);
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);

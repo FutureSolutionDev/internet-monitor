@@ -49,10 +49,7 @@ export function History() {
   const date = picked ?? today;
   const logs = useAsync((signal) => api.logs(date, 5000, signal), [date === today ? latestEvent : 0], date);
 
-  const rows = useMemo(
-    () => buildRows(logs.data ?? [], Date.now(), date === today),
-    [logs.data, date, today],
-  );
+  const rows = useMemo(() => buildRows(logs.data ?? [], now, date === today), [logs.data, date, today, now]);
   const summary = useMemo(() => summarize(rows), [rows]);
   const visible = filter === "all" ? rows : rows.filter((r) => r.event.event === filter);
 

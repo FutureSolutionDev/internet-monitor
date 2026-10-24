@@ -94,12 +94,12 @@ func (sr *speedRunner) start(triggeredBy string) bool {
 			return
 		}
 		if err != nil || result == nil {
-			msg := "no_result"
+			code, detail := "no_result", "no result"
 			if err != nil {
-				msg = err.Error()
+				code, detail = "failed", err.Error()
 			}
-			sr.s.logf("SPEEDTEST failed (%s): %s", triggeredBy, msg)
-			sr.emit(speedProgress{Phase: "error", Done: true, Error: msg})
+			sr.s.logf("SPEEDTEST failed (%s): %s", triggeredBy, detail)
+			sr.emit(speedProgress{Phase: "error", Done: true, Error: code})
 			return
 		}
 		sr.emit(speedProgress{Phase: "ping", LatencyMs: result.LatencyMs})
