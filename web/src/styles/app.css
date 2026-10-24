@@ -3226,21 +3226,6 @@ select.input {
   }
 }
 
-@media (max-width: 767px) {
-  .ss-compact .ss-value {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .ss-compact .ss-trigger {
-    padding-inline: 10px 8px;
-  }
-}
-
 @media (pointer: coarse) {
   .ss-pill .ss-trigger,
   .ss-field .ss-trigger {
@@ -3663,5 +3648,24 @@ select.input {
 @media (prefers-reduced-motion: reduce) {
   .spotlight {
     animation: none;
+  }
+}
+
+.ss-pill.ss-icon-only .ss-trigger {
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+}
+
+.ss-icon-only .ss-leading {
+  color: var(--text-primary);
+}
+
+@media (pointer: coarse) {
+  .ss-pill.ss-icon-only .ss-trigger {
+    width: 44px;
+    height: 44px;
   }
 }

@@ -34,6 +34,7 @@ interface Props<T extends string> {
   disabled?: boolean;
   variant?: "field" | "pill";
   leading?: ReactNode;
+  iconOnly?: boolean;
   className?: string;
   describedBy?: string;
 }
@@ -69,6 +70,7 @@ export function SmartSelect<T extends string>({
   disabled = false,
   variant = "field",
   leading,
+  iconOnly = false,
   className,
   describedBy,
 }: Props<T>) {
@@ -260,7 +262,7 @@ export function SmartSelect<T extends string>({
     : undefined;
 
   return (
-    <div className={["ss", `ss-${variant}`, className].filter(Boolean).join(" ")}>
+    <div className={["ss", `ss-${variant}`, iconOnly && "ss-icon-only", className].filter(Boolean).join(" ")}>
       <button
         ref={trigger}
         type="button"
@@ -271,16 +273,20 @@ export function SmartSelect<T extends string>({
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
         aria-describedby={describedBy}
+        title={iconOnly ? `${label}: ${current?.label ?? ""}` : undefined}
         onClick={() => (open ? close(true) : openList())}
         onKeyDown={onTriggerKey}
       >
         <span className="sr-only">{label}: </span>
         {leading ? <span className="ss-leading">{leading}</span> : null}
         {current?.icon ? <span className="ss-icon">{current.icon}</span> : null}
-        <span className={current ? "ss-value" : "ss-value ss-placeholder"} lang={current?.lang}>
+        <span
+          className={iconOnly ? "sr-only" : current ? "ss-value" : "ss-value ss-placeholder"}
+          lang={current?.lang}
+        >
           {current?.label ?? placeholder ?? t("select_placeholder")}
         </span>
-        <ChevronDown size={16} className="ss-chevron" aria-hidden />
+        {iconOnly ? null : <ChevronDown size={16} className="ss-chevron" aria-hidden />}
       </button>
 
       {open && pos

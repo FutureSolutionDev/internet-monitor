@@ -52,7 +52,8 @@
         "26": "FAQ answers link straight to the setting they mention and highlight it for you.",
         "27": "Error messages say what actually went wrong, and availability never rounds up to 100% when there was downtime.",
         "28": "A new license, the Elastic License 2.0: the app is still free for personal and commercial use and its code is still public.",
-        "29": "The Arabic interface, alerts and Webhook/Telegram messages are now written in everyday Egyptian Arabic."
+        "29": "The Arabic interface, alerts and Webhook/Telegram messages are now written in everyday Egyptian Arabic.",
+        "30": "The language button in the top bar is a single icon, which leaves more room on phones."
       }
     },
     "v0.10.1": {

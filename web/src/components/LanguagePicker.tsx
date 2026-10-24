@@ -19,13 +19,13 @@ export function useChangeLanguage() {
   };
 }
 
-export function LanguageSelect({ compact = false }: { compact?: boolean }) {
+export function LanguageSelect({ iconOnly = false }: { iconOnly?: boolean }) {
   const { t, lang } = useI18n();
   const change = useChangeLanguage();
   return (
     <SmartSelect<Lang>
       variant="pill"
-      className={compact ? "ss-compact" : undefined}
+      iconOnly={iconOnly}
       label={t("f_language")}
       leading={<Languages size={16} aria-hidden />}
       value={lang}

@@ -48,6 +48,7 @@ export const RELEASES: Release[] = [
       { kind: "improved", text: "changelog.v2.0.0.items.26" },
       { kind: "improved", text: "changelog.v2.0.0.items.27" },
       { kind: "improved", text: "changelog.v2.0.0.items.29" },
+      { kind: "improved", text: "changelog.v2.0.0.items.30" },
       { kind: "fixed", text: "changelog.v2.0.0.items.11" },
       { kind: "fixed", text: "changelog.v2.0.0.items.12" },
       { kind: "security", text: "changelog.v2.0.0.items.13" },

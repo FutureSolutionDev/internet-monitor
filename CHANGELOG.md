@@ -68,6 +68,7 @@ The v2 rebuild.
   addition to Go. `make build`, `build-debug`, `build-gui` and `scripts\build*.cmd`
   build the web UI first.
 - Settings saving is conflict-safe.
+- The top-bar language switcher is an icon button; its menu lists the languages.
 - Config handling moved to a hardened config store; the Go toolchain is
   upgraded to the version declared in `go.mod`.
 - Dev mode: `go run ./cmd/tray` plus `bun run dev` in `web/` for the UI. The

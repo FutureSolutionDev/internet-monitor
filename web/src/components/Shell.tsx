@@ -303,7 +303,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
           <div className="topbar-actions">
             <ConnectionPill />
             <NotificationBell />
-            <LanguageSelect compact />
+            <LanguageSelect iconOnly />
             <Button
               variant="edge"
               size="sm"
