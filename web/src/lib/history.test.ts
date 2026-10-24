@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { toCSV } from "./csv";
-import { formatDuration } from "./format";
+import { formatDuration, formatLatency } from "./format";
 import { buildRows, summarize } from "./history";
 import { translate } from "./i18n";
 import type { LogEvent } from "./types";
@@ -53,6 +53,15 @@ describe("formatting", () => {
     expect(formatDuration(t, 125)).toBe("2m 5s");
     expect(formatDuration(t, 3725)).toBe("1h 2m");
     expect(formatDuration(t, 90000)).toBe("1d 1h");
+  });
+
+  test("latency scales from ms to seconds and minutes", () => {
+    expect(formatLatency(t, "en", 46)).toBe("46 ms");
+    expect(formatLatency(t, "en", 1057)).toBe("1.06 s");
+    expect(formatLatency(t, "en", 1000)).toBe("1 s");
+    expect(formatLatency(t, "en", 12_345)).toBe("12.3 s");
+    expect(formatLatency(t, "en", 125_000)).toBe("2m 5s");
+    expect(formatLatency(t, "en", Number.NaN)).toBe("—");
   });
 
   test("arabic strings interpolate", () => {

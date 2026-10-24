@@ -6,13 +6,13 @@
     },
     "restored": {
       "title": "✅ Internet Restored",
-      "latency": "Latency: {ms}ms",
+      "latency": "Latency: {ms}",
       "ok": "All checks passing",
       "after": "Back after {duration}"
     },
     "degraded": {
       "title": "⚠️ Internet Degraded",
-      "body": "Loss: {loss}% — latency: {ms}ms"
+      "body": "Loss: {loss}% — latency: {ms}"
     },
     "down": {
       "title": "🔴 Internet Disconnected",
@@ -26,8 +26,8 @@
     "speed": {
       "title": "🚀 Speed test finished",
       "slow_title": "⚠️ Speed below {threshold} Mbps",
-      "body": "↓ {down} Mbps · ↑ {up} Mbps · {ms} ms",
-      "body_down": "↓ {down} Mbps · {ms} ms"
+      "body": "↓ {down} Mbps · ↑ {up} Mbps · {ms}",
+      "body_down": "↓ {down} Mbps · {ms}"
     },
     "action": {
       "open": "Open dashboard"
@@ -38,7 +38,8 @@
     "m": "{m} min",
     "ms": "{m} min {s} s",
     "h": "{h} h",
-    "hm": "{h} h {m} min"
+    "hm": "{h} h {m} min",
+    "millis": "{n} ms"
   },
   "remote": {
     "title": {
@@ -72,7 +73,7 @@
       "disconnected": "Disconnected",
       "checking": "Checking…"
     },
-    "detail": "loss {loss}% · {ms} ms",
+    "detail": "loss {loss}% · {ms}",
     "last_change": "Last change: {time}",
     "last_change_none": "Last change: —",
     "open_dashboard": "Open dashboard",

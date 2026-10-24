@@ -72,6 +72,8 @@ The v2 rebuild.
   build the web UI first.
 - Settings saving is conflict-safe.
 - The top-bar language switcher is an icon button; its menu lists the languages.
+- Latency and jitter are shown in the most readable unit (`46 ms`, `1.06 s`, `2 min 5 s`)
+  in the dashboard, chart axis, desktop alerts, tray tooltip and Webhook/Telegram messages.
 - Config handling moved to a hardened config store; the Go toolchain is
   upgraded to the version declared in `go.mod`.
 - Dev mode: `go run ./cmd/tray` plus `bun run dev` in `web/` for the UI. The

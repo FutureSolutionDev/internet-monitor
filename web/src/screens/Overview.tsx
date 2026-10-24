@@ -23,9 +23,11 @@ import {
   eventKey,
   formatAgo,
   formatDuration,
+  formatLatency,
   formatNumber,
   formatPct,
   formatTime,
+  latencyParts,
   statusKey,
 } from "../lib/format";
 import { useNow } from "../lib/hooks";
@@ -122,18 +124,19 @@ function Stat({
 
 function Stats({ snap }: { snap: Snapshot }) {
   const { t, lang } = useI18n();
-  const ms = t("ms_unit");
   const live = snap.total_checks > 0;
+  const latency = latencyParts(t, lang, snap.latency_ms);
+  const jitter = latencyParts(t, lang, snap.jitter_ms);
   return (
     <div className="grid grid-stats">
       <Stat
         icon={Activity}
         label={t("stat_latency")}
-        value={live && snap.latency_ms > 0 ? formatNumber(lang, snap.latency_ms) : "—"}
-        unit={ms}
+        value={live && snap.latency_ms > 0 ? latency.value : "—"}
+        unit={live && snap.latency_ms > 0 ? latency.unit : undefined}
         foot={
           snap.avg_latency_ms
-            ? t("stat_avg", { value: `${formatNumber(lang, snap.avg_latency_ms)} ${ms}` })
+            ? t("stat_avg", { value: formatLatency(t, lang, snap.avg_latency_ms) })
             : undefined
         }
         flare={tone.latency}
@@ -141,8 +144,8 @@ function Stats({ snap }: { snap: Snapshot }) {
       <Stat
         icon={Waves}
         label={t("stat_jitter")}
-        value={live ? formatNumber(lang, snap.jitter_ms) : "—"}
-        unit={ms}
+        value={live ? jitter.value : "—"}
+        unit={live ? jitter.unit : undefined}
         flare={tone.jitter}
       />
       <Stat
@@ -219,9 +222,7 @@ function Targets({ snap }: { snap: Snapshot }) {
                       aria-hidden
                       style={{ verticalAlign: "-2px", color: tone.connected }}
                     />{" "}
-                    {tg.latency_ms > 0
-                      ? `${formatNumber(lang, tg.latency_ms)} ${t("ms_unit")}`
-                      : t("target_ok")}
+                    {tg.latency_ms > 0 ? formatLatency(t, lang, tg.latency_ms) : t("target_ok")}
                   </>
                 ) : (
                   <>

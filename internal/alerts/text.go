@@ -41,7 +41,7 @@ func SpeedText(lang string, s SpeedInfo) (title, body string) {
 	if s.Below && s.ThresholdMbps > 0 {
 		title = i18n.T(lang, "notify.speed.slow_title", i18n.Vars{"threshold": mbps(s.ThresholdMbps)})
 	}
-	vars := i18n.Vars{"down": mbps(s.DownloadMbps), "ms": s.LatencyMs}
+	vars := i18n.Vars{"down": mbps(s.DownloadMbps), "ms": notifytext.Latency(lang, s.LatencyMs)}
 	if s.UploadMbps != nil {
 		vars["up"] = mbps(*s.UploadMbps)
 		return title, i18n.T(lang, "notify.speed.body", vars)

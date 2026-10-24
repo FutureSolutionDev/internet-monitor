@@ -50,7 +50,7 @@ func eventLines(lang string, ev monitor.Event) (checks, metrics []remoteLine) {
 		metrics = append(metrics, remoteLine{"📉 " + i18n.T(lang, "remote.loss", nil), fmt.Sprintf("%.1f%%", ev.Reason.PacketLossPct)})
 	}
 	if ev.Reason.AvgLatencyMs > 0 {
-		metrics = append(metrics, remoteLine{"⚡ " + i18n.T(lang, "remote.latency", nil), fmt.Sprintf("%d ms", ev.Reason.AvgLatencyMs)})
+		metrics = append(metrics, remoteLine{"⚡ " + i18n.T(lang, "remote.latency", nil), notifytext.Latency(lang, ev.Reason.AvgLatencyMs)})
 	}
 	if ev.DurationSeconds >= 1 {
 		metrics = append(metrics, remoteLine{"⏱️ " + i18n.T(lang, "remote.duration", nil), notifytext.Duration(lang, ev.DurationSeconds)})
@@ -105,7 +105,7 @@ func speedLines(lang string, ev SpeedTestEvent, thresholdMbps float64, below boo
 	if ev.UploadMbps != nil {
 		lines = append(lines, remoteLine{"📤 " + i18n.T(lang, "remote.upload", nil), fmt.Sprintf("%.1f Mbps", *ev.UploadMbps)})
 	}
-	lines = append(lines, remoteLine{"📡 " + i18n.T(lang, "remote.latency", nil), fmt.Sprintf("%d ms", ev.LatencyMs)})
+	lines = append(lines, remoteLine{"📡 " + i18n.T(lang, "remote.latency", nil), notifytext.Latency(lang, ev.LatencyMs)})
 	if ev.DurationSeconds > 0 {
 		lines = append(lines, remoteLine{"⏱️ " + i18n.T(lang, "remote.duration", nil), fmt.Sprintf("%.1f s", ev.DurationSeconds)})
 	}

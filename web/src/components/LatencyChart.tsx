@@ -1,5 +1,5 @@
 import { type KeyboardEvent, type PointerEvent, useEffect, useId, useMemo, useRef, useState } from "react";
-import { formatNumber, formatTime } from "../lib/format";
+import { formatLatency, formatTime } from "../lib/format";
 import { isRtl, type Lang, type Translate } from "../lib/i18n";
 import { tone } from "../styles/categories";
 import { ChartTooltip } from "./ChartTooltip";
@@ -118,14 +118,14 @@ export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height =
     setActive(next);
   };
 
-  const ms = t("ms_unit");
-  const summary = `${t("chart_latency")}: ${formatNumber(lang, geo.min)}–${formatNumber(lang, geo.peak)} ${ms}, ${t("stat_avg", { value: `${formatNumber(lang, geo.avg)} ${ms}` })}`;
+  const lat = (v: number) => formatLatency(t, lang, v);
+  const summary = `${t("chart_latency")}: ${lat(geo.min)}–${lat(geo.peak)}, ${t("stat_avg", { value: lat(geo.avg) })}`;
   const activeValue = active !== null ? values[active] : undefined;
   const tipX = active !== null ? geo.xAt(active) : 0;
   const valueAt = (i: number) => {
     const v = values[i];
     if (v === undefined) return "";
-    return `${formatTime(lang, timeOf(i))}: ${v > 0 ? `${formatNumber(lang, v)} ${ms}` : t("chart_failed")}`;
+    return `${formatTime(lang, timeOf(i))}: ${v > 0 ? lat(v) : t("chart_failed")}`;
   };
   const valueText = valueAt(active ?? n - 1);
 
@@ -171,7 +171,7 @@ export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height =
                 y={geo.yAt(tick) + 4}
                 textAnchor="end"
               >
-                {formatNumber(lang, tick)}
+                {lat(tick)}
               </text>
             </g>
           ))}
@@ -232,7 +232,7 @@ export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height =
             activeValue > 0
               ? {
                   label: t("chart_latency"),
-                  value: `${formatNumber(lang, activeValue)} ${ms}`,
+                  value: lat(activeValue),
                   tone: tone.latency,
                 }
               : { label: t("chart_latency"), value: t("chart_failed"), tone: tone.disconnected },

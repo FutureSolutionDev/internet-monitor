@@ -54,7 +54,8 @@
         "28": "A new license, the Elastic License 2.0: the app is still free for personal and commercial use and its code is still public.",
         "29": "The Arabic interface, alerts and Webhook/Telegram messages are now written in everyday Egyptian Arabic.",
         "30": "The language button in the top bar is a single icon, which leaves more room on phones.",
-        "31": "A Support us page with PayPal, Vodafone Cash and InstaPay, for anyone who wants to help keep the app free."
+        "31": "A Support us page with PayPal, Vodafone Cash and InstaPay, for anyone who wants to help keep the app free.",
+        "32": "Response times read naturally: milliseconds under a second, then seconds, then minutes (1.06 s instead of 1,057 ms), in the app, alerts and Webhook/Telegram messages."
       }
     },
     "v0.10.1": {

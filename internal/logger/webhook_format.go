@@ -3,6 +3,7 @@ package logger
 import (
 	"fmt"
 	"internet-monitor/internal/config"
+	"internet-monitor/internal/notifytext"
 	"strings"
 	"time"
 )
@@ -66,7 +67,7 @@ func discordTestPayload(results TestResults) map[string]interface{} {
 	fields := []map[string]interface{}{}
 
 	for _, r := range results.PingTargets {
-		val := fmt.Sprintf("✅ %dms", r.LatencyMs)
+		val := "✅ " + notifytext.Latency("en", r.LatencyMs)
 		if !r.OK {
 			val = fmt.Sprintf("❌ %s", r.Error)
 		}
@@ -74,7 +75,7 @@ func discordTestPayload(results TestResults) map[string]interface{} {
 	}
 
 	for _, r := range results.HTTPTargets {
-		val := fmt.Sprintf("✅ %dms", r.LatencyMs)
+		val := "✅ " + notifytext.Latency("en", r.LatencyMs)
 		if !r.OK {
 			val = fmt.Sprintf("❌ %s", r.Error)
 		}
@@ -86,7 +87,7 @@ func discordTestPayload(results TestResults) map[string]interface{} {
 	}
 
 	for _, r := range results.DNSTargets {
-		val := fmt.Sprintf("✅ %dms", r.LatencyMs)
+		val := "✅ " + notifytext.Latency("en", r.LatencyMs)
 		if !r.OK {
 			val = fmt.Sprintf("❌ %s", r.Error)
 		}
@@ -132,7 +133,7 @@ func field(name, value string, inline bool) map[string]interface{} {
 
 func formatSlackResult(label string, ok bool, latMs int64, errStr string) string {
 	if ok {
-		return fmt.Sprintf("• %s: ✅ %dms", label, latMs)
+		return fmt.Sprintf("• %s: ✅ %s", label, notifytext.Latency("en", latMs))
 	}
 	return fmt.Sprintf("• %s: ❌ %s", label, errStr)
 }

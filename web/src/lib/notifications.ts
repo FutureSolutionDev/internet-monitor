@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
-import { describeCause, formatDuration, formatNumber } from "./format";
+import { describeCause, formatDuration, formatLatency, formatNumber } from "./format";
 import type { Lang, MessageKey, Translate } from "./i18n";
 import { useLive } from "./live";
 import type { AlertChannel, AlertKind, MuteReason, NotificationList, NotificationRecord } from "./types";
@@ -56,7 +56,7 @@ export function noticeDetail(t: Translate, lang: Lang, r: NotificationRecord): s
   if (r.kind === "speed" && r.speed) {
     const parts = [`↓ ${formatNumber(lang, r.speed.download_mbps, 1)} ${t("speed_unit")}`];
     if (r.speed.upload_mbps) parts.push(`↑ ${formatNumber(lang, r.speed.upload_mbps, 1)} ${t("speed_unit")}`);
-    parts.push(`${formatNumber(lang, r.speed.latency_ms)} ${t("ms_unit")}`);
+    parts.push(formatLatency(t, lang, r.speed.latency_ms));
     return parts.join(" · ");
   }
   if (r.kind === "restored" || r.kind === "reminder") {

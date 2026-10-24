@@ -5,6 +5,7 @@ import (
 	"internet-monitor/internal/i18n"
 	"internet-monitor/internal/types"
 	"math"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -53,7 +54,7 @@ func StatusDetail(lang string, status types.Status, r types.CheckResult) string 
 	if status == types.StatusDisconnected || (r.PacketLoss == 0 && r.LatencyMs == 0) {
 		return label
 	}
-	return label + " · " + i18n.T(lang, "tray.detail", i18n.Vars{"loss": fmt.Sprintf("%.0f", r.PacketLoss), "ms": r.LatencyMs})
+	return label + " · " + i18n.T(lang, "tray.detail", i18n.Vars{"loss": fmt.Sprintf("%.0f", r.PacketLoss), "ms": Latency(lang, r.LatencyMs)})
 }
 
 func Lang() string {
@@ -83,13 +84,13 @@ func Build(lang string, status types.Status, r types.CheckResult) (title, body s
 	case types.StatusConnected:
 		title = i18n.T(lang, "notify.restored.title", nil)
 		if r.LatencyMs > 0 {
-			return title, i18n.T(lang, "notify.restored.latency", i18n.Vars{"ms": r.LatencyMs})
+			return title, i18n.T(lang, "notify.restored.latency", i18n.Vars{"ms": Latency(lang, r.LatencyMs)})
 		}
 		return title, i18n.T(lang, "notify.restored.ok", nil)
 
 	case types.StatusDegraded:
 		return i18n.T(lang, "notify.degraded.title", nil),
-			i18n.T(lang, "notify.degraded.body", i18n.Vars{"loss": fmt.Sprintf("%.0f", r.PacketLoss), "ms": r.LatencyMs})
+			i18n.T(lang, "notify.degraded.body", i18n.Vars{"loss": fmt.Sprintf("%.0f", r.PacketLoss), "ms": Latency(lang, r.LatencyMs)})
 
 	default:
 		var parts []string
@@ -107,6 +108,26 @@ func Build(lang string, status types.Status, r types.CheckResult) (title, body s
 			return title, i18n.T(lang, "notify.down.failed", i18n.Vars{"layers": strings.Join(parts, " + ")})
 		}
 		return title, i18n.T(lang, "notify.down.lost", nil)
+	}
+}
+
+func Latency(lang string, ms int64) string {
+	switch {
+	case ms < 0:
+		ms = 0
+		fallthrough
+	case ms < 1000:
+		return i18n.T(lang, "duration.millis", i18n.Vars{"n": ms})
+	case ms < 60000:
+		s := float64(ms) / 1000
+		digits := 2
+		if s >= 10 {
+			digits = 1
+		}
+		text := strings.TrimRight(strings.TrimRight(strconv.FormatFloat(s, 'f', digits, 64), "0"), ".")
+		return i18n.T(lang, "duration.s", i18n.Vars{"s": text})
+	default:
+		return Duration(lang, float64(ms)/1000)
 	}
 }
 

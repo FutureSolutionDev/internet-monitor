@@ -5,7 +5,7 @@ import { toast } from "../../components/Toast";
 import { Button, Card, CardHead, Switch } from "../../components/ui";
 import { api } from "../../lib/api";
 import { errorKey } from "../../lib/errors";
-import { formatNumber } from "../../lib/format";
+import { formatLatency } from "../../lib/format";
 import { type Lang, type MessageKey, type Translate, useI18n } from "../../lib/i18n";
 import { type Draft, type FieldKey, MAX_TARGETS } from "../../lib/settingsForm";
 import type { ConfigView, TestTargetResult } from "../../lib/types";
@@ -92,7 +92,7 @@ const PROBE_KEYS: Record<string, MessageKey> = {
 };
 
 function probeText(t: Translate, lang: Lang, r: TestTargetResult): ItemResult {
-  if (r.ok) return { ok: true, text: `${formatNumber(lang, r.latency_ms)} ${t("ms_unit")}` };
+  if (r.ok) return { ok: true, text: formatLatency(t, lang, r.latency_ms) };
   const code = r.error ?? "error";
   if (code.startsWith("http_")) return { ok: false, text: `HTTP ${code.slice(5)}` };
   return { ok: false, text: t(PROBE_KEYS[code] ?? "probe_error") };

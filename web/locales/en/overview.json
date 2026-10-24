@@ -51,7 +51,7 @@
   "cause_http": "HTTP failed",
   "cause_dns": "DNS failed",
   "cause_loss": "{value}% packet loss",
-  "cause_latency": "{value} ms latency",
+  "cause_latency": "{value} latency",
   "cause_none": "—",
   "cause_name_tcp": "TCP ping",
   "cause_name_http": "HTTP",

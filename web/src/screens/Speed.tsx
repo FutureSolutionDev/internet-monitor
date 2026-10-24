@@ -15,7 +15,7 @@ import { toast } from "../components/Toast";
 import { Banner, Button, Card, CardHead, Empty, Skeleton } from "../components/ui";
 import { ApiError, api } from "../lib/api";
 import { speedErrorKey } from "../lib/errors";
-import { formatNumber, formatTime, localDateKey } from "../lib/format";
+import { formatNumber, formatTime, latencyParts, localDateKey } from "../lib/format";
 import { useAsync } from "../lib/hooks";
 import { type MessageKey, useI18n } from "../lib/i18n";
 import { live, useLive } from "../lib/live";
@@ -179,8 +179,8 @@ export function Speed() {
         <Phase
           icon={Timer}
           label={t("speed_ping")}
-          value={latency ? formatNumber(lang, latency) : "—"}
-          unit={t("ms_unit")}
+          value={latency ? latencyParts(t, lang, latency).value : "—"}
+          unit={latency ? latencyParts(t, lang, latency).unit : t("ms_unit")}
           flare={tone.ping}
           active={busy && phase === "ping"}
         />
@@ -249,7 +249,8 @@ export function Speed() {
                       {h.upload_mbps === null ? null : <span className="muted">{t("speed_unit")}</span>}
                     </td>
                     <td className="num">
-                      {formatNumber(lang, h.latency_ms)} <span className="muted">{t("ms_unit")}</span>
+                      {latencyParts(t, lang, h.latency_ms).value}{" "}
+                      <span className="muted">{latencyParts(t, lang, h.latency_ms).unit}</span>
                     </td>
                     <td className="hide-sm secondary">
                       {t(h.triggered_by === "schedule" ? "speed_by_schedule" : "speed_by_user")}

@@ -32,6 +32,22 @@ export function formatDuration(t: Translate, seconds: number): string {
   return parts.slice(0, 2).join(" ");
 }
 
+export function latencyParts(t: Translate, lang: Lang, ms: number): { value: string; unit: string } {
+  if (!Number.isFinite(ms)) return { value: "—", unit: "" };
+  if (ms < 1000) return { value: formatNumber(lang, Math.max(0, Math.round(ms))), unit: t("ms_unit") };
+  if (ms < 60_000) {
+    const s = ms / 1000;
+    const value = new Intl.NumberFormat(localeOf(lang), { maximumFractionDigits: s < 10 ? 2 : 1 }).format(s);
+    return { value, unit: t("s_unit") };
+  }
+  return { value: formatDuration(t, ms / 1000), unit: "" };
+}
+
+export function formatLatency(t: Translate, lang: Lang, ms: number): string {
+  const { value, unit } = latencyParts(t, lang, ms);
+  return unit ? `${value} ${unit}` : value;
+}
+
 export function formatAgo(t: Translate, fromMs: number, nowMs: number): string {
   const diff = Math.max(0, (nowMs - fromMs) / 1000);
   if (diff < 5) return t("ago_now");
@@ -154,7 +170,7 @@ export function describeCause(t: Translate, lang: Lang, c: CauseInput): string {
   if (c.dns) parts.push(t("cause_dns"));
   if (!parts.length && c.loss > 0) parts.push(t("cause_loss", { value: formatNumber(lang, c.loss) }));
   if (!parts.length && c.latency > 0)
-    parts.push(t("cause_latency", { value: formatNumber(lang, c.latency) }));
+    parts.push(t("cause_latency", { value: formatLatency(t, lang, c.latency) }));
   return parts.length ? parts.join(" · ") : t("cause_none");
 }
 

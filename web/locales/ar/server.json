@@ -6,13 +6,13 @@
     },
     "restored": {
       "title": "✅ النت رجع",
-      "latency": "زمن الاستجابة: {ms}ms",
+      "latency": "زمن الاستجابة: {ms}",
       "ok": "كل الفحوصات تمام",
       "after": "رجع بعد {duration}"
     },
     "degraded": {
       "title": "⚠️ النت مش مستقر",
-      "body": "فقدان الحزم: {loss}% — زمن الاستجابة: {ms}ms"
+      "body": "فقدان الحزم: {loss}% — زمن الاستجابة: {ms}"
     },
     "down": {
       "title": "🔴 النت قطع",
@@ -26,8 +26,8 @@
     "speed": {
       "title": "🚀 خلص قياس السرعة",
       "slow_title": "⚠️ السرعة أقل من {threshold} Mbps",
-      "body": "↓ {down} Mbps · ↑ {up} Mbps · {ms} ms",
-      "body_down": "↓ {down} Mbps · {ms} ms"
+      "body": "↓ {down} Mbps · ↑ {up} Mbps · {ms}",
+      "body_down": "↓ {down} Mbps · {ms}"
     },
     "action": {
       "open": "افتح لوحة التحكم"
@@ -38,7 +38,8 @@
     "m": "{m} د",
     "ms": "{m} د {s} ث",
     "h": "{h} س",
-    "hm": "{h} س {m} د"
+    "hm": "{h} س {m} د",
+    "millis": "{n} م.ث"
   },
   "remote": {
     "title": {
@@ -72,7 +73,7 @@
       "disconnected": "مقطوع",
       "checking": "جاري الفحص…"
     },
-    "detail": "فقدان {loss}% · {ms} مللي ثانية",
+    "detail": "فقدان {loss}% · {ms}",
     "last_change": "آخر تغيير: {time}",
     "last_change_none": "آخر تغيير: —",
     "open_dashboard": "افتح لوحة التحكم",

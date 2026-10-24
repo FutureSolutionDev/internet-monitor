@@ -71,3 +71,15 @@ func TestDuration(t *testing.T) {
 		}
 	}
 }
+
+func TestLatencyIsReadable(t *testing.T) {
+	cases := map[int64]string{-3: "0 ms", 46: "46 ms", 999: "999 ms", 1000: "1 s", 1057: "1.06 s", 12345: "12.3 s", 125000: "2 min 5 s"}
+	for in, want := range cases {
+		if got := Latency("en", in); got != want {
+			t.Errorf("Latency(%d) = %q, want %q", in, got, want)
+		}
+	}
+	if got := Latency("ar", 1057); got != "1.06 ث" {
+		t.Errorf("Arabic latency = %q", got)
+	}
+}

@@ -51,7 +51,7 @@
   "cause_http": "فشل HTTP",
   "cause_dns": "فشل DNS",
   "cause_loss": "فقدان {value}% من الحزم",
-  "cause_latency": "استجابة {value} م.ث",
+  "cause_latency": "استجابة {value}",
   "cause_none": "—",
   "cause_name_tcp": "TCP",
   "cause_name_http": "HTTP",
