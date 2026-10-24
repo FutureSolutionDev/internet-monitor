@@ -4,6 +4,7 @@ import type {
   ConfigView,
   LogEvent,
   MonthlyReport,
+  NotificationList,
   SpeedTestEvent,
   StartupState,
   TestTargetsResponse,
@@ -124,9 +125,17 @@ export const api = {
   cancelSpeedTest: () => post<{ ok: boolean }>("/api/speed-test/cancel"),
   testTargets: (targets: { ping_targets: string[]; http_targets: string[]; dns_targets: string[] }) =>
     post<TestTargetsResponse>("/api/test-targets", { ...targets, notify: false }),
-  testNotification: (lang: string) => post<{ ok: boolean }>(`/api/test-notification?lang=${lang}`),
+  testNotification: (lang: string, volume?: number) =>
+    post<{ ok: boolean }>(
+      `/api/test-notification?lang=${lang}${volume === undefined ? "" : `&volume=${volume}`}`,
+    ),
   testWebhook: (url?: string) => post<{ ok: boolean }>("/api/test-webhook", url ? { url } : {}),
-  playSound: () => post<{ ok: boolean }>("/api/play-sound"),
+  playSound: (volume?: number) =>
+    post<{ ok: boolean }>(volume === undefined ? "/api/play-sound" : `/api/play-sound?volume=${volume}`),
+  notifications: (limit = 50, signal?: AbortSignal) =>
+    get<NotificationList>(`/api/notifications?limit=${limit}`, signal),
+  markNotificationsRead: (until?: string) =>
+    post<{ ok: boolean; unread: number }>("/api/notifications/read", until ? { until } : {}),
   async soundInfo(): Promise<{ custom: boolean; duration: number }> {
     const res = await fetch("/notification-sound", { method: "HEAD", cache: "no-store" });
     if (res.status === 401) for (const fn of unauthorizedListeners) fn();

@@ -117,6 +117,53 @@ export interface SpeedTestConfig {
   schedule_minutes: number;
 }
 
+export type NotifyEvent = "down" | "degraded" | "restored" | "speed";
+export type NotifyChannel = "desktop" | "webhook" | "telegram";
+export type QuietMode = "sound" | "all";
+
+export type ChannelSwitches = Record<NotifyChannel, boolean>;
+
+export interface NotificationSettings {
+  sound: { enabled: boolean; volume: number };
+  quiet_hours: { enabled: boolean; start: string; end: string; days: number[]; mode: QuietMode };
+  events: Record<NotifyEvent, ChannelSwitches>;
+  min_outage_seconds: number;
+  reminder_minutes: number;
+}
+
+export type AlertKind = "down" | "degraded" | "restored" | "reminder" | "speed" | "test";
+export type AlertChannel = "desktop" | "sound" | "webhook" | "telegram";
+export type MuteReason = "disabled" | "quiet_hours" | "sound_off" | "short_outage" | "startup";
+
+export interface NotificationRecord {
+  id: string;
+  time: string;
+  kind: AlertKind;
+  reason?: {
+    tcp_ping_failed: boolean;
+    http_failed: boolean;
+    dns_failed: boolean;
+    packet_loss_pct: number;
+    avg_latency_ms: number;
+  };
+  duration_seconds?: number;
+  speed?: {
+    download_mbps: number;
+    upload_mbps?: number;
+    latency_ms: number;
+    threshold_mbps?: number;
+    below?: boolean;
+  };
+  sent: AlertChannel[];
+  muted?: Partial<Record<AlertChannel, MuteReason>>;
+}
+
+export interface NotificationList {
+  items: NotificationRecord[];
+  unread: number;
+  last_read_at: string | null;
+}
+
 export interface Config {
   check_interval_sec: number;
   ping_targets: string[];
@@ -133,6 +180,7 @@ export interface Config {
   use_icmp: boolean;
   language: string;
   speed_test: SpeedTestConfig;
+  notifications: NotificationSettings;
 }
 
 export interface LogEvent {

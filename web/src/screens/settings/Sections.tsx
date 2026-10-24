@@ -198,7 +198,7 @@ export function AlertsSection({ draft, set, err, base }: SectionProps & { base: 
   const testNotify = async () => {
     setBusy("notify");
     try {
-      await api.testNotification(lang);
+      await api.testNotification(lang, draft.sound_enabled ? draft.sound_volume : 0);
       toast(t("notification_sent"), "ok");
     } catch {
       toast(t("probe_error"), "error");

@@ -17,8 +17,8 @@ import (
 )
 
 type Hooks struct {
-	TestNotification func(lang string)
-	PlaySound        func()
+	TestNotification func(lang string, volume *int)
+	PlaySound        func(volume int)
 	TestWebhook      func(url string) string
 	CheckUpdate      func() (*updater.Info, error)
 	ApplyUpdate      func(downloadURL string) error

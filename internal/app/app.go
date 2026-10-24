@@ -85,8 +85,8 @@ func New(opts Options) (*App, error) {
 		NativeNotifications: true,
 		History:             history,
 		Hooks: server.Hooks{
-			TestNotification: func(lang string) { al.Test(lang) },
-			PlaySound:        func() { sound.PlayAt(store.Get().Notifications.Sound.Volume) },
+			TestNotification: func(lang string, volume *int) { al.Test(lang, volume) },
+			PlaySound:        sound.PlayAt,
 			TestWebhook:      lgr.SendTestWebhook,
 			CheckUpdate:      func() (*updater.Info, error) { return updater.Check(opts.Version) },
 			ApplyUpdate:      updater.Apply,

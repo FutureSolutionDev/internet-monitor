@@ -1,5 +1,5 @@
 import type { MessageKey, Vars } from "./i18n";
-import type { ConfigView } from "./types";
+import type { ChannelSwitches, ConfigView, NotificationSettings, NotifyEvent, QuietMode } from "./types";
 
 export const MAX_TARGETS = 10;
 
@@ -25,6 +25,40 @@ export interface Draft {
   speed_schedule: string;
   speed_download_targets: string[];
   speed_upload_target: string;
+  sound_enabled: boolean;
+  sound_volume: number;
+  quiet_enabled: boolean;
+  quiet_start: string;
+  quiet_end: string;
+  quiet_days: number[];
+  quiet_mode: QuietMode;
+  notify_events: Record<NotifyEvent, ChannelSwitches>;
+  min_outage: string;
+  reminder: string;
+}
+
+export const NOTIFY_EVENTS: NotifyEvent[] = ["down", "degraded", "restored", "speed"];
+
+export const DEFAULT_NOTIFICATIONS: NotificationSettings = {
+  sound: { enabled: true, volume: 100 },
+  quiet_hours: { enabled: false, start: "22:00", end: "07:00", days: [0, 1, 2, 3, 4, 5, 6], mode: "sound" },
+  events: {
+    down: { desktop: true, webhook: true, telegram: true },
+    degraded: { desktop: true, webhook: true, telegram: true },
+    restored: { desktop: true, webhook: true, telegram: true },
+    speed: { desktop: false, webhook: true, telegram: true },
+  },
+  min_outage_seconds: 0,
+  reminder_minutes: 0,
+};
+
+function copyEvents(e: Record<NotifyEvent, ChannelSwitches>): Record<NotifyEvent, ChannelSwitches> {
+  return {
+    down: { ...e.down },
+    degraded: { ...e.degraded },
+    restored: { ...e.restored },
+    speed: { ...e.speed },
+  };
 }
 
 export type FieldKey = keyof Draft | "targets";
@@ -55,7 +89,47 @@ export function draftFrom(c: ConfigView): Draft {
     speed_schedule: String(c.speed_test.schedule_minutes),
     speed_download_targets: [...(c.speed_test.download_targets ?? [])],
     speed_upload_target: c.speed_test.upload_target ?? "",
+    ...notificationDraft(c.notifications ?? DEFAULT_NOTIFICATIONS),
   };
+}
+
+function notificationDraft(n: NotificationSettings) {
+  return {
+    sound_enabled: n.sound.enabled,
+    sound_volume: n.sound.volume,
+    quiet_enabled: n.quiet_hours.enabled,
+    quiet_start: n.quiet_hours.start,
+    quiet_end: n.quiet_hours.end,
+    quiet_days: [...(n.quiet_hours.days ?? [])].sort((a, b) => a - b),
+    quiet_mode: n.quiet_hours.mode,
+    notify_events: copyEvents(n.events),
+    min_outage: String(n.min_outage_seconds),
+    reminder: String(n.reminder_minutes),
+  };
+}
+
+export function notificationsFrom(d: Draft, base: NotificationSettings): NotificationSettings {
+  const num = (raw: string, fallback: number) => {
+    const n = Number(raw);
+    return raw.trim() !== "" && Number.isInteger(n) ? n : fallback;
+  };
+  return {
+    sound: { enabled: d.sound_enabled, volume: d.sound_volume },
+    quiet_hours: {
+      enabled: d.quiet_enabled,
+      start: d.quiet_start,
+      end: d.quiet_end,
+      days: [...d.quiet_days].sort((a, b) => a - b),
+      mode: d.quiet_mode,
+    },
+    events: copyEvents(d.notify_events),
+    min_outage_seconds: num(d.min_outage, base.min_outage_seconds),
+    reminder_minutes: num(d.reminder, base.reminder_minutes),
+  };
+}
+
+export function isClock(v: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
 }
 
 const WEBHOOK_HOSTS: Record<string, string> = {
@@ -167,6 +241,12 @@ export function validateDraft(d: Draft): Issues {
   if (d.telegram_token.mode === "set" && !d.telegram_token.value.trim())
     issues.telegram_token = { key: "err_required" };
   if (!isSafeLogDir(d.log_dir)) issues.log_dir = { key: "err_logdir" };
+  put("min_outage", numberIssue(d.min_outage, 0, 3600));
+  put("reminder", numberIssue(d.reminder, 0, 1440));
+  if (!isClock(d.quiet_start)) issues.quiet_start = { key: "err_time" };
+  if (!isClock(d.quiet_end)) issues.quiet_end = { key: "err_time" };
+  else if (d.quiet_enabled && d.quiet_start === d.quiet_end) issues.quiet_end = { key: "err_quiet_span" };
+  if (d.quiet_enabled && d.quiet_days.length === 0) issues.quiet_days = { key: "err_days" };
   return issues;
 }
 
@@ -216,6 +296,12 @@ export function buildChanges(d: Draft, base: ConfigView): Record<string, unknown
   if (d.speed_upload_target.trim() !== (st.upload_target ?? ""))
     speed.upload_target = d.speed_upload_target.trim();
   if (Object.keys(speed).length) out.speed_test = speed;
+
+  const baseNotify = base.notifications ?? DEFAULT_NOTIFICATIONS;
+  const notify = notificationsFrom(d, baseNotify);
+  if (JSON.stringify(notify) !== JSON.stringify(notificationsFrom(draftFrom(base), baseNotify))) {
+    out.notifications = notify;
+  }
   return out;
 }
 
@@ -223,6 +309,18 @@ const SECTION_FIELDS: Record<string, FieldKey[]> = {
   monitoring: ["check_interval_sec", "fail_threshold", "packet_loss_threshold", "latency_threshold_ms"],
   targets: ["ping_targets", "http_targets", "dns_targets", "targets"],
   alerts: ["webhook", "telegram_token", "telegram_chat_id"],
+  notifications: [
+    "sound_enabled",
+    "sound_volume",
+    "quiet_enabled",
+    "quiet_start",
+    "quiet_end",
+    "quiet_days",
+    "quiet_mode",
+    "notify_events",
+    "min_outage",
+    "reminder",
+  ],
   speed: [
     "speed_timeout",
     "speed_parallel",

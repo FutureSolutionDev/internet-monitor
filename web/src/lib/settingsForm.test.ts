@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   buildChanges,
+  DEFAULT_NOTIFICATIONS,
   draftFrom,
   isHostPort,
   isSafeLogDir,
@@ -8,7 +9,7 @@ import {
   rebaseDraft,
   validateDraft,
 } from "./settingsForm";
-import type { ConfigView } from "./types";
+import type { ConfigView, NotificationSettings } from "./types";
 
 const base: ConfigView = {
   check_interval_sec: 5,
@@ -34,6 +35,7 @@ const base: ConfigView = {
     schedule_minutes: 0,
   },
   secret_set: { webhook_url: true, telegram_bot_token: true },
+  notifications: DEFAULT_NOTIFICATIONS,
 };
 
 describe("buildChanges", () => {
@@ -168,5 +170,53 @@ describe("rebaseDraft", () => {
       webhook: { mode: "set" as const, value: "https://discord.com/api/webhooks/1/a" },
     };
     expect(rebaseDraft(mine, base, remote).conflicts).toEqual(["webhook"]);
+  });
+});
+
+describe("notification settings", () => {
+  test("unsorted saved days do not count as a change", () => {
+    const saved = {
+      ...base,
+      notifications: {
+        ...DEFAULT_NOTIFICATIONS,
+        quiet_hours: { ...DEFAULT_NOTIFICATIONS.quiet_hours, days: [6, 0, 3] },
+      },
+    };
+    expect(buildChanges(draftFrom(saved), saved)).toEqual({});
+  });
+
+  test("one switch sends the whole notifications object", () => {
+    const d = draftFrom(base);
+    d.notify_events = { ...d.notify_events, speed: { ...d.notify_events.speed, desktop: true } };
+    d.min_outage = "30";
+    const out = buildChanges(d, base);
+    expect(Object.keys(out)).toEqual(["notifications"]);
+    const sent = out.notifications as NotificationSettings;
+    expect(sent.events.speed.desktop).toBe(true);
+    expect(sent.events.down).toEqual(DEFAULT_NOTIFICATIONS.events.down);
+    expect(sent.min_outage_seconds).toBe(30);
+  });
+
+  test("editing the draft never mutates the saved config", () => {
+    const d = draftFrom(base);
+    d.notify_events.down.webhook = false;
+    expect(base.notifications.events.down.webhook).toBe(true);
+  });
+
+  test("quiet hours are checked only while enabled", () => {
+    const off = { ...draftFrom(base), quiet_days: [], quiet_start: "07:00", quiet_end: "07:00" };
+    expect(validateDraft(off).quiet_days).toBeUndefined();
+    expect(validateDraft(off).quiet_end).toBeUndefined();
+    const on = { ...off, quiet_enabled: true };
+    expect(validateDraft(on).quiet_days?.key).toBe("err_days");
+    expect(validateDraft(on).quiet_end?.key).toBe("err_quiet_span");
+    expect(validateDraft({ ...on, quiet_start: "7:5" }).quiet_start?.key).toBe("err_time");
+  });
+
+  test("noise limits match the server", () => {
+    const d = draftFrom(base);
+    expect(validateDraft({ ...d, min_outage: "3601" }).min_outage).toBeDefined();
+    expect(validateDraft({ ...d, reminder: "1441" }).reminder).toBeDefined();
+    expect(validateDraft({ ...d, min_outage: "3600", reminder: "1440" }).min_outage).toBeUndefined();
   });
 });

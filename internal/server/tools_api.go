@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -199,16 +200,48 @@ func (s *Server) serveTestNotification(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	lang := i18n.Normalize(r.URL.Query().Get("lang"))
+	volume, set, ok := volumeParam(r)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid", "volume must be between 0 and 100")
+		return
+	}
+	var override *int
+	if set {
+		override = &volume
+	}
 	s.logf("NOTIFICATION test triggered by user (lang=%s)", lang)
 	if s.hooks.TestNotification != nil {
-		go s.hooks.TestNotification(lang)
+		go s.hooks.TestNotification(lang, override)
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-func (s *Server) servePlaySound(w http.ResponseWriter, _ *http.Request) {
+func volumeParam(r *http.Request) (volume int, set, ok bool) {
+	v := r.URL.Query().Get("volume")
+	if v == "" {
+		return 0, false, true
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 || n > 100 {
+		return 0, false, false
+	}
+	return n, true, true
+}
+
+func (s *Server) servePlaySound(w http.ResponseWriter, r *http.Request) {
+	volume, set, ok := volumeParam(r)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid", "volume must be between 0 and 100")
+		return
+	}
+	if !set {
+		volume = 100
+		if s.store != nil {
+			volume = s.store.Get().Notifications.Sound.Volume
+		}
+	}
 	if s.hooks.PlaySound != nil {
-		go s.hooks.PlaySound()
+		go s.hooks.PlaySound(volume)
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

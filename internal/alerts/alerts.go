@@ -442,14 +442,18 @@ func (a *Alerts) OnSpeedResult(ev logger.SpeedTestEvent, thresholdMbps float64, 
 	}
 }
 
-func (a *Alerts) Test(lang string) {
+func (a *Alerts) Test(lang string, volume *int) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.closed {
 		return
 	}
 	now := a.now()
-	d := Decide(KindTest, a.settings, a.has, now)
+	settings := a.settings
+	if volume != nil {
+		settings.Sound = config.SoundSettings{Enabled: *volume > 0, Volume: *volume}
+	}
+	d := Decide(KindTest, settings, a.has, now)
 	a.record(Record{ID: a.nextID(), Time: now, Kind: KindTest, Sent: d.Sent(), Muted: d.Muted})
 	if a.opts.Desktop != nil {
 		title, body := TestText(lang)

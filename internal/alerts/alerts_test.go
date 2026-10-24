@@ -382,7 +382,7 @@ func TestChangingTheReminderReArmsIt(t *testing.T) {
 func TestSpeedAndTest(t *testing.T) {
 	h := newHarness(t, baseConfig())
 	h.a.OnSpeedResult(logger.SpeedTestEvent{DownloadMbps: 4}, 50, true)
-	h.a.Test("en")
+	h.a.Test("en", nil)
 	if got := h.kinds(); !reflect.DeepEqual(got, []Kind{KindSpeed, KindTest}) {
 		t.Fatalf("kinds = %v", got)
 	}
@@ -392,6 +392,21 @@ func TestSpeedAndTest(t *testing.T) {
 	toasts := h.drain()
 	if len(toasts) != 1 || toasts[0].Kind != KindTest {
 		t.Fatalf("toasts = %+v", toasts)
+	}
+}
+
+func TestTestUsesOnScreenVolume(t *testing.T) {
+	h := newHarness(t, baseConfig())
+	quiet := 30
+	h.a.Test("en", &quiet)
+	off := 0
+	h.a.Test("en", &off)
+	toasts := h.drain()
+	if len(toasts) != 2 || toasts[0].Volume != 30 || toasts[1].Volume != 0 {
+		t.Fatalf("toasts = %+v", toasts)
+	}
+	if h.records[1].Muted[ChannelSound] != ReasonSoundOff {
+		t.Fatalf("muted = %v", h.records[1].Muted)
 	}
 }
 

@@ -54,6 +54,9 @@ export const FAQ: FaqSection[] = [
       { id: "telegram", q: "faq.telegram.q", a: "faq.telegram.a" },
       { id: "sound", q: "faq.sound.q", a: "faq.sound.a" },
       { id: "silent", q: "faq.silent.q", a: "faq.silent.a" },
+      { id: "quiet", q: "faq.quiet.q", a: "faq.quiet.a" },
+      { id: "noise", q: "faq.noise.q", a: "faq.noise.a" },
+      { id: "history", q: "faq.history.q", a: "faq.history.a" },
     ],
   },
   {

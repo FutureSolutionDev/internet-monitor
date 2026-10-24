@@ -3,6 +3,7 @@ import { useSyncExternalStore } from "react";
 export type Route =
   | "overview"
   | "history"
+  | "notifications"
   | "speed"
   | "settings"
   | "report"
@@ -16,6 +17,7 @@ export type Route =
 const paths: Record<Route, string> = {
   overview: "/",
   history: "/history",
+  notifications: "/notifications",
   speed: "/speed",
   settings: "/settings",
   report: "/report",

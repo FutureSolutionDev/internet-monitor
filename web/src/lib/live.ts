@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { onUnauthorized } from "./api";
-import type { Snapshot, SpeedProgress } from "./types";
+import type { NotificationRecord, Snapshot, SpeedProgress } from "./types";
 
 export type Connection = "connecting" | "live" | "reconnecting" | "unauthorized" | "busy";
 
@@ -10,6 +10,7 @@ export interface LiveState {
   speed: SpeedProgress | null;
   soundRevision: number;
   receivedAt: number;
+  notice: { revision: number; unread: number | null; last: NotificationRecord | null };
 }
 
 type Listener = () => void;
@@ -40,11 +41,13 @@ export function createLiveStore(deps: LiveDeps) {
     speed: null,
     soundRevision: 0,
     receivedAt: 0,
+    notice: { revision: 0, unread: null, last: null },
   };
   const listeners = new Set<Listener>();
   let source: EventSourceLike | null = null;
   let retryTimer: unknown = null;
   let attempts = 0;
+  let opened = false;
   let firstBoot: { id: string; version: string } | null = null;
   let stopped = true;
   let speedPendingSince = 0;
@@ -81,7 +84,17 @@ export function createLiveStore(deps: LiveDeps) {
       return;
     }
     if (!msg || typeof msg !== "object") return;
-    const typed = msg as { type?: string };
+    const typed = msg as { type?: string; unread?: number; notification?: NotificationRecord };
+    if (typed.type === "notification" || typed.type === "notifications_read") {
+      set({
+        notice: {
+          revision: state.notice.revision + 1,
+          unread: typeof typed.unread === "number" ? typed.unread : state.notice.unread,
+          last: typed.type === "notification" ? (typed.notification ?? null) : state.notice.last,
+        },
+      });
+      return;
+    }
     if (typed.type === "speed_test_progress") {
       const progress = msg as SpeedProgress;
       const prev = state.speed;
@@ -132,7 +145,12 @@ export function createLiveStore(deps: LiveDeps) {
     source = es;
     es.onopen = () => {
       attempts = 0;
-      set({ connection: "live" });
+      if (!opened) {
+        opened = true;
+        set({ connection: "live" });
+        return;
+      }
+      set({ connection: "live", notice: { ...state.notice, revision: state.notice.revision + 1 } });
     };
     es.onmessage = (ev) => {
       if (state.connection !== "live") set({ connection: "live" });

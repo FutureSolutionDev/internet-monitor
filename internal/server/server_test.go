@@ -97,6 +97,18 @@ func TestGuardRejectsForeignHost(t *testing.T) {
 	}
 }
 
+func TestVolumeParamIsValidated(t *testing.T) {
+	e := newTestEnv(t)
+	for _, path := range []string{"/api/play-sound?volume=101", "/api/play-sound?volume=x", "/api/test-notification?volume=-1"} {
+		if r := e.do(t, "POST", path, "", nil); r.StatusCode != http.StatusBadRequest {
+			t.Errorf("%s: %d, want 400", path, r.StatusCode)
+		}
+	}
+	if r := e.do(t, "POST", "/api/play-sound?volume=40", "", nil); r.StatusCode != http.StatusOK {
+		t.Errorf("valid volume: %d, want 200", r.StatusCode)
+	}
+}
+
 func TestGuardRejectsCrossOriginAndBadContentType(t *testing.T) {
 	e := newTestEnv(t)
 	if r := e.do(t, "POST", "/api/play-sound", "", map[string]string{"Origin": "https://evil.example"}); r.StatusCode != http.StatusForbidden {

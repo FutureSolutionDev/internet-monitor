@@ -12,6 +12,7 @@ import { Contact } from "../screens/Contact";
 import { Faq } from "../screens/Faq";
 import { History } from "../screens/History";
 import { Legal } from "../screens/Legal";
+import { Notifications } from "../screens/Notifications";
 import { Overview } from "../screens/Overview";
 import { Report } from "../screens/Report";
 import { Speed } from "../screens/Speed";
@@ -66,6 +67,7 @@ export function App() {
     body = (
       <Shell route={route}>
         {route === "history" ? <History /> : null}
+        {route === "notifications" ? <Notifications /> : null}
         {route === "speed" ? <Speed /> : null}
         {route === "settings" ? <Settings /> : null}
         {route === "overview" ? <Overview /> : null}

@@ -1,5 +1,6 @@
 import {
   ArrowDownToLine,
+  BellRing,
   CircleAlert,
   CircleHelp,
   Gauge as GaugeIcon,
@@ -36,16 +37,18 @@ import { useTheme } from "../lib/theme";
 import { changeThemeWithTransition } from "../lib/themeTransition";
 import { statusTone } from "../styles/categories";
 import { LanguageSelect } from "./LanguagePicker";
+import { NotificationBell } from "./NotificationBell";
 import { toast } from "./Toast";
 import { Banner, Button } from "./ui";
 
 const NAV: {
   route: Route;
-  key: "nav_overview" | "nav_history" | "nav_speed" | "nav_settings";
+  key: "nav_overview" | "nav_history" | "nav_notifications" | "nav_speed" | "nav_settings";
   icon: LucideIcon;
 }[] = [
   { route: "overview", key: "nav_overview", icon: LayoutDashboard },
   { route: "history", key: "nav_history", icon: History },
+  { route: "notifications", key: "nav_notifications", icon: BellRing },
   { route: "speed", key: "nav_speed", icon: GaugeIcon },
   { route: "settings", key: "nav_settings", icon: Settings },
 ];
@@ -62,6 +65,7 @@ const ABOUT: { route: Route; key: MessageKey; icon: LucideIcon }[] = [
 const TITLES: Record<Route, MessageKey> = {
   overview: "nav_overview",
   history: "nav_history",
+  notifications: "nav_notifications",
   speed: "nav_speed",
   settings: "nav_settings",
   report: "report_open",
@@ -297,6 +301,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
           </div>
           <div className="topbar-actions">
             <ConnectionPill />
+            <NotificationBell />
             <LanguageSelect compact />
             <Button
               variant="edge"

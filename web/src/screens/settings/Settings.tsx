@@ -1,5 +1,6 @@
 import {
   Bell,
+  BellRing,
   CircleAlert,
   Gauge,
   type LucideIcon,
@@ -31,6 +32,7 @@ import {
 } from "../../lib/settingsForm";
 import type { ConfigView } from "../../lib/types";
 import { AppSection } from "./AppSection";
+import { NotificationsSection } from "./NotificationsSection";
 import { AlertsSection, MonitoringSection, SpeedSection, TargetsSection } from "./Sections";
 import { SoundCard } from "./SoundCard";
 
@@ -44,6 +46,7 @@ const SECTIONS: { id: string; key: MessageKey; icon: LucideIcon }[] = [
   { id: "monitoring", key: "sec_monitoring", icon: Radar },
   { id: "targets", key: "sec_targets", icon: Target },
   { id: "alerts", key: "sec_alerts", icon: Bell },
+  { id: "notifications", key: "sec_notifications", icon: BellRing },
   { id: "sound", key: "sec_sound", icon: Music },
   { id: "speed", key: "sec_speed", icon: Gauge },
   { id: "app", key: "sec_app", icon: Settings2 },
@@ -361,6 +364,7 @@ export function Settings() {
           <MonitoringSection {...props} />
           <TargetsSection {...props} />
           <AlertsSection {...props} base={state.base} />
+          <NotificationsSection {...props} base={state.base} />
           <SoundCard />
           <SpeedSection {...props} />
           <AppSection {...props} />
