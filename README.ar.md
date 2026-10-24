@@ -3,7 +3,7 @@
 ![Logo](internal/assets/favicon.png)
 
 [![Build & Release](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml/badge.svg)](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: Elastic 2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go)](https://go.dev)
 ![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 
@@ -11,7 +11,7 @@
 
 # وثّق انقطاعات الإنترنت، واكسب نزاعك مع مزوّد الخدمة.
 
-**مراقب الإنترنت** أداة مجانية مفتوحة المصدر تلتقط **دليلاً** على كل انقطاع — عشان تبطّل تتكلّم من الذاكرة وتبدأ ترفق أدلة بتذكرة الدعم.
+**مراقب الإنترنت** أداة مجانية والكود بتاعها متاح للكل، بتلتقط **دليلاً** على كل انقطاع — عشان تبطّل تتكلّم من الذاكرة وتبدأ ترفق أدلة بتذكرة الدعم.
 
 تُسجّل كل انقطاع **بتفصيل لكل طبقة (TCP / HTTP / DNS)** — فتقدر تثبت أشياء مثل *"الـ DNS فشل بينما الخط كان شغّالاً"* — بطوابع زمنية ومدد دقيقة، وتُصدّر **تقريراً شهرياً (PDF)** أو **CSV** نظيفاً تسلّمه لمزوّدك. محلي 100%: بلا حساب، بلا سحابة، بلا تتبّع.
 
@@ -508,6 +508,8 @@ git checkout -b feature/اسم-الميزة
 
 ## 📄 الرخصة
 
-MIT — مجاني للاستخدام الشخصي والتجاري.
+[Elastic License 2.0](LICENSE) — مجاني للاستخدام الشخصي والتجاري، والكود متاح للكل.
+مينفعش تقدّمه لحد تاني كخدمة مستضافة أو مُدارة، ولازم تسيب الرخصة وحقوق النشر زي ما هي.
+النسخ اللي قبل 2.0.0 نزلت برخصة MIT.
 
 صُنع بـ ❤️ بواسطة [FutureSolutionDev](https://github.com/FutureSolutionDev)

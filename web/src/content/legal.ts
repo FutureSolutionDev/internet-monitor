@@ -71,7 +71,7 @@ export const TERMS: LegalDoc = {
     {
       id: "use",
       title: "terms.use.title",
-      body: ["terms.use.p1"],
+      body: ["terms.use.p1", "terms.use.p2", "terms.use.p3"],
     },
     {
       id: "warranty",

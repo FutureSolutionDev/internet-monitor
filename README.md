@@ -3,7 +3,7 @@
 ![Logo](internal/assets/favicon.png)
 
 [![Build & Release](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml/badge.svg)](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: Elastic 2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go)](https://go.dev)
 ![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 
@@ -11,7 +11,7 @@
 
 # Document your outages. Win the dispute with your ISP.
 
-**Internet Monitor** is a free, open-source tool that captures **proof** of every internet drop — so you can stop arguing from memory and start attaching evidence to your support ticket.
+**Internet Monitor** is a free, source-available tool that captures **proof** of every internet drop — so you can stop arguing from memory and start attaching evidence to your support ticket.
 
 It logs each outage with **per-layer detail (TCP / HTTP / DNS)** — so you can prove things like *"DNS failed while the link was up"* — with exact **timestamps and durations**, and exports a clean **monthly report (PDF)** or **CSV** you can hand to your provider. 100% local: no account, no cloud, no telemetry.
 
@@ -511,6 +511,8 @@ in Settings automatically.
 
 ## 📄 License
 
-MIT — Free for personal and commercial use.
+[Elastic License 2.0](LICENSE) — free for personal and commercial use, and the source is public.
+You may not offer it to others as a hosted or managed service, and you must keep its license and
+copyright notices. Versions before 2.0.0 were released under the MIT license.
 
 Built with ❤️ by [FutureSolutionDev](https://github.com/FutureSolutionDev)

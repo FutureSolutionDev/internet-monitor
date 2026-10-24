@@ -78,7 +78,7 @@ export function About() {
           <div>
             <dt>{t("about_license")}</dt>
             <dd>
-              <RouteLink route="terms">MIT</RouteLink>
+              <RouteLink route="terms">Elastic License 2.0</RouteLink>
             </dd>
           </div>
           <div className="about-wide">

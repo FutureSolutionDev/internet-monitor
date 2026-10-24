@@ -54,6 +54,10 @@ The v2 rebuild.
 - CI `web` job (typecheck, lint, test, build); Go jobs reuse its `web-dist` artifact.
 
 ### Changed
+- **License: the Elastic License 2.0 replaces MIT.** The app stays free for
+  personal and commercial use and the source stays public; offering it to others
+  as a hosted or managed service is not allowed. Versions before 2.0.0 were
+  released under MIT.
 - The fixed 4-second desktop alert cooldown is gone; a quick drop-and-return now
   shows both alerts. Use the minimum outage length to hide short blips.
 - Repository layout: entry points in `cmd/tray` and `cmd/gui`, packages under
