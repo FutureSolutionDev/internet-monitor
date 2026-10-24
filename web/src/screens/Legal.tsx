@@ -39,7 +39,10 @@ export function Legal({ kind }: { kind: "privacy" | "terms" }) {
         <article className="card legal-body">
           {doc.sections.map((s) => (
             <section key={s.id} id={`${prefix}${s.id}`} aria-labelledby={`${prefix}${s.id}-h`}>
-              <h2 id={`${prefix}${s.id}-h`}>{t(s.title)}</h2>
+              <h2 id={`${prefix}${s.id}-h`} style={{
+                fontSize: "1.2rem",
+                fontWeight: "bolder"
+              }}>{t(s.title)}</h2>
               {s.body.map((p) => (
                 <p key={p}>{t(p)}</p>
               ))}
