@@ -87,6 +87,8 @@ func (s *Store) Subscribe(fn func(Config)) {
 }
 
 func (s *Store) Update(expectRev uint64, fn func(*Config) error) (Config, uint64, error) {
+	s.notifyMu.Lock()
+	defer s.notifyMu.Unlock()
 	s.mu.Lock()
 	if s.readOnly {
 		s.mu.Unlock()
@@ -122,10 +124,8 @@ func (s *Store) Update(expectRev uint64, fn func(*Config) error) (Config, uint64
 	s.loadErr = nil
 	rev := s.rev
 	subs := append([]func(Config){}, s.subs...)
-	s.notifyMu.Lock()
 	s.mu.Unlock()
 
-	defer s.notifyMu.Unlock()
 	for _, sub := range subs {
 		s.deliver(sub, next.Clone())
 	}

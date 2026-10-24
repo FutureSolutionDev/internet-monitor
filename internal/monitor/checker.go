@@ -102,6 +102,7 @@ func (c *Checker) Check(ctx context.Context) CheckResult {
 	}
 	wg.Wait()
 
+	result.TCPPingOK = len(cfg.PingTargets) == 0
 	for _, r := range tcp {
 		if r.OK {
 			result.TCPPingOK = true
@@ -110,8 +111,8 @@ func (c *Checker) Check(ctx context.Context) CheckResult {
 			}
 		}
 	}
-	result.HTTPOK = anyOK(httpRes)
-	result.DNSOK = anyOK(dnsRes)
+	result.HTTPOK = len(cfg.HTTPTargets) == 0 || anyOK(httpRes)
+	result.DNSOK = len(cfg.DNSTargets) == 0 || anyOK(dnsRes)
 	result.Targets = append(append(append(result.Targets, tcp...), httpRes...), dnsRes...)
 	result.Gateway, result.GatewayOK = gateway, gatewayOK
 	result.PacketLoss = c.recordTCP(result.TCPPingOK)

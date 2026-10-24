@@ -26,6 +26,8 @@ type Tray struct {
 	status     monitor.Status
 	result     monitor.CheckResult
 	lastChange time.Time
+	shown      monitor.Status
+	shownSet   bool
 }
 
 func New(logDir, dashURL string) *Tray {
@@ -70,7 +72,7 @@ func (t *Tray) handleMenu() {
 	}
 }
 
-func (t *Tray) applyStatus(status monitor.Status, result monitor.CheckResult) {
+func (t *Tray) setIcon(status monitor.Status) {
 	switch status {
 	case monitor.StatusConnected:
 		systray.SetIcon(GreenIcon())
@@ -78,7 +80,16 @@ func (t *Tray) applyStatus(status monitor.Status, result monitor.CheckResult) {
 		systray.SetIcon(YellowIcon())
 	case monitor.StatusDisconnected:
 		systray.SetIcon(RedIcon())
+	default:
+		return
 	}
+	t.mu.Lock()
+	t.shown, t.shownSet = status, true
+	t.mu.Unlock()
+}
+
+func (t *Tray) applyStatus(status monitor.Status, result monitor.CheckResult) {
+	t.setIcon(status)
 	t.mu.Lock()
 	t.known, t.status, t.result, t.lastChange = true, status, result, time.Now()
 	t.mu.Unlock()
@@ -89,7 +100,13 @@ func (t *Tray) updateTooltip(status monitor.Status, result monitor.CheckResult) 
 	t.mu.Lock()
 	t.known, t.status, t.result = true, status, result
 	ready := t.ready
+	stale := !t.shownSet || t.shown != status
 	t.mu.Unlock()
+	if ready && stale {
+		t.setIcon(status)
+		t.relabel()
+		return
+	}
 	if ready {
 		lang := notifytext.Lang()
 		systray.SetTooltip(i18n.T(lang, "app_name", nil) + " — " + notifytext.StatusDetail(lang, status, result))

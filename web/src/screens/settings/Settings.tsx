@@ -131,7 +131,7 @@ export function Settings() {
   const changes = useMemo(() => (state ? buildChanges(state.draft, state.base) : {}), [state]);
   const dirty = Object.keys(changes).length > 0;
   const issues = useMemo(
-    () => (state ? { ...validateDraft(state.draft), ...serverIssue } : {}),
+    () => (state ? { ...validateDraft(state.draft, state.base), ...serverIssue } : {}),
     [state, serverIssue],
   );
 

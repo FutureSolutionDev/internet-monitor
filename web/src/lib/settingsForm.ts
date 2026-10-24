@@ -209,7 +209,7 @@ export function listIssue(
   return undefined;
 }
 
-export function validateDraft(d: Draft): Issues {
+export function validateDraft(d: Draft, base?: Pick<ConfigView, "log_dir">): Issues {
   const issues: Issues = {};
   const put = (k: FieldKey, issue: FieldIssue | undefined) => {
     if (issue) issues[k] = issue;
@@ -244,7 +244,8 @@ export function validateDraft(d: Draft): Issues {
     issues.webhook = { key: "err_webhook" };
   if (d.telegram_token.mode === "set" && !d.telegram_token.value.trim())
     issues.telegram_token = { key: "err_required" };
-  if (!isSafeLogDir(d.log_dir)) issues.log_dir = { key: "err_logdir" };
+  if ((!base || d.log_dir.trim() !== base.log_dir) && !isSafeLogDir(d.log_dir))
+    issues.log_dir = { key: "err_logdir" };
   put("min_outage", numberIssue(d.min_outage, 0, 3600));
   put("reminder", numberIssue(d.reminder, 0, 1440));
   if (d.quiet_enabled) {
