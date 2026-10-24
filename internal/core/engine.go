@@ -239,6 +239,14 @@ func (e *Engine) accumulate(r types.CheckResult, status types.Status) {
 	}
 }
 
+func (e *Engine) lastLoggedProblem() bool {
+	if e.lgr == nil {
+		return false
+	}
+	last, ok := e.lgr.LastEvent()
+	return ok && last.EventType != types.StatusConnected.String()
+}
+
 func (e *Engine) flushAgg() {
 	if e.agg.samples == 0 || e.lgr == nil {
 		return
@@ -304,7 +312,7 @@ func (e *Engine) runCheck() {
 		}
 
 		isFirst := e.currentStatus == nil
-		if !isFirst || newStatus != types.StatusConnected {
+		if !isFirst || newStatus != types.StatusConnected || e.lastLoggedProblem() {
 			e.lgr.Log(event)
 		}
 		if e.Notifier != nil {

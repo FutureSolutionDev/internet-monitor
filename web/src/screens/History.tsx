@@ -33,6 +33,18 @@ import { statusTone } from "../styles/categories";
 
 type Filter = "all" | "disconnected" | "degraded" | "connected";
 
+async function firstEvent(date: string, signal: AbortSignal): Promise<LogEvent | undefined> {
+  try {
+    const events = await api.logs(date, 5000, signal);
+    return events.reduce<LogEvent | undefined>(
+      (first, e) => (!first || Date.parse(e.timestamp) < Date.parse(first.timestamp) ? e : first),
+      undefined,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
 export function History() {
   const { t, lang } = useI18n();
   const now = useNow(60_000);
@@ -47,9 +59,20 @@ export function History() {
   const hasLogs = stored.length > 0;
   const available = stored.includes(today) ? stored : [today, ...stored];
   const date = picked ?? today;
-  const logs = useAsync((signal) => api.logs(date, 5000, signal), [date === today ? latestEvent : 0], date);
+  const nextDate = date === today ? undefined : stored.filter((d) => d > date).sort()[0];
+  const logs = useAsync(
+    async (signal) => {
+      const events = await api.logs(date, 5000, signal);
+      return Object.assign(events, { after: nextDate ? await firstEvent(nextDate, signal) : undefined });
+    },
+    [date === today ? latestEvent : 0, nextDate],
+    date,
+  );
 
-  const rows = useMemo(() => buildRows(logs.data ?? [], now, date === today), [logs.data, date, today, now]);
+  const rows = useMemo(
+    () => buildRows(logs.data ?? [], now, date === today, logs.data?.after),
+    [logs.data, date, today, now],
+  );
   const summary = useMemo(() => summarize(rows), [rows]);
   const visible = filter === "all" ? rows : rows.filter((r) => r.event.event === filter);
 

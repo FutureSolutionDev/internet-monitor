@@ -7,16 +7,26 @@ export interface HistoryRow {
   ongoing: boolean;
 }
 
-export function buildRows(events: LogEvent[], now: number, isToday: boolean): HistoryRow[] {
+const RESTART_SLACK_SECONDS = 120;
+
+function segmentSeconds(ts: number, next: { e: LogEvent; ts: number }): number {
+  const gap = (next.ts - ts) / 1000;
+  const lasted = next.e.duration_seconds;
+  if (lasted == null) return gap;
+  return gap - lasted > RESTART_SLACK_SECONDS ? gap - lasted : lasted;
+}
+
+export function buildRows(events: LogEvent[], now: number, isToday: boolean, after?: LogEvent): HistoryRow[] {
   const sorted = [...events]
     .map((e) => ({ e, ts: Date.parse(e.timestamp) }))
     .filter((x) => Number.isFinite(x.ts))
     .sort((a, b) => a.ts - b.ts);
+  const following = after ? { e: after, ts: Date.parse(after.timestamp) } : undefined;
   const rows = sorted.map(({ e, ts }, i) => {
-    const next = sorted[i + 1];
+    const next = sorted[i + 1] ?? (following && following.ts > ts ? following : undefined);
     let duration: number | null = null;
     let ongoing = false;
-    if (next) duration = next.e.duration_seconds ?? (next.ts - ts) / 1000;
+    if (next) duration = segmentSeconds(ts, next);
     else if (isToday) {
       duration = Math.max(0, (now - ts) / 1000);
       ongoing = true;

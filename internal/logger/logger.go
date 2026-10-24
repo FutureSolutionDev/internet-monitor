@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"internet-monitor/internal/config"
 	"internet-monitor/internal/i18n"
+	"internet-monitor/internal/jsonl"
 	"internet-monitor/internal/monitor"
 	"internet-monitor/internal/types"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -125,6 +127,25 @@ func (l *Logger) Log(event monitor.Event) {
 		l.AppLog("ERROR open log file: %v", err)
 	}
 
+}
+
+func (l *Logger) LastEvent() (types.Event, bool) {
+	l.mu.Lock()
+	dir := l.cfg.LogDir
+	l.mu.Unlock()
+	files, _ := filepath.Glob(filepath.Join(dir, "connectivity_*.jsonl"))
+	sort.Sort(sort.Reverse(sort.StringSlice(files)))
+	for _, f := range files {
+		lines, err := jsonl.Tail(f, 1)
+		if err != nil || len(lines) == 0 {
+			continue
+		}
+		var ev types.Event
+		if json.Unmarshal(lines[0], &ev) == nil {
+			return ev, true
+		}
+	}
+	return types.Event{}, false
 }
 
 type SpeedTestEvent struct {

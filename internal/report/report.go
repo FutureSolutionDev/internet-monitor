@@ -313,9 +313,16 @@ func failedLayers(r types.EventReason) string {
 	return strings.Join(p, "+")
 }
 
+const restartSlack = 2 * time.Minute
+
 func segmentDuration(events []types.Event, k int, now time.Time) float64 {
 	if k+1 < len(events) {
-		return events[k+1].DurationSeconds
+		next := events[k+1]
+		gap := next.Timestamp.Sub(events[k].Timestamp).Seconds()
+		if gap-next.DurationSeconds > restartSlack.Seconds() {
+			return gap - next.DurationSeconds
+		}
+		return next.DurationSeconds
 	}
 	if d := now.Sub(events[k].Timestamp).Seconds(); d > 0 {
 		return d
