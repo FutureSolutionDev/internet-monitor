@@ -263,6 +263,10 @@ h3 {
   display: none;
 }
 
+.content:focus {
+  outline: none;
+}
+
 .content {
   width: 100%;
   max-width: 1360px;
@@ -851,25 +855,53 @@ svg text {
   stroke-width: 2;
 }
 
-.tooltip {
+.chart-tip {
   position: absolute;
-  top: 0;
-  z-index: 5;
-  min-width: 140px;
-  padding: 8px 12px;
+  z-index: 6;
+  display: grid;
+  gap: 6px;
+  min-width: 160px;
+  max-width: 280px;
+  padding: 10px 12px;
   border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
   background: var(--color-surface-top);
   box-shadow: var(--shadow-overlay);
-  border: 1px solid var(--border-default);
+  color: var(--text-primary);
   font-size: var(--text-xs);
   pointer-events: none;
   white-space: nowrap;
 }
 
-.tooltip strong {
-  display: block;
-  font-size: var(--text-md);
+.chart-tip-title {
+  color: var(--text-secondary);
+}
+
+.chart-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-tip-label {
+  flex: 1;
+  color: var(--text-secondary);
+}
+
+.chart-tip-value {
+  color: var(--text-primary);
+  font-size: var(--text-sm);
   font-weight: 500;
+}
+
+.chart svg:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.meter {
+  position: relative;
 }
 
 .field {
@@ -1364,14 +1396,34 @@ select.input {
 }
 
 .bars .bar {
-  padding: 0;
-  border: 0;
-  cursor: default;
+  display: flex;
+  align-items: flex-end;
   flex: 1;
   min-width: 2px;
   max-width: 24px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.bar-fill {
+  display: block;
+  width: 100%;
   border-radius: 4px 4px 0 0;
   background: var(--tone, var(--accent-green));
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.bars .bar[data-dim] .bar-fill {
+  opacity: 0.45;
+}
+
+.bars .bar:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .report {

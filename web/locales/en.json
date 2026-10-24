@@ -263,6 +263,7 @@
     "report_generated": "Generated {date}",
     "report_uptime": "Uptime",
     "report_outages": "Outages",
+    "report_share": "Share of outages",
     "report_downtime": "Total downtime",
     "report_degraded": "Unstable time",
     "report_longest": "Longest outage",

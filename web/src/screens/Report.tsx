@@ -8,7 +8,8 @@ import {
   Printer,
   RefreshCw,
 } from "lucide-react";
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useId, useMemo, useRef, useState } from "react";
+import { ChartTooltip } from "../components/ChartTooltip";
 import { Banner, Button, Card, CardHead, Empty, Meter, Skeleton } from "../components/ui";
 import { api } from "../lib/api";
 import {
@@ -42,12 +43,39 @@ function daysOf(month: string, days: ReportDay[]): (ReportDay | { date: string; 
 
 function DailyChart({ report }: { report: MonthlyReport }) {
   const { t, lang } = useI18n();
-  const [active, setActive] = useState<number | null>(null);
+  const wrap = useRef<HTMLDivElement>(null);
+  const tipId = useId();
+  const [active, setActive] = useState<{ i: number; x: number; y: number; w: number } | null>(null);
   const days = useMemo(() => daysOf(report.month, report.days ?? []), [report]);
   const max = Math.max(60, ...days.map((d) => ("empty" in d ? 0 : d.downtime_seconds)));
-  const current = active !== null ? days[active] : undefined;
+  const current = active !== null ? days[active.i] : undefined;
+
+  const show = (i: number, el: HTMLElement) => {
+    const box = wrap.current?.getBoundingClientRect();
+    const fill = el.firstElementChild?.getBoundingClientRect() ?? el.getBoundingClientRect();
+    if (!box) return;
+    setActive({ i, x: fill.left + fill.width / 2 - box.left, y: fill.top - box.top, w: box.width });
+  };
+
+  const tipRows = (d: (typeof days)[number]) =>
+    "empty" in d
+      ? [{ label: t("report_uptime"), value: t("avail_none") }]
+      : [
+          {
+            label: t("report_uptime"),
+            value: formatPct(lang, d.uptime_pct),
+            tone: availabilityTone(d.uptime_pct),
+          },
+          { label: t("report_outages"), value: formatNumber(lang, d.outages), tone: tone.disconnected },
+          {
+            label: t("report_downtime"),
+            value: formatDuration(t, d.downtime_seconds),
+            tone: tone.disconnected,
+          },
+        ];
+
   return (
-    <div className="chart">
+    <div className="chart" ref={wrap}>
       <div className="bars" onPointerLeave={() => setActive(null)}>
         {days.map((d, i) => {
           const empty = "empty" in d;
@@ -62,30 +90,36 @@ function DailyChart({ report }: { report: MonthlyReport }) {
               key={d.date}
               className="bar"
               aria-label={label}
-              onPointerEnter={() => setActive(i)}
-              onFocus={() => setActive(i)}
+              aria-describedby={active?.i === i ? tipId : undefined}
+              data-active={active?.i === i || undefined}
+              data-dim={(active !== null && active.i !== i) || undefined}
+              onPointerEnter={(e) => show(i, e.currentTarget)}
+              onFocus={(e) => show(i, e.currentTarget)}
               onBlur={() => setActive(null)}
               style={
                 {
-                  height: `${h}%`,
                   "--tone": empty ? "var(--color-track)" : down > 0 ? tone.disconnected : tone.connected,
-                  opacity: active === null || active === i ? 1 : 0.55,
                 } as CSSProperties
               }
-            />
+            >
+              <span className="bar-fill" style={{ height: `${h}%` }} />
+            </button>
           );
         })}
       </div>
+      {current && active ? (
+        <ChartTooltip
+          id={tipId}
+          x={active.x}
+          y={active.y}
+          bounds={active.w}
+          title={formatDate(lang, current.date, { weekday: "long", day: "numeric", month: "long" })}
+          rows={tipRows(current)}
+        />
+      ) : null}
       <div className="row" style={{ justifyContent: "space-between", marginTop: 8 }}>
         <span className="chart-axis num muted">
           {days[0] ? formatDate(lang, days[0].date, { day: "numeric", month: "short" }) : ""}
-        </span>
-        <span className="muted num" style={{ fontSize: "var(--text-xs)" }} aria-live="polite">
-          {current && !("empty" in current)
-            ? `${formatDate(lang, current.date)} · ${formatPct(lang, current.uptime_pct)} · ${t("report_outages")}: ${formatNumber(lang, current.outages)} · ${formatDuration(t, current.downtime_seconds)}`
-            : current
-              ? `${formatDate(lang, current.date)} · —`
-              : ""}
         </span>
         <span className="chart-axis num muted">
           {days.length
@@ -247,6 +281,16 @@ export function Report({ month: initial }: { month: string | null }) {
                     value={c.pct}
                     display={formatPct(lang, c.pct)}
                     tone={tone.disconnected}
+                    tipTitle={describeReportCause(t, layer)}
+                    tipRows={[
+                      {
+                        label: t("report_outages"),
+                        value: formatNumber(lang, c.outages),
+                        tone: tone.disconnected,
+                      },
+                      { label: t("report_downtime"), value: formatDuration(t, c.downtime_seconds) },
+                      { label: t("report_share"), value: formatPct(lang, c.pct) },
+                    ]}
                   />
                 ))}
               </div>

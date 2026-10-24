@@ -1,6 +1,16 @@
 import type { LucideIcon } from "lucide-react";
 import { LoaderCircle } from "lucide-react";
-import type { ButtonHTMLAttributes, CSSProperties, MouseEvent, ReactNode, Ref } from "react";
+import {
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+  type Ref,
+  useRef,
+  useState,
+} from "react";
+import { ChartTooltip, type TipRow } from "./ChartTooltip";
 
 type Variant = "default" | "edge" | "aurora" | "solid" | "ghost" | "danger";
 
@@ -202,21 +212,44 @@ export function Meter({
   value,
   display,
   tone,
+  tipTitle,
+  tipRows,
 }: {
   label: string;
   value: number | null;
   display: string;
   tone: string;
+  tipTitle?: string;
+  tipRows?: TipRow[];
 }) {
   const pct = value === null ? 0 : Math.max(0, Math.min(100, value));
+  const box = useRef<HTMLDivElement>(null);
+  const track = useRef<HTMLDivElement>(null);
+  const [tip, setTip] = useState<{ x: number; y: number; w: number } | null>(null);
+  const move = (e: PointerEvent<HTMLDivElement>) => {
+    const b = box.current?.getBoundingClientRect();
+    const tr = track.current?.getBoundingClientRect();
+    if (!b || !tr) return;
+    setTip({ x: e.clientX - b.left, y: tr.top - b.top, w: b.width });
+  };
   return (
-    <div className="meter">
+    <div className="meter" ref={box} onPointerMove={move} onPointerLeave={() => setTip(null)}>
+      {tip ? (
+        <ChartTooltip
+          x={tip.x}
+          y={tip.y}
+          bounds={tip.w}
+          title={tipTitle ?? label}
+          rows={tipRows ?? [{ label: label, value: display, tone }]}
+        />
+      ) : null}
       <div className="meter-top">
         <span className="secondary">{label}</span>
         <span className="num">{display}</span>
       </div>
       {/* biome-ignore lint/a11y/useSemanticElements: styled track needs a div; native meter cannot be themed consistently */}
       <div
+        ref={track}
         className="meter-track"
         role="meter"
         aria-label={label}

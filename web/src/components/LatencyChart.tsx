@@ -1,6 +1,8 @@
-import { type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { formatNumber, formatTime } from "../lib/format";
 import { isRtl, type Lang, type Translate } from "../lib/i18n";
+import { tone } from "../styles/categories";
+import { ChartTooltip } from "./ChartTooltip";
 
 interface Props {
   values: number[];
@@ -26,6 +28,7 @@ export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height =
   const wrap = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(600);
   const [active, setActive] = useState<number | null>(null);
+  const tipId = useId();
   const rtl = isRtl(lang);
 
   useEffect(() => {
@@ -94,11 +97,30 @@ export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height =
     setActive(n <= 1 ? 0 : Math.round((p / geo.plotW) * (n - 1)));
   };
 
+  const onKey = (e: KeyboardEvent<SVGSVGElement>) => {
+    if (n === 0) return;
+    const forward = rtl ? "ArrowLeft" : "ArrowRight";
+    const back = rtl ? "ArrowRight" : "ArrowLeft";
+    const cur = active ?? n - 1;
+    let next: number | null = null;
+    if (e.key === forward) next = Math.min(n - 1, cur + 1);
+    else if (e.key === back) next = Math.max(0, cur - 1);
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = n - 1;
+    else if (e.key === "Escape") {
+      setActive(null);
+      return;
+    }
+    if (next === null) return;
+    e.preventDefault();
+    setActive(next);
+  };
+
   const ms = t("ms_unit");
   const summary = `${t("chart_latency")}: ${formatNumber(lang, geo.min)}–${formatNumber(lang, geo.peak)} ${ms}, ${t("stat_avg", { value: `${formatNumber(lang, geo.avg)} ${ms}` })}`;
   const activeValue = active !== null ? values[active] : undefined;
   const tipX = active !== null ? geo.xAt(active) : 0;
-  const tipLeft = Math.max(0, Math.min(width - 150, tipX - 75));
+  const tipY = activeValue !== undefined && activeValue > 0 ? geo.yAt(activeValue) : PAD.top + geo.plotH - 10;
 
   return (
     <div className="chart" ref={wrap}>
@@ -107,8 +129,13 @@ export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height =
         viewBox={`0 0 ${width} ${height}`}
         role="img"
         aria-label={summary}
+        aria-describedby={active !== null ? tipId : undefined}
+        tabIndex={n ? 0 : -1}
         onPointerMove={pick}
         onPointerLeave={() => setActive(null)}
+        onKeyDown={onKey}
+        onFocus={() => setActive((a) => a ?? (n ? n - 1 : null))}
+        onBlur={() => setActive(null)}
       >
         {geo.ticks.map((tick) => (
           <g key={tick}>
@@ -175,12 +202,22 @@ export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height =
         </text>
       </svg>
       {active !== null && activeValue !== undefined ? (
-        <div className="tooltip" style={{ left: tipLeft, top: 4 }} aria-live="polite">
-          <span className="muted">{formatTime(lang, timeOf(active))}</span>
-          <strong className="num">
-            {activeValue > 0 ? `${formatNumber(lang, activeValue)} ${ms}` : t("chart_failed")}
-          </strong>
-        </div>
+        <ChartTooltip
+          id={tipId}
+          x={tipX}
+          y={tipY}
+          bounds={width}
+          title={formatTime(lang, timeOf(active))}
+          rows={[
+            activeValue > 0
+              ? {
+                  label: t("chart_latency"),
+                  value: `${formatNumber(lang, activeValue)} ${ms}`,
+                  tone: tone.latency,
+                }
+              : { label: t("chart_latency"), value: t("chart_failed"), tone: tone.disconnected },
+          ]}
+        />
       ) : null}
     </div>
   );

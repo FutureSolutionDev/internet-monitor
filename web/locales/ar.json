@@ -263,6 +263,7 @@
     "report_generated": "أُنشئ {date}",
     "report_uptime": "نسبة الاتصال",
     "report_outages": "الانقطاعات",
+    "report_share": "من إجمالي الانقطاعات",
     "report_downtime": "إجمالي الانقطاع",
     "report_degraded": "مدة عدم الاستقرار",
     "report_longest": "أطول انقطاع",
