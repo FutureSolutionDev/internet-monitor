@@ -28,7 +28,7 @@ func TestEventPayloadIsLocalized(t *testing.T) {
 	for _, url := range []string{"https://discord.com/api/webhooks/1/x", "https://hooks.slack.com/services/T/B/X"} {
 		data, _ := json.Marshal(BuildEventPayload("ar", ev, "restored", url))
 		s := string(data)
-		if !strings.Contains(s, "عاد") || strings.Contains(s, "Internet restored") {
+		if !strings.Contains(s, "رجع") || strings.Contains(s, "Internet restored") {
 			t.Errorf("%s payload not Arabic: %s", url, s)
 		}
 	}

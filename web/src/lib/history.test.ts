@@ -56,7 +56,7 @@ describe("formatting", () => {
   });
 
   test("arabic strings interpolate", () => {
-    expect(translate("ar", "test_ok", { ok: 2, total: 3 })).toBe("2 من 3 متاح");
+    expect(translate("ar", "test_ok", { ok: 2, total: 3 })).toBe("2 من 3 شغّالين");
   });
 
   test("csv escapes quotes and neutralises formulas", () => {

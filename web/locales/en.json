@@ -716,6 +716,7 @@
     "changelog.v2.27": "Error messages say what actually went wrong, and availability never rounds up to 100% when there was downtime.",
     "terms.use.p2": "You may not offer Internet Monitor to others as a hosted or managed service, and you may not remove or hide its license, copyright or other notices.",
     "terms.use.p3": "Versions before 2.0.0 were released under the MIT license.",
-    "changelog.v2.28": "A new license, the Elastic License 2.0: the app is still free for personal and commercial use and its code is still public."
+    "changelog.v2.28": "A new license, the Elastic License 2.0: the app is still free for personal and commercial use and its code is still public.",
+    "changelog.v2.29": "The Arabic interface, alerts and Webhook/Telegram messages are now written in everyday Egyptian Arabic."
   }
 }
