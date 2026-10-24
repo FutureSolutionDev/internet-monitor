@@ -93,6 +93,9 @@ func (s *Server) handleSessionLaunch(w http.ResponseWriter, r *http.Request) boo
 	}
 	q.Del(sessionQuery)
 	target := r.URL.Path
+	if !strings.HasPrefix(target, "/") || strings.HasPrefix(target, "//") || strings.HasPrefix(target, "/\\") {
+		target = "/"
+	}
 	if enc := q.Encode(); enc != "" {
 		target += "?" + enc
 	}

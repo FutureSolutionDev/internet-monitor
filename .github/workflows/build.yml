@@ -147,6 +147,21 @@ jobs:
           release_branches: master,main
           dry_run: true
 
+      - name: Refuse a version below the newest tag
+        env:
+          NEW_TAG: ${{ steps.tag.outputs.new_tag }}
+        run: |
+          latest=$(git tag -l 'v[0-9]*' | sort -V | tail -1)
+          if [ -z "$latest" ]; then
+            exit 0
+          fi
+          new_core=${NEW_TAG%%-*}
+          latest_core=${latest%%-*}
+          if [ "$(printf '%s\n%s\n' "$latest_core" "$new_core" | sort -V | tail -1)" != "$new_core" ]; then
+            echo "::error file=.release-version::$NEW_TAG is below the newest tag $latest. Set .release-version to the next version."
+            exit 1
+          fi
+
   # ══════════════════════════════════════════════════════════════
   # BUILD JOBS — all depend on version (if: always() keeps them
   # running on PRs where version job is skipped)

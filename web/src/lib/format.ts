@@ -34,13 +34,15 @@ export function formatDuration(t: Translate, seconds: number): string {
 
 export function latencyParts(t: Translate, lang: Lang, ms: number): { value: string; unit: string } {
   if (!Number.isFinite(ms)) return { value: "—", unit: "" };
-  if (ms < 1000) return { value: formatNumber(lang, Math.max(0, Math.round(ms))), unit: t("ms_unit") };
-  if (ms < 60_000) {
-    const s = ms / 1000;
-    const value = new Intl.NumberFormat(localeOf(lang), { maximumFractionDigits: s < 10 ? 2 : 1 }).format(s);
+  const whole = Math.max(0, Math.round(ms));
+  if (whole < 1000) return { value: formatNumber(lang, whole), unit: t("ms_unit") };
+  const digits = ms < 10_000 ? 2 : 1;
+  const s = Number((ms / 1000).toFixed(digits));
+  if (s < 60) {
+    const value = new Intl.NumberFormat(localeOf(lang), { maximumFractionDigits: digits }).format(s);
     return { value, unit: t("s_unit") };
   }
-  return { value: formatDuration(t, ms / 1000), unit: "" };
+  return { value: formatDuration(t, Math.max(60, ms / 1000)), unit: "" };
 }
 
 export function formatLatency(t: Translate, lang: Lang, ms: number): string {

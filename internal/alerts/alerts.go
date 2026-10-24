@@ -381,9 +381,7 @@ func (a *Alerts) dispatchLocked(kind Kind, ev types.Event, d Decision, duration 
 	}
 	if (d.Webhook || d.Telegram) && a.opts.Remote != nil {
 		sent := ev
-		if duration > 0 {
-			sent.DurationSeconds = duration
-		}
+		sent.DurationSeconds = duration
 		a.opts.Remote.SendEvent(lang, sent, string(kind), d.Webhook, d.Telegram)
 	}
 }

@@ -10,7 +10,7 @@ const mutexName = `Local\InternetMonitor_4f8a2b1c`
 
 var instanceMutex windows.Handle
 
-func AcquireSingleInstance() bool {
+func acquireInstance() bool {
 	name, err := windows.UTF16PtrFromString(mutexName)
 	if err != nil {
 		return true

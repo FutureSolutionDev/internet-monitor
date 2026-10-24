@@ -204,6 +204,8 @@ func parseChecksums(data []byte, asset string) string {
 	return ""
 }
 
+const RelaunchEnv = "IM_RELAUNCH"
+
 func Restart() {
 	exe, err := os.Executable()
 	if err != nil {
@@ -213,7 +215,7 @@ func Restart() {
 	exe, _ = filepath.EvalSymlinks(exe)
 
 	cmd := exec.Command(exe, os.Args[1:]...)
-	cmd.Env = os.Environ()
+	cmd.Env = append(os.Environ(), RelaunchEnv+"=1")
 	cmd.Dir = filepath.Dir(exe)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

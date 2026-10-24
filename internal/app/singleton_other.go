@@ -10,7 +10,7 @@ import (
 
 var lockFile *os.File
 
-func AcquireSingleInstance() bool {
+func acquireInstance() bool {
 	dir, err := os.UserCacheDir()
 	if err != nil {
 		dir = os.TempDir()

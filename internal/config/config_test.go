@@ -198,12 +198,15 @@ func TestStoreConcurrentUpdatesAreSerialized(t *testing.T) {
 
 func TestStoreKeepsLegacyAbsoluteLogDirWritable(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(`{"log_dir":"D:\monitor-logs"}`), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"log_dir":"D:\\monitor-logs"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	s, err := Open(path)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if got := s.Get().LogDir; got != `D:\monitor-logs` || s.LoadError() != nil {
+		t.Fatalf("legacy config not loaded: log_dir = %q, load error = %v", got, s.LoadError())
 	}
 	if _, _, err := s.Update(0, func(c *Config) error { c.Language = "ar"; return nil }); err != nil {
 		t.Fatalf("unrelated save blocked by legacy log_dir: %v", err)

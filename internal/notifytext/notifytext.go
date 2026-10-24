@@ -124,8 +124,12 @@ func Latency(lang string, ms int64) string {
 		if s >= 10 {
 			digits = 1
 		}
-		text := strings.TrimRight(strings.TrimRight(strconv.FormatFloat(s, 'f', digits, 64), "0"), ".")
-		return i18n.T(lang, "duration.s", i18n.Vars{"s": text})
+		text := strconv.FormatFloat(s, 'f', digits, 64)
+		if rounded, _ := strconv.ParseFloat(text, 64); rounded < 60 {
+			text = strings.TrimRight(strings.TrimRight(text, "0"), ".")
+			return i18n.T(lang, "duration.s", i18n.Vars{"s": text})
+		}
+		return Duration(lang, 60)
 	default:
 		return Duration(lang, float64(ms)/1000)
 	}

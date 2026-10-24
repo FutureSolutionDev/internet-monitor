@@ -23,6 +23,7 @@ type Logger struct {
 	appMu   sync.Mutex
 	appLog  *log.Logger
 	appFile *os.File
+	appPath string
 }
 
 const maxAppLogSize = 5 << 20
@@ -44,7 +45,7 @@ func New(cfg config.Config) (*Logger, error) {
 		f = nil
 	}
 
-	return &Logger{cfg: cfg.Clone(), appLog: appLog, appFile: f}, nil
+	return &Logger{cfg: cfg.Clone(), appLog: appLog, appFile: f, appPath: appLogFile}, nil
 }
 
 func (l *Logger) Close() error {
@@ -80,9 +81,24 @@ func (l *Logger) SetConfig(cfg config.Config) {
 func (l *Logger) AppLog(format string, args ...interface{}) {
 	l.appMu.Lock()
 	defer l.appMu.Unlock()
-	if l.appLog != nil {
-		l.appLog.Printf(format, args...)
+	if l.appLog == nil {
+		return
 	}
+	l.appLog.Printf(format, args...)
+	if info, err := l.appFile.Stat(); err == nil && info.Size() > maxAppLogSize {
+		l.rotateAppLogLocked()
+	}
+}
+
+func (l *Logger) rotateAppLogLocked() {
+	_ = l.appFile.Close()
+	_ = os.Rename(l.appPath, l.appPath+".1")
+	f, err := os.OpenFile(l.appPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		l.appFile, l.appLog = nil, nil
+		return
+	}
+	l.appFile, l.appLog = f, log.New(f, "", log.LstdFlags)
 }
 
 func (l *Logger) Log(event monitor.Event) {
