@@ -296,7 +296,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
         tabIndex={-1}
         onClick={() => closeDrawer(true)}
       />
-      <div className="main" inert={phone && drawer}>
+      <div className="main">
         <header className="topbar">
           <Button
             ref={menuButton}
@@ -311,7 +311,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
           <div className="topbar-title">
             <strong>{t(TITLES[route])}</strong>
           </div>
-          <div className="topbar-actions">
+          <div className="topbar-actions" inert={phone && drawer}>
             <ConnectionPill />
             <NotificationBell />
             <LanguageSelect iconOnly />
@@ -326,7 +326,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
             />
           </div>
         </header>
-        <main ref={mainRef} id="main" className="content" tabIndex={-1}>
+        <main ref={mainRef} id="main" className="content" tabIndex={-1} inert={phone && drawer}>
           {connection === "reconnecting" || connection === "busy" ? (
             <Banner tone="warn" icon={CircleAlert}>
               {t(connection === "busy" ? "gate_busy_body" : "conn_reconnecting")} · {t("conn_stale")}
