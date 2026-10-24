@@ -544,6 +544,17 @@
     "notify.degraded.body": "Loss: {loss}% — latency: {ms}ms",
     "notify.down.title": "🔴 Internet Disconnected",
     "notify.down.failed": "Failed: {layers}",
-    "notify.down.lost": "Connection lost"
+    "notify.down.lost": "Connection lost",
+    "cl_search": "Search changes",
+    "cl_search_placeholder": "Search, for example “Telegram” or “0.9”",
+    "cl_results": "{changes} changes in {releases} releases",
+    "cl_no_results": "Nothing matches your search.",
+    "cl_clear": "Clear search and filters",
+    "cl_in_progress": "In development",
+    "cl_map": "Versions",
+    "cl_jump": "Jump to a version",
+    "cl_change_count": "{n} changes",
+    "cl_expand_all": "Expand all",
+    "cl_collapse_all": "Collapse all"
   }
 }

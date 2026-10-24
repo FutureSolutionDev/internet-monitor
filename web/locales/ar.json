@@ -544,6 +544,17 @@
     "notify.degraded.body": "فقدان: {loss}% — زمن: {ms}ms",
     "notify.down.title": "🔴 انقطع الإنترنت",
     "notify.down.failed": "فشل: {layers}",
-    "notify.down.lost": "فقدان الاتصال"
+    "notify.down.lost": "فقدان الاتصال",
+    "cl_search": "ابحث في التغييرات",
+    "cl_search_placeholder": "ابحث، مثلاً «Telegram» أو «0.9»",
+    "cl_results": "{changes} تغيير في {releases} إصدار",
+    "cl_no_results": "لا توجد نتائج مطابقة لبحثك.",
+    "cl_clear": "امسح البحث والفلاتر",
+    "cl_in_progress": "قيد التطوير",
+    "cl_map": "الإصدارات",
+    "cl_jump": "انتقل إلى إصدار",
+    "cl_change_count": "{n} تغيير",
+    "cl_expand_all": "افتح الكل",
+    "cl_collapse_all": "اطوِ الكل"
   }
 }
