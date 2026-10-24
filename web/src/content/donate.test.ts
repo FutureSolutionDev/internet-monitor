@@ -15,10 +15,15 @@ describe("donation methods", () => {
       instapay: "example@instapay",
       instapayLink: "https://ipn.eg/S/example/instapay/abc",
     });
-    expect(methods.map((m) => [m.id, m.handle, m.href])).toEqual([
-      ["paypal", "paypal.me/example", "https://paypal.me/example/"],
-      ["vodafone-cash", "01012345678", undefined],
-      ["instapay", "example@instapay", "https://ipn.eg/S/example/instapay/abc"],
+    expect(methods.map((m) => [m.id, m.handle, m.copy, m.href])).toEqual([
+      ["paypal", "paypal.me", "https://paypal.me/example/", "https://paypal.me/example/"],
+      ["vodafone-cash", "010 1234 5678", "01012345678", undefined],
+      [
+        "instapay",
+        "example@instapay",
+        "https://ipn.eg/S/example/instapay/abc",
+        "https://ipn.eg/S/example/instapay/abc",
+      ],
     ]);
   });
 
@@ -34,7 +39,10 @@ describe("donation methods", () => {
   });
 
   test("InstaPay accepts an Egyptian mobile number as well as an address", () => {
-    expect(donateMethods({ ...EMPTY, instapay: "0112 345 6789" })[0]?.handle).toBe("01123456789");
+    const [m] = donateMethods({ ...EMPTY, instapay: "0112 345 6789" });
+    expect([m?.handle, m?.copy]).toEqual(["011 2345 6789", "01123456789"]);
+    const [linked] = donateMethods({ ...EMPTY, instapay: "01123456789", instapayLink: "https://ipn.eg/S/x" });
+    expect(linked?.handle).toBe("011 2345 6789");
     expect(donateMethods({ ...EMPTY, instapay: "01312345678" })).toEqual([]);
   });
 

@@ -32,6 +32,10 @@ export function Support() {
         <p className="secondary">{t("support_intro")}</p>
       </header>
 
+      <Banner tone="warn" icon={ShieldAlert}>
+        {t("support_safety")}
+      </Banner>
+
       {methods.length === 0 ? (
         <Banner tone="info" icon={HeartHandshake}>
           {t("support_none")}
@@ -75,7 +79,7 @@ export function Support() {
                     icon={Copy}
                     aria-label={t("contact_copy", { name })}
                     title={t("contact_copy", { name })}
-                    onClick={() => void copy(m.handle)}
+                    onClick={() => void copy(m.copy)}
                   >
                     {m.href ? null : t("contact_copy", { name })}
                   </Button>
@@ -87,10 +91,6 @@ export function Support() {
       )}
 
       <p className="secondary">{t("support_thanks")}</p>
-
-      <Banner tone="warn" icon={ShieldAlert}>
-        {t("support_safety")}
-      </Banner>
     </div>
   );
 }

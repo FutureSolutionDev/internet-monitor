@@ -64,9 +64,10 @@ const ABOUT: { route: Route; key: MessageKey; icon: LucideIcon }[] = [
   { route: "contact", key: "nav_contact", icon: MessagesSquare },
   { route: "privacy", key: "nav_privacy", icon: ShieldCheck },
   { route: "terms", key: "nav_terms", icon: Scale },
+  ...(donateMethods().length > 0
+    ? [{ route: "support" as const, key: "nav_support" as const, icon: HeartHandshake }]
+    : []),
 ];
-
-if (donateMethods().length > 0) ABOUT.push({ route: "support", key: "nav_support", icon: HeartHandshake });
 
 const TITLES: Record<Route, MessageKey> = {
   overview: "nav_overview",

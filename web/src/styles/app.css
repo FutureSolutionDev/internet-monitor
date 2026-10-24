@@ -2183,6 +2183,7 @@ select.input {
 }
 
 .contact-actions {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 6px;

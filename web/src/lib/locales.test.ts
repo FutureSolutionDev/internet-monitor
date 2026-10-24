@@ -68,12 +68,20 @@ describe("locale files", () => {
     const meta = { name: "X", dir: "ltr", intl: "en" };
     expect(() =>
       loadLocales({
-        "/locales/xx/meta.json": meta,
-        "/locales/xx/a.json": { faq: { q: "1" } },
-        "/locales/xx/b.json": { "faq.q": "2" },
+        "/locales/en/meta.json": meta,
+        "/locales/en/a.json": { faq: { q: "1" } },
+        "/locales/en/b.json": { "faq.q": "2" },
       }),
     ).toThrow(/faq\.q/);
-    expect(() => loadLocales({ "/locales/xx/a.json": { k: "v" } })).toThrow(/meta\.json/);
+    expect(() => loadLocales({ "/locales/en/a.json": { k: "v" } })).toThrow(/meta\.json/);
+  });
+
+  test.each([
+    ["a number", 1],
+    ["null", null],
+    ["an array", ["a"]],
+  ])("a leaf that is %s is rejected", (_, value) => {
+    expect(() => flattenMessages({ k: value } as unknown as MessageTree, "x.json")).toThrow(/x\.json: "k"/);
   });
 
   test("unknown placeholders are left untouched", () => {

@@ -65,11 +65,12 @@ export function flattenMessages(
 ): Record<string, string> {
   for (const [name, value] of Object.entries(tree)) {
     const key = prefix + name;
-    if (typeof value !== "string") {
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
       flattenMessages(value, where, out, `${key}.`);
       continue;
     }
-    if (key in out) throw new Error(`${where}: "${key}" is defined more than once`);
+    if (typeof value !== "string") throw new Error(`${where}: "${key}" must be a string or an object`);
+    if (Object.hasOwn(out, key)) throw new Error(`${where}: "${key}" is defined more than once`);
     out[key] = value;
   }
   return out;
@@ -84,13 +85,14 @@ export function loadLocales(files: Record<string, unknown>): Locale[] {
     const entry = byLang.get(code) ?? { messages: {} };
     byLang.set(code, entry);
     if (file === "meta") entry.meta = data as LocaleMeta;
-    else flattenMessages(data as MessageTree, code, entry.messages);
+    else flattenMessages(data as MessageTree, `${code}/${file}.json`, entry.messages);
   }
   const list: Locale[] = [];
   for (const [code, { meta, messages }] of byLang) {
     if (!meta) throw new Error(`${code}: meta.json is missing`);
     list.push({ code, ...meta, messages: messages as Locale["messages"] });
   }
+  if (!byLang.has(DEFAULT_LANG)) throw new Error(`${DEFAULT_LANG}: locale is missing`);
   return list.sort((a, b) =>
     a.code === DEFAULT_LANG ? -1 : b.code === DEFAULT_LANG ? 1 : a.code.localeCompare(b.code),
   );
@@ -122,7 +124,9 @@ export function isRtl(lang: Lang): boolean {
 export function translate(lang: Lang, key: MessageKey, vars?: Vars): string {
   const template = byCode.get(lang)?.messages[key] ?? fallback[key] ?? key;
   if (!vars) return template;
-  return template.replace(/\{(\w+)\}/g, (m, name: string) => (name in vars ? String(vars[name]) : m));
+  return template.replace(/\{(\w+)\}/g, (m, name: string) =>
+    Object.hasOwn(vars, name) ? String(vars[name]) : m,
+  );
 }
 
 const LANG_KEY = "im.lang";

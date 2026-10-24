@@ -24,7 +24,7 @@
   "speed_alert": "أقل من حد التنبيه {value} ميجابت/ث",
   "speed_schedule_note": "قياس تلقائي كل {n} دقيقة",
   "speed_offline": "انت مش متصل — اتصل الأول",
-  "speed_err_failed": "الاختبار ما كملش. اتأكد من الاتصال وجرّب تاني.",
+  "speed_err_failed": "الاختبار ماكملش. اتأكد من الاتصال وجرّب تاني.",
   "speed_err_no_result": "الاختبار خلص من غير نتيجة.",
   "speed_err_running": "فيه اختبار شغال بالفعل.",
   "speed_source": "المصدر"

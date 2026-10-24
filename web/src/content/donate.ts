@@ -24,6 +24,7 @@ export interface DonateMethod {
   name: MessageKey;
   how: MessageKey;
   handle: string;
+  copy: string;
   href?: string;
 }
 
@@ -45,6 +46,8 @@ export const isVodafoneCash = (raw: string) => /^010\d{8}$/.test(raw);
 export const isInstapayAddress = (raw: string) =>
   /^[a-z0-9._-]+@instapay$/i.test(raw) || /^01[0125]\d{8}$/.test(raw);
 
+const groupPhone = (digits: string) => digits.replace(/^(\d{3})(\d{4})(\d{4})$/, "$1 $2 $3");
+
 export function donateMethods(cfg: DonateConfig = DONATE): DonateMethod[] {
   const out: DonateMethod[] = [];
   const paypal = cfg.paypal.trim();
@@ -55,7 +58,8 @@ export function donateMethods(cfg: DonateConfig = DONATE): DonateMethod[] {
       accent: "blue",
       name: "support.paypal.name",
       how: "support.paypal.how",
-      handle: new URL(paypal).host + new URL(paypal).pathname.replace(/\/$/, ""),
+      handle: new URL(paypal).hostname.replace(/^www\./, ""),
+      copy: paypal,
       href: paypal,
     });
   }
@@ -67,7 +71,8 @@ export function donateMethods(cfg: DonateConfig = DONATE): DonateMethod[] {
       accent: "coral",
       name: "support.vodafone.name",
       how: "support.vodafone.how",
-      handle: phone,
+      handle: groupPhone(phone),
+      copy: phone,
     });
   }
   const address = cfg.instapay.replace(/[\s-]/g, "");
@@ -79,7 +84,8 @@ export function donateMethods(cfg: DonateConfig = DONATE): DonateMethod[] {
       accent: "violet",
       name: "support.instapay.name",
       how: "support.instapay.how",
-      handle: address,
+      handle: /^\d+$/.test(address) ? groupPhone(address) : address,
+      copy: isInstapayLink(link) ? link : address,
       href: isInstapayLink(link) ? link : undefined,
     });
   }

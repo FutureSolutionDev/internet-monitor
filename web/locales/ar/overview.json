@@ -50,7 +50,7 @@
   "cause_tcp": "فشل TCP",
   "cause_http": "فشل HTTP",
   "cause_dns": "فشل DNS",
-  "cause_loss": "ضياع {value}% من الحزم",
+  "cause_loss": "فقدان {value}% من الحزم",
   "cause_latency": "استجابة {value} م.ث",
   "cause_none": "—",
   "cause_name_tcp": "TCP",

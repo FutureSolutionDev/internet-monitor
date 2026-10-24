@@ -279,7 +279,7 @@ export function SmartSelect<T extends string>({
       >
         <span className="sr-only">{label}: </span>
         {leading ? <span className="ss-leading">{leading}</span> : null}
-        {current?.icon ? <span className="ss-icon">{current.icon}</span> : null}
+        {current?.icon && !iconOnly ? <span className="ss-icon">{current.icon}</span> : null}
         <span
           className={iconOnly ? "sr-only" : current ? "ss-value" : "ss-value ss-placeholder"}
           lang={current?.lang}

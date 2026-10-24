@@ -12,7 +12,7 @@
     },
     "degraded": {
       "title": "⚠️ النت مش مستقر",
-      "body": "فقد: {loss}% — زمن: {ms}ms"
+      "body": "فقدان الحزم: {loss}% — زمن الاستجابة: {ms}ms"
     },
     "down": {
       "title": "🔴 النت قطع",
@@ -20,7 +20,7 @@
       "lost": "الاتصال اتقطع"
     },
     "reminder": {
-      "title": "⏰ لسه مفيش نت",
+      "title": "⏰ النت لسه مقطوع",
       "body": "مقطوع من {duration}"
     },
     "speed": {
@@ -30,7 +30,7 @@
       "body_down": "↓ {down} Mbps · {ms} ms"
     },
     "action": {
-      "open": "افتح اللوحة"
+      "open": "افتح لوحة التحكم"
     }
   },
   "duration": {
@@ -50,7 +50,7 @@
     "tcp": "TCP ping",
     "http": "HTTP",
     "dns": "DNS",
-    "loss": "فقد الحزم",
+    "loss": "فقدان الحزم",
     "latency": "زمن الاستجابة",
     "duration": "المدة",
     "ok": "سليم",
@@ -72,7 +72,7 @@
       "disconnected": "مقطوع",
       "checking": "جاري الفحص…"
     },
-    "detail": "فقد {loss}% · {ms} مللي ثانية",
+    "detail": "فقدان {loss}% · {ms} مللي ثانية",
     "last_change": "آخر تغيير: {time}",
     "last_change_none": "آخر تغيير: —",
     "open_dashboard": "افتح لوحة التحكم",
