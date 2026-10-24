@@ -132,6 +132,9 @@ jobs:
           v=$(tr -d ' \r\n' < .release-version 2>/dev/null || true)
           if [ -n "$v" ] && ! git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then
             echo "custom=$v" >> "$GITHUB_OUTPUT"
+          elif [[ "$v" == *-* ]]; then
+            echo "::error file=.release-version::v$v is already released. Set .release-version to the next prerelease or to the final version."
+            exit 1
           fi
 
       - name: Compute next version tag (no tag pushed)
