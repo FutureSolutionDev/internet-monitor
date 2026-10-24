@@ -1,6 +1,17 @@
 import { useSyncExternalStore } from "react";
 
-export type Route = "overview" | "history" | "speed" | "settings" | "report";
+export type Route =
+  | "overview"
+  | "history"
+  | "speed"
+  | "settings"
+  | "report"
+  | "changelog"
+  | "faq"
+  | "privacy"
+  | "terms"
+  | "about"
+  | "contact";
 
 const paths: Record<Route, string> = {
   overview: "/",
@@ -8,6 +19,12 @@ const paths: Record<Route, string> = {
   speed: "/speed",
   settings: "/settings",
   report: "/report",
+  changelog: "/changelog",
+  faq: "/faq",
+  privacy: "/privacy",
+  terms: "/terms",
+  about: "/about",
+  contact: "/contact",
 };
 
 type Blocker = (proceed: () => void) => boolean;
@@ -58,7 +75,7 @@ export function setNavigationBlocker(fn: Blocker | null) {
 export function navigate(route: Route, search = "", replace = false) {
   const target = hrefOf(route, search);
   const go = () => {
-    if (target === current) return;
+    if (target === current && !window.location.hash) return;
     if (replace) window.history.replaceState(null, "", target);
     else window.history.pushState(null, "", target);
     emit();

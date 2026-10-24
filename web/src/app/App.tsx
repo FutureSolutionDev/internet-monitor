@@ -6,7 +6,12 @@ import { Button, Card } from "../components/ui";
 import { useI18n } from "../lib/i18n";
 import { live, useLive } from "../lib/live";
 import { useLocation } from "../lib/router";
+import { About } from "../screens/About";
+import { Changelog } from "../screens/Changelog";
+import { Contact } from "../screens/Contact";
+import { Faq } from "../screens/Faq";
 import { History } from "../screens/History";
+import { Legal } from "../screens/Legal";
 import { Overview } from "../screens/Overview";
 import { Report } from "../screens/Report";
 import { Speed } from "../screens/Speed";
@@ -52,10 +57,6 @@ export function App() {
     return () => live.stop();
   }, []);
 
-  useEffect(() => {
-    if (route !== "report") document.title = t("app_name");
-  }, [route, t]);
-
   let body: React.ReactNode;
   if (connection === "unauthorized") body = <Gate kind="unauthorized" />;
   else if (connection === "busy" && !hasSnapshot) body = <Gate kind="busy" />;
@@ -68,6 +69,12 @@ export function App() {
         {route === "speed" ? <Speed /> : null}
         {route === "settings" ? <Settings /> : null}
         {route === "overview" ? <Overview /> : null}
+        {route === "changelog" ? <Changelog /> : null}
+        {route === "faq" ? <Faq /> : null}
+        {route === "privacy" ? <Legal kind="privacy" /> : null}
+        {route === "terms" ? <Legal kind="terms" /> : null}
+        {route === "about" ? <About /> : null}
+        {route === "contact" ? <Contact /> : null}
       </Shell>
     );
   }

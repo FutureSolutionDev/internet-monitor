@@ -29,3 +29,26 @@ func TestValidateWebURL(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateExternalURL(t *testing.T) {
+	cases := []struct {
+		in string
+		ok bool
+	}{
+		{"https://github.com/FutureSolutionDev/internet-monitor/issues", true},
+		{"https://wa.me/201069017890", true},
+		{"https://discord.gg/7Vhx6fw4qj", true},
+		{"http://github.com/", false},
+		{"https://github.com.evil.example/", false},
+		{"https://user@github.com/", false},
+		{"https://github.com:8443/", false},
+		{"https://example.com/", false},
+		{"mailto:someone@example.com", false},
+		{"javascript:alert(1)", false},
+	}
+	for _, c := range cases {
+		if _, err := ValidateExternalURL(c.in); (err == nil) != c.ok {
+			t.Errorf("ValidateExternalURL(%q) err=%v, want ok=%v", c.in, err, c.ok)
+		}
+	}
+}

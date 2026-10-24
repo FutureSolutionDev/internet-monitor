@@ -38,6 +38,16 @@ func main() {
 	if err := w.Bind("nativeMinimizeToTray", func() { hideWindow(hwnd) }); err != nil {
 		a.Log.AppLog("webview bind failed: %v", err)
 	}
+	if err := w.Bind("nativeOpenURL", func(raw string) {
+		u, err := tray.ValidateExternalURL(raw)
+		if err != nil {
+			a.Log.AppLog("open external link rejected %q: %v", raw, err)
+			return
+		}
+		tray.OpenURL(u)
+	}); err != nil {
+		a.Log.AppLog("webview bind failed: %v", err)
+	}
 
 	tray.SetCustomIcon(assets.FaviconPNG())
 	setWindowIcon(hwnd)

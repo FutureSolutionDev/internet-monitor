@@ -22,3 +22,22 @@ func ValidateWebURL(raw string) (string, error) {
 	}
 	return u.String(), nil
 }
+
+var externalHosts = map[string]bool{
+	"github.com":  true,
+	"wa.me":       true,
+	"discord.gg":  true,
+	"discord.com": true,
+}
+
+func ValidateExternalURL(raw string) (string, error) {
+	valid, err := ValidateWebURL(raw)
+	if err != nil {
+		return "", err
+	}
+	u, _ := url.Parse(valid)
+	if !strings.EqualFold(u.Scheme, "https") || u.User != nil || !externalHosts[strings.ToLower(u.Hostname())] || u.Port() != "" {
+		return "", errUnsupportedURL
+	}
+	return valid, nil
+}

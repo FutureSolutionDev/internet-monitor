@@ -7,6 +7,9 @@ import "./styles/app.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app/App";
+import { installExternalLinks } from "./lib/externalLinks";
+
+installExternalLinks();
 
 const root = document.getElementById("root");
 if (root) {

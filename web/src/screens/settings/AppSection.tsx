@@ -6,7 +6,8 @@ import { Button, Card, CardHead, Segmented, Switch } from "../../components/ui";
 import { api } from "../../lib/api";
 import { type Lang, setLangOverride, useI18n } from "../../lib/i18n";
 import { useLive } from "../../lib/live";
-import { setTheme, type Theme, useTheme } from "../../lib/theme";
+import { type Theme, useTheme } from "../../lib/theme";
+import { changeThemeWithTransition } from "../../lib/themeTransition";
 import type { StartupState } from "../../lib/types";
 import type { SectionProps } from "./Sections";
 
@@ -118,7 +119,7 @@ export function AppSection({ draft, set, err }: SectionProps) {
           <Segmented<Theme>
             label={t("f_theme")}
             value={theme}
-            onChange={setTheme}
+            onChange={(next, e) => changeThemeWithTransition(next, e)}
             options={[
               { value: "dark", label: t("theme_dark") },
               { value: "light", label: t("theme_light") },

@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { LoaderCircle } from "lucide-react";
-import type { ButtonHTMLAttributes, CSSProperties, ReactNode, Ref } from "react";
+import type { ButtonHTMLAttributes, CSSProperties, MouseEvent, ReactNode, Ref } from "react";
 
 type Variant = "default" | "edge" | "aurora" | "solid" | "ghost" | "danger";
 
@@ -178,7 +178,7 @@ export function Segmented<T extends string>({
 }: {
   value: T;
   options: { value: T; label: string }[];
-  onChange: (v: T) => void;
+  onChange: (v: T, e: MouseEvent<HTMLButtonElement>) => void;
   label: string;
 }) {
   return (
@@ -188,7 +188,7 @@ export function Segmented<T extends string>({
           key={o.value}
           type="button"
           aria-pressed={o.value === value}
-          onClick={() => onChange(o.value)}
+          onClick={(e) => onChange(o.value, e)}
         >
           {o.label}
         </button>

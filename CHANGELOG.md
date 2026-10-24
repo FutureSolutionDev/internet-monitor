@@ -27,6 +27,11 @@ The v2 rebuild.
   a real alert".
 - **New default alert sound.**
 - Dark and light themes, Arabic/English with full RTL, layout for phone-size windows.
+  Switching themes reveals the new one in a circle from the button you clicked
+  (instant when the system asks for reduced motion).
+- In-app pages: **What's new** (every release since v0.0.1, filterable by type),
+  **FAQ**, **About**, **Contact** (WhatsApp, Discord, email, GitHub), **Privacy**
+  and **Terms of use**, linked from the sidebar.
 - Unsaved-changes guard in Settings.
 - CI `web` job (typecheck, lint, test, build); Go jobs reuse its `web-dist` artifact.
 
