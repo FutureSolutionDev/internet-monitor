@@ -3,18 +3,21 @@
 package main
 
 import (
-	"internet-monitor/monitor"
-	"internet-monitor/tray"
+	"internet-monitor/internal/i18n"
+	"internet-monitor/internal/monitor"
+	"internet-monitor/internal/notifytext"
+	"internet-monitor/internal/tray"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
 
 	webview "github.com/webview/webview_go"
 
-	"github.com/getlantern/systray"
+	"fyne.io/systray"
 )
 
 var (
@@ -42,10 +45,6 @@ func restoreWindow(hwnd uintptr) {
 	procSetForegroundWindow.Call(hwnd)
 }
 
-// setWindowIcon loads the favicon ICO from a temp file and applies it to
-// the WebView2 window via WM_SETICON (title bar, Alt+Tab, taskbar button).
-// This is needed because go-winres is not in the dev environment, so the
-// exe has no embedded icon resource.
 func setWindowIcon(hwnd uintptr) {
 	icoData := tray.GrayIcon()
 	if len(icoData) == 0 {
@@ -77,8 +76,6 @@ func setWindowIcon(hwnd uintptr) {
 	procSendMessageW.Call(hwnd, wmSetIcon, iconSmall, hIcon)
 }
 
-// setWindowIconFromExe loads the icon from the running exe's embedded resources.
-// Used after go-winres is run and a release build is produced.
 func setWindowIconFromExe(hwnd uintptr) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -103,8 +100,6 @@ func setWindowIconFromExe(hwnd uintptr) {
 	procSendMessageW.Call(hwnd, wmSetIcon, iconSmall, hIcon)
 }
 
-// initTray starts systray in a locked OS thread.
-// The returned stop func blocks until systray has fully exited — prevents zombie processes.
 func initTray(w webview.WebView, hwnd uintptr) func() {
 	quit := make(chan struct{})
 	done := make(chan struct{})
@@ -112,12 +107,20 @@ func initTray(w webview.WebView, hwnd uintptr) func() {
 	go func() {
 		runtime.LockOSThread()
 		systray.Run(func() {
+			lang := notifytext.Lang()
 			systray.SetIcon(tray.GrayIcon())
-			systray.SetTooltip("Internet Monitor — جاري الفحص...")
+			systray.SetTooltip(i18n.T(lang, "app_name", nil) + " — " + i18n.T(lang, "tray.status.checking", nil))
 
-			mOpen := systray.AddMenuItem("فتح النافذة / Open", "إظهار النافذة الرئيسية")
+			mOpen := systray.AddMenuItem(i18n.T(lang, "tray.open_window", nil), i18n.T(lang, "tray.open_window_hint", nil))
 			systray.AddSeparator()
-			mExit := systray.AddMenuItem("إغلاق / Exit", "إنهاية البرنامج")
+			mExit := systray.AddMenuItem(i18n.T(lang, "tray.exit", nil), i18n.T(lang, "tray.exit_hint", nil))
+			notifytext.OnLangChange(func(lang string) {
+				mOpen.SetTitle(i18n.T(lang, "tray.open_window", nil))
+				mOpen.SetTooltip(i18n.T(lang, "tray.open_window_hint", nil))
+				mExit.SetTitle(i18n.T(lang, "tray.exit", nil))
+				mExit.SetTooltip(i18n.T(lang, "tray.exit_hint", nil))
+				updateTrayStatus(monitor.Status(lastStatus.Load()))
+			})
 
 			go func() {
 				for {
@@ -126,9 +129,7 @@ func initTray(w webview.WebView, hwnd uintptr) func() {
 						restoreWindow(hwnd)
 					case <-mExit.ClickedCh:
 						systray.Quit()
-						// Dispatch Terminate to the main thread — PostQuitMessage(0)
-						// must run on the same thread as w.Run() or WM_QUIT goes
-						// to the wrong queue and the process becomes a zombie.
+
 						w.Dispatch(func() { w.Terminate() })
 					case <-quit:
 						systray.Quit()
@@ -153,16 +154,22 @@ func initTray(w webview.WebView, hwnd uintptr) func() {
 	}
 }
 
+var lastStatus atomic.Int32
+
+func init() { lastStatus.Store(-1) }
+
 func updateTrayStatus(status monitor.Status) {
+	lastStatus.Store(int32(status))
 	switch status {
 	case monitor.StatusConnected:
 		systray.SetIcon(tray.GreenIcon())
-		systray.SetTooltip("Internet Monitor — متصل ✅")
 	case monitor.StatusDegraded:
 		systray.SetIcon(tray.YellowIcon())
-		systray.SetTooltip("Internet Monitor — ضعيف ⚠️")
 	case monitor.StatusDisconnected:
 		systray.SetIcon(tray.RedIcon())
-		systray.SetTooltip("Internet Monitor — منقطع ❌")
+	default:
+		return
 	}
+	lang := notifytext.Lang()
+	systray.SetTooltip(i18n.T(lang, "app_name", nil) + " — " + notifytext.StatusLabel(lang, status))
 }

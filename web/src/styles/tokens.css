@@ -1,0 +1,155 @@
+:root {
+  color-scheme: dark;
+  --color-frame: #05070a;
+  --color-canvas: #0c1015;
+  --color-sidebar: #13171c;
+  --color-surface: #1a1e23;
+  --color-surface-top: #2a2e31;
+  --color-surface-inset: #161a1e;
+  --color-surface-raised: #22262b;
+  --color-bubble: #191d21;
+  --color-input: #05060f;
+  --color-track: #34383d;
+  --color-tile: #20242a;
+  --color-backdrop: rgba(5, 7, 10, 0.6);
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --text-primary: #f3f4f6;
+  --text-secondary: #b4b8bf;
+  --text-tertiary: #8a8f97;
+  --text-muted: #7b818a;
+  --text-on-light: #16161c;
+
+  --accent-violet: #8b7cf0;
+  --accent-amber: #f49514;
+  --accent-green: #6bbf72;
+  --accent-success: #14eb78;
+  --accent-blue: #68b3ec;
+  --accent-blue-strong: #2f6fdb;
+  --accent-blue-soft: #77a3e2;
+  --accent-coral: #ed7572;
+  --accent-danger: #d33a3a;
+
+  --gradient-aurora: linear-gradient(
+    var(--aurora-angle, 90deg),
+    #7ba9ec 0%,
+    #a9c0ea 20%,
+    #ece1e9 44%,
+    #fdd0d8 60%,
+    #fe9fc1 82%,
+    #f5a9ca 100%
+  );
+  --gradient-aurora-card: linear-gradient(
+    115deg,
+    #67a5f7 0%,
+    #c9e0f8 26%,
+    #ffffff 48%,
+    #fef8f5 70%,
+    #ffd6c8 100%
+  );
+  --gradient-aurora-orb: radial-gradient(
+    circle at 32% 28%,
+    #ffffff 0%,
+    #fbd9d4 32%,
+    #f4a39c 62%,
+    #a8c4f5 100%
+  );
+  --gradient-edge: linear-gradient(
+    var(--aurora-angle, 90deg),
+    rgba(242, 170, 125, 0.95) 0%,
+    rgba(255, 255, 255, 0.28) 22%,
+    rgba(255, 255, 255, 0.1) 55%,
+    rgba(110, 155, 225, 0.95) 100%
+  );
+  --gradient-card: linear-gradient(180deg, var(--color-surface-top) 0%, var(--color-surface) 60%);
+  --gradient-row: linear-gradient(180deg, #1c2025 0%, #14181c 100%);
+  --well-fill: radial-gradient(circle at 50% 30%, #2c3036, #1b1f24);
+
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-overlay: 0 24px 60px rgba(0, 0, 0, 0.45);
+
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-2xl: 28px;
+  --radius-pill: 999px;
+
+  --layout-sidebar: 232px;
+  --layout-topbar: 72px;
+  --layout-gap: 12px;
+
+  --font-sans: "Poppins", "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-arabic: "IBM Plex Sans Arabic", "Poppins", system-ui, sans-serif;
+
+  --text-2xs: 11px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 24px;
+  --text-stat: 34px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 140ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+}
+
+:root[dir="rtl"] {
+  --aurora-angle: 270deg;
+  --font-sans: "IBM Plex Sans Arabic", "Poppins", system-ui, sans-serif;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-frame: #dfe3ea;
+  --color-canvas: #f3f5f9;
+  --color-sidebar: #e9edf3;
+  --color-surface: #ffffff;
+  --color-surface-top: #ffffff;
+  --color-surface-inset: #f5f7fa;
+  --color-surface-raised: #eef1f6;
+  --color-bubble: #eef1f6;
+  --color-input: #ffffff;
+  --color-track: #dde2ea;
+  --color-tile: #eef1f6;
+  --color-backdrop: rgba(20, 24, 33, 0.35);
+
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --border-default: rgba(15, 23, 42, 0.12);
+  --border-strong: rgba(15, 23, 42, 0.2);
+
+  --text-primary: #12151b;
+  --text-secondary: #3f4652;
+  --text-tertiary: #5d6470;
+  --text-muted: #6b7280;
+
+  --accent-violet: #5747c9;
+  --accent-amber: #a85f00;
+  --accent-green: #2b7d36;
+  --accent-success: #1a9c55;
+  --accent-blue: #1f68b8;
+  --accent-blue-strong: #1d5fc8;
+  --accent-blue-soft: #2c6fc4;
+  --accent-coral: #c13f3b;
+  --accent-danger: #c62f2f;
+
+  --gradient-edge: linear-gradient(
+    var(--aurora-angle, 90deg),
+    rgba(226, 132, 78, 0.9) 0%,
+    rgba(15, 23, 42, 0.12) 22%,
+    rgba(15, 23, 42, 0.08) 55%,
+    rgba(52, 103, 196, 0.9) 100%
+  );
+  --gradient-card: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  --gradient-row: linear-gradient(180deg, #f7f9fc 0%, #f1f4f8 100%);
+  --well-fill: radial-gradient(circle at 50% 30%, #ffffff, #eef1f6);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --shadow-overlay: 0 24px 60px rgba(15, 23, 42, 0.18);
+}

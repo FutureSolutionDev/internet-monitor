@@ -1,0 +1,174 @@
+{
+  "cl_eyebrow": "Release history",
+  "cl_title": "Every update, in order",
+  "cl_intro": "Everything that changed in Internet Monitor, newest first.",
+  "cl_stat_releases": "Releases",
+  "cl_stat_new": "New features",
+  "cl_stat_improved": "Improvements",
+  "cl_stat_fixed": "Fixes and security",
+  "cl_filter": "Show changes",
+  "cl_all": "All",
+  "kind_new": "New",
+  "kind_improved": "Improved",
+  "kind_fixed": "Fixed",
+  "kind_security": "Security",
+  "cl_next": "Next release",
+  "cl_latest": "Latest",
+  "wn_eyebrow": "What's new",
+  "wn_title": "Version {v} is here",
+  "wn_all": "See all changes",
+  "wn_close": "Got it",
+  "cl_installed": "Your version",
+  "cl_versions": "v{from} – v{to}",
+  "changelog": {
+    "v2.0.0": {
+      "title": "Version 2: rebuilt from the ground up",
+      "items": {
+        "1": "A new dashboard with live status, a plain-language diagnosis, a latency chart, jitter, packet loss, and availability for today, 7 days and 30 days.",
+        "2": "A History screen with a log for each day, filters, and CSV export for one day, 7 days or 30 days.",
+        "3": "A monthly report page with “Print or save as PDF”, ready to send to your internet provider.",
+        "4": "A Speed test screen with a live gauge, today's runs, scheduled tests and an alert threshold.",
+        "5": "Dark and light themes with a circular reveal when you switch, plus full Arabic and English with a right-to-left layout.",
+        "6": "In-app pages: What's new, FAQ, Privacy and Terms of use.",
+        "7": "A new, gentler default alert sound.",
+        "8": "Settings shows whether your custom sound is active and how long it is, with “Try the sound” and “Play like a real alert”.",
+        "9": "Settings save safely even when two windows change them at once, and warn you before leaving with unsaved changes.",
+        "10": "The layout works in phone-size windows.",
+        "11": "Uploaded custom alert sounds silently fell back to the default. Uploads are now checked and converted, and the sound you upload is the one that plays.",
+        "12": "The auto-updater no longer picks the window (GUI) build for a tray install.",
+        "13": "The dashboard is reachable only from this computer and needs a private key that changes daily, so an open dashboard reconnects on its own after the app restarts. Open it from the tray menu or the app window.",
+        "14": "Your webhook URL and Telegram token are never sent back to the browser. Settings shows them as “Saved — hidden”.",
+        "15": "Webhook URLs must use https and point to Discord or Slack.",
+        "16": "Updates download only from GitHub, and the Go networking and crypto libraries were updated.",
+        "17": "Notification controls: turn the sound on or off and set its volume, set quiet hours, pick which events go to desktop, webhook or Telegram, skip short outages, and get reminders while the connection stays down.",
+        "18": "A notification bell and a Notifications page that list every alert, where it was sent, and what was held back and why.",
+        "19": "Windows alerts show the connection status icon and an Open button, and a new connection alert replaces the previous one instead of piling up.",
+        "20": "Webhook and Telegram messages are written in the app's language.",
+        "21": "Every chart shows exact values on hover, tap or keyboard focus.",
+        "22": "The monthly report prints in the same theme you see on screen.",
+        "23": "Every drop-down is a new picker with search, keyboard and touch support, and correct right-to-left placement.",
+        "24": "What's new is grouped by month, with a side map to jump between releases.",
+        "25": "After an update, a short window shows what changed in the new version.",
+        "26": "FAQ answers link straight to the setting they mention and highlight it for you.",
+        "27": "Error messages say what actually went wrong, and availability never rounds up to 100% when there was downtime.",
+        "28": "A new license, the Elastic License 2.0: the app is still free for personal and commercial use and its code is still public.",
+        "29": "The Arabic interface, alerts and Webhook/Telegram messages are now written in everyday Egyptian Arabic.",
+        "30": "The language button in the top bar is a single icon, which leaves more room on phones.",
+        "31": "A Support us page with PayPal, Vodafone Cash and InstaPay, for anyone who wants to help keep the app free.",
+        "32": "Response times read naturally: milliseconds under a second, then seconds, then minutes (1.06 s instead of 1,057 ms), in the app, alerts and Webhook/Telegram messages."
+      }
+    },
+    "v0.10.1": {
+      "title": "Documentation refresh",
+      "items": {
+        "1": "The README and screenshots now cover the latest features."
+      }
+    },
+    "v0.10.0": {
+      "title": "Check for updates on demand",
+      "items": {
+        "1": "A “Check for updates” button in the dashboard, so you don't have to wait for the background check.",
+        "2": "A new version is published only when every platform builds successfully.",
+        "3": "Release builds that stopped before starting, and build checks that failed on Linux."
+      }
+    },
+    "v0.9.4": {
+      "title": "Outage reports you can send to your provider",
+      "items": {
+        "1": "A monthly outage report (PDF) with a month picker, charts, a log of events in order, and the cause of each outage. It's neutral by default, with an optional branding footer.",
+        "2": "Upload speed test with live progress, next to download and ping, on a circular gauge.",
+        "3": "Scheduled automatic speed tests.",
+        "4": "Telegram notifications, and system notifications in your chosen language.",
+        "5": "Tells DNS, website and full outages apart, says whether the problem is your local network or your provider, and adds optional ICMP ping, jitter and a Prometheus /metrics endpoint.",
+        "6": "Availability widget, copy summary, and CSV export for a date range.",
+        "7": "Settings changes apply right away, without a restart.",
+        "8": "One sound player for every alert. The previous sound always stops first, so chimes never overlap, and uploaded MP3s are converted so system notifications can play them.",
+        "9": "Outages that cross into a new month are counted correctly in both months.",
+        "10": "More accurate latency, captive-portal (login page) detection, uptime, and fewer false alarms at startup. Speed tests no longer race.",
+        "11": "Downloaded updates are checked against the release's SHA256SUMS before they're installed.",
+        "12": "The local dashboard API is protected against cross-site requests and oversized requests."
+      }
+    },
+    "v0.8.1": {
+      "title": "Native Windows notifications",
+      "items": {
+        "1": "Notifications use the native Windows balloon instead of PowerShell, and the app makes sure Windows lets it show them.",
+        "2": "The window and tray icons change with the connection status."
+      }
+    },
+    "v0.7.0": {
+      "title": "Your own alert sound",
+      "items": {
+        "1": "Upload a custom notification sound."
+      }
+    },
+    "v0.6.0": {
+      "title": "A new logo",
+      "items": {
+        "1": "A new app logo: a globe with a pulse line.",
+        "2": "Notifications that fired on top of each other, sounds that replayed without stopping, and empty notification text."
+      }
+    },
+    "v0.5.0": {
+      "title": "Speed test",
+      "items": {
+        "1": "A Speed test tab with your own download targets and timeout.",
+        "2": "A table of the last 20 checks.",
+        "3": "Settings split into four tabs: monitoring, targets, notifications and speed test.",
+        "4": "A rewritten monitoring engine, and a full README in English and Arabic.",
+        "5": "The speed test progress bar follows the timeout you set."
+      }
+    },
+    "v0.4.3": {
+      "title": "Live update notices",
+      "items": {
+        "1": "The dashboard shows when a new version is available, live.",
+        "2": "The close button on the update banner.",
+        "3": "Updated the Go crypto library."
+      }
+    },
+    "v0.3.2": {
+      "title": "Start with Windows",
+      "items": {
+        "1": "An option to start the app with Windows.",
+        "2": "Versions are numbered automatically, so the updater always finds the newest one.",
+        "3": "The app could freeze when you quit it from the tray on Windows."
+      }
+    },
+    "v0.2.0": {
+      "title": "Automatic updates",
+      "items": {
+        "1": "Automatic updates.",
+        "2": "Several website and DNS targets instead of one.",
+        "3": "A button to test your webhook, and only one copy of the app runs at a time.",
+        "4": "Errors and outage reasons are shown in Arabic or English."
+      }
+    },
+    "v0.1.0": {
+      "title": "Tray icon and alerts",
+      "items": {
+        "1": "A tray icon that changes color with the connection status.",
+        "2": "Sound alerts and desktop notifications."
+      }
+    },
+    "v0.0.1": {
+      "title": "First release",
+      "items": {
+        "1": "A web dashboard with live status, settings and a log viewer.",
+        "2": "Discord and Slack webhook alerts, and a default config created on first run.",
+        "3": "Two builds: one that lives in the tray and one with its own window."
+      }
+    }
+  },
+  "cl_search": "Search changes",
+  "cl_search_placeholder": "Search, for example “Telegram” or “0.9”",
+  "cl_results": "{changes} changes in {releases} releases",
+  "cl_no_results": "Nothing matches your search.",
+  "cl_clear": "Clear search and filters",
+  "cl_in_progress": "In development",
+  "cl_map": "Versions",
+  "cl_jump": "Jump to a version",
+  "cl_change_count": "{n} changes",
+  "cl_expand_all": "Expand all",
+  "cl_collapse_all": "Collapse all"
+}

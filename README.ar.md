@@ -1,17 +1,17 @@
 # 🌐 مراقب الإنترنت
 
-![Logo](dashboard/assets/favicon.png)
+![Logo](internal/assets/favicon.png)
 
 [![Build & Release](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml/badge.svg)](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev)
+[![License: Elastic 2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go)](https://go.dev)
 ![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 
 > [🇺🇸 Read in English](README.md)
 
 # وثّق انقطاعات الإنترنت، واكسب نزاعك مع مزوّد الخدمة.
 
-**مراقب الإنترنت** أداة مجانية مفتوحة المصدر تلتقط **دليلاً** على كل انقطاع — عشان تبطّل تتكلّم من الذاكرة وتبدأ ترفق أدلة بتذكرة الدعم.
+**مراقب الإنترنت** أداة مجانية والكود بتاعها متاح للكل، بتلتقط **دليلاً** على كل انقطاع — عشان تبطّل تتكلّم من الذاكرة وتبدأ ترفق أدلة بتذكرة الدعم.
 
 تُسجّل كل انقطاع **بتفصيل لكل طبقة (TCP / HTTP / DNS)** — فتقدر تثبت أشياء مثل *"الـ DNS فشل بينما الخط كان شغّالاً"* — بطوابع زمنية ومدد دقيقة، وتُصدّر **تقريراً شهرياً (PDF)** أو **CSV** نظيفاً تسلّمه لمزوّدك. محلي 100%: بلا حساب، بلا سحابة، بلا تتبّع.
 
@@ -23,13 +23,11 @@
 
 ![لوحة التحكم — إنجليزي](docs/screenshot-dashboard.png)
 
-![قياس السرعة — جاري التشغيل](docs/screenshot-speed-running.png)
-
 ![نتيجة قياس السرعة](docs/screenshot-speed-result.png)
 
-![السجلات](docs/screenshot-logs.png)
+![السجل](docs/screenshot-logs.png)
 
-![الإعدادات — العناوين](docs/screenshot-settings-targets.png)
+![الإعدادات](docs/screenshot-settings.png)
 
 ## 💡 لماذا مراقب الإنترنت؟
 
@@ -44,7 +42,7 @@
 
 1. **شغّله** في الخلفية (شريط المهام أو نافذة مستقلة) — بيفحص كل بضع ثوانٍ، 24/7.
 2. **سيبه يلتقط الانقطاعات** — كل انقطاع بيتسجّل بسببه (TCP/HTTP/DNS) ووقت بدايته ومدته.
-3. **ولّد التقرير الشهري** — افتح لوحة التحكم ← **السجلات ← تقرير شهري (PDF)**، اختر الشهر، ثم **اطبع / احفظ PDF**.
+3. **ولّد التقرير الشهري** — افتح لوحة التحكم ← **السجل**، وافتح التقرير الشهري (`/report?month=YYYY-MM`)، اختر الشهر، ثم اضغط **طباعة أو حفظ كـ PDF**.
 4. **أرفقه بالتذكرة/الشكوى.** التقرير **محايد افتراضيًا** (يُقرأ كمستندك أنت)؛ ومفتاح "قابل للمشاركة" اختياري يضيف سطرًا صغيرًا لو حبيت.
 
 > نصيحة: فعّل **اختبارات السرعة المجدوَلة** و**تشخيص ICMP (محلي مقابل المزوّد)** لتقوية موقفك بتاريخ latency وjitter والسرعة.
@@ -64,16 +62,20 @@
 | الميزة | التفاصيل |
 | ------ | --------- |
 | 🔍 **فحص متعدد الطبقات** | TCP Ping + HTTP + DNS في آنٍ واحد — جميع العناوين قابلة للتخصيص كمصفوفات |
-| 📊 **لوحة تحكم حية** | مخطط زمن الاستجابة + الإحصاءات + سجل الأحداث + جدول آخر الفحوصات |
-| ⚡ **قياس السرعة** | قياس تنزيل **ورفع** عبر Cloudflare بعدّاد دائري على طراز speedtest.net، مع تخصيص الاتصالات المتوازية والمدة و**قياسات تلقائية مجدولة** اختيارية |
-| 🔔 **إشعارات فورية** | Windows Toast + Discord / Slack / **Telegram** + صوت تنبيه مخصص، بلغة المستخدم المختارة |
+| 📊 **نظرة عامة حية** | حالة الاتصال، وتشخيص بلغة بسيطة (مثل "الراوتر سليم والانقطاع عند المزوّد")، ومخطط زمن الاستجابة، وjitter، وفقدان الحزم، ونسبة التوفّر اليوم / 7 أيام / 30 يوماً، وحالة كل عنوان |
+| 🕘 **السجل** | سجل أحداث لكل يوم مع فلاتر وتصدير CSV (اليوم المحدد، آخر 7 أيام، آخر 30 يوماً) |
+| ⚡ **قياس السرعة** | قياس تنزيل **ورفع** عبر Cloudflare بعدّاد دائري، ونتائج ping وتنزيل ورفع، وقياسات اليوم، مع تخصيص الاتصالات المتوازية والمدة و**قياسات تلقائية مجدولة** وحد تنبيه عند انخفاض السرعة |
+| 🔔 **إشعارات فورية** | Windows Toast + Discord / Slack / **Telegram**، بلغة المستخدم المختارة |
+| 🎵 **صوت تنبيه مخصص** | ارفع ملف MP3 أو WAV (حتى 30 ثانية و10 ميجابايت). تعرض الإعدادات هل الصوت المخصص مفعّل ومدته، ويمكنك تجربته بزر **جرّب الصوت** أو **شغّله كتنبيه حقيقي**. وفي التطبيق صوت افتراضي جديد |
 | 📋 **سجلات منظّمة** | ملفات JSONL يومية — أحداث الاتصال في `connectivity_DATE.jsonl`، قياسات السرعة في `speedtest_DATE.jsonl` |
-| 📤 **تصدير CSV** | تصدير سجلات الاتصال وتاريخ قياسات السرعة من لوحة التحكم مباشرةً |
+| 📄 **التقرير الشهري** | صفحة `/report?month=YYYY-MM` مع زر **طباعة أو حفظ كـ PDF** |
 | 🔄 **تحديث تلقائي** | يفحص GitHub Releases (خلفياً + زر **"فحص التحديثات"** يدوي) ويُحدّث بنقرة واحدة مع إعادة تشغيل تلقائية |
 | 🌐 **واجهة ثنائية اللغة** | العربية والإنجليزية مع دعم كامل RTL، قابلة للتبديل في أي وقت |
+| 🎨 **سمات وشاشات صغيرة** | سمة داكنة وفاتحة، والتصميم يتكيّف مع نوافذ بحجم الهاتف |
 | 🖥️ **وضعان للتشغيل** | System Tray (خلفية) + نافذة مستقلة نيتيف |
 | 🔒 **نسخة واحدة فقط** | يمنع تشغيل أكثر من نسخة في آنٍ واحد |
-| ⚙️ **إعدادات منظّمة** | تبويبات داخلية: المراقبة / العناوين / الإشعارات / قياس السرعة |
+| ⚙️ **إعدادات آمنة** | تنبيه عند وجود تغييرات غير محفوظة، وحفظ يتجنّب التعارض (حفظ قديم لا يستبدل إعدادات أحدث) |
+| 🛡️ **لوحة محلية فقط** | تستمع على `127.0.0.1` فقط، ومحمية برمز جلسة مختلف في كل تشغيل. رابط الـ webhook ورمز Telegram لا يُرسَلان للمتصفح أبداً |
 
 ---
 
@@ -110,36 +112,35 @@ chmod +x internet-monitor-*
 ./internet-monitor-macos-arm64
 ```
 
-افتح لوحة التحكم على **<http://localhost:8765>**
+افتح لوحة التحكم من **قائمة الـ Tray** (أو من نافذة التطبيق في نسخة GUI).
+
+> لا تقبل لوحة التحكم إلا الطلبات التي تحمل رمز جلسة خاصاً بكل تشغيل. فتح <http://127.0.0.1:8765> مباشرةً في المتصفح يعرض رسالة "افتح من التطبيق" — وهذا سلوك متوقع.
 
 ---
 
-## 🧑‍💻 وضع التطوير (Live Reload)
+## 🧑‍💻 وضع التطوير
 
-### الخيار الأول — `go run` (الأبسط)
+تحتاج [Go](https://go.dev/dl/) و[bun](https://bun.sh) (انظر [البناء من المصدر](#️-البناء-من-المصدر)). ابنِ واجهة الويب مرة واحدة ليجد Go ملفات للتضمين:
 
 ```bash
 git clone https://github.com/FutureSolutionDev/internet-monitor.git
 cd internet-monitor
-go mod tidy
-go run .
+cd web && bun install --frozen-lockfile && bun run build && cd ..
+go run ./cmd/tray
 ```
 
-### الخيار الثاني — [Air](https://github.com/air-verse/air) (إعادة بناء تلقائية عند تغيير الملفات)
+### العمل على الواجهة مباشرةً (خادم Vite)
+
+والخلفية تعمل، شغّل خادم Vite في نافذة طرفية ثانية. يمرّر `/api` و`/events` و`/notification-sound` إلى `http://127.0.0.1:8765` (غيّره بالمتغير `IM_BACKEND`) ويضيف رمز الجلسة تلقائياً. الرمز هو قيمة `token` في ملف `.session` بجوار الملف التنفيذي الجاري.
 
 ```bash
-# تثبيت air
-go install github.com/air-verse/air@latest
-
-# التشغيل مع Live Reload
-air
+cd web
+IM_SESSION=<token> bun run dev
 ```
 
-يراقب Air ملفات `.go` و`.html` و`.js` و`.css` ويُعيد البناء تلقائياً.
+في Windows PowerShell: `$env:IM_SESSION="<token>"; bun run dev`.
 
-افتح لوحة التحكم على **<http://localhost:8765>** — عدّل أي ملف وسيُعاد تشغيل البرنامج.
-
-> نسخة النافذة النيتيف (GUI) تحتاج GCC — انظر [البناء من المصدر](#️-البناء-من-المصدر) أدناه.
+> نسخة النافذة النيتيف (GUI) تحتاج CGO — انظر [البناء من المصدر](#️-البناء-من-المصدر) أدناه.
 
 ---
 
@@ -149,33 +150,55 @@ air
 
 | الأداة | الإصدار | ملاحظة |
 | ------ | ------- | ------- |
-| [Go](https://go.dev/dl/) | 1.21+ | مطلوب |
-| GCC (يُنصح بـ TDM-GCC) | أي إصدار | اختياري — لنسخة النافذة النيتيف فقط |
+| [Go](https://go.dev/dl/) | حسب `go.mod` (حالياً 1.27.3) | مطلوب |
+| [bun](https://bun.sh) | 1.3.14 (الإصدار الذي يستخدمه CI) | مطلوب — لبناء لوحة React |
+| GCC (يُنصح بـ TDM-GCC) | أي إصدار | اختياري — لنسخة النافذة النيتيف فقط (CGO) |
 
-### نسخة الـ Tray — لا تحتاج CGO
+لوحة التحكم في `web/` تُضمَّن داخل ملفات Go التنفيذية (`web/embed.go`)، لذلك **ابنِها أولاً**. بدون `web/dist` يفشل `go build`.
+
+### واجهة الويب
+
+```bash
+cd web
+bun install --frozen-lockfile
+bun run build
+cd ..
+```
+
+فحوص أخرى يستخدمها CI: `bun run typecheck` و`bun run lint` و`bun run test`.
+
+### نسخة الـ Tray — لا تحتاج CGO على Windows
 
 ```bash
 git clone https://github.com/FutureSolutionDev/internet-monitor.git
 cd internet-monitor
-go mod tidy
-CGO_ENABLED=0 go build -ldflags="-H=windowsgui -s -w" -o internet-monitor.exe .
+cd web && bun install --frozen-lockfile && bun run build && cd ..
+go build -ldflags="-H=windowsgui -s -w" -o internet-monitor.exe ./cmd/tray
 ```
 
-### نسخة النافذة النيتيف — تحتاج GCC
+### نسخة النافذة النيتيف — تحتاج CGO
 
-**Windows** — يُثبّت TDM-GCC تلقائياً إذا لم يكن موجوداً:
+تستخدم WebView2 على Windows وWebKitGTK/WebKit على Linux/macOS.
+
+**Windows** — يبني واجهة الويب ثم يُثبّت TDM-GCC تلقائياً إذا لم يكن موجوداً:
 
 ```bat
 scripts\build-gui.cmd
 ```
 
-**macOS / Linux** — GCC مثبّت مسبقاً:
+**macOS / Linux** — GCC مثبّت مسبقاً (وعلى Linux تحتاج أيضاً `libgtk-3-dev` و`libwebkit2gtk-4.0-dev`):
 
 ```bash
 go build -ldflags="-s -w" -o internet-monitor-gui ./cmd/gui/
 ```
 
+### Makefile
+
+الأوامر `make build` و`make build-debug` و`make build-gui` تعتمد على `make web`، الذي ينفّذ `bun install --frozen-lockfile && bun run build` داخل `web/`.
+
 ### السكريبتات المتاحة
+
+سكريبتات `build*.cmd` تستدعي `scripts\build-web.cmd` أولاً.
 
 ```text
 scripts\build.cmd        بناء الـ Tray exe
@@ -191,14 +214,20 @@ scripts\logs.cmd         فتح مجلد السجلات
 
 ### CI/CD — GitHub Actions
 
-كل push على `master` يُطلق بناءً تلقائياً لجميع المنصات:
+كل push على `master` (وكل pull request) يُشغّل المسار التالي:
 
 ```text
+Web UI        →  typecheck وlint وtest وbuild (bun 1.3.14)؛ ويرفع web/dist كـ artifact
+Quality       →  gofmt وgo vet وgo test وgolangci-lint (يعتمد على Web UI)
 Windows Tray  →  cross-compiled على Linux (CGO معطّل)
 Windows GUI   →  windows-latest runner
-macOS         →  macos-latest (arm64 نيتيف + intel cross-compile)
-Linux         →  ubuntu-22.04 (WebKitGTK 4.0)
+macOS         →  macos-latest (arm64 نيتيف + intel cross-compile؛ Tray وGUI)
+Linux         →  ubuntu-22.04 (WebKitGTK 4.0؛ Tray وGUI)
 ```
+
+تنزّل مهام بناء Go الـ artifact المسمّى `web-dist` بدل إعادة بناء الواجهة.
+
+عند push على `master` يُنشأ tag وإصدار GitHub **فقط إذا نجحت كل عمليات البناء**. تتحقق مهمة الإصدار من وجود الملفات التنفيذية الثمانية، وتنشر معها ملف `SHA256SUMS`.
 
 ---
 
@@ -218,7 +247,11 @@ Linux         →  ubuntu-22.04 (WebKitGTK 4.0)
   "latency_threshold_ms": 500,
   "log_dir": "logs",
   "webhook_url": "",
+  "telegram_bot_token": "",
+  "telegram_chat_id": "",
   "dashboard_port": 8765,
+  "use_icmp": false,
+  "language": "en",
   "speed_test": {
     "download_targets": ["https://speed.cloudflare.com/__down"],
     "parallel_connections": 4,
@@ -235,10 +268,16 @@ Linux         →  ubuntu-22.04 (WebKitGTK 4.0)
 | `ping_targets` | عناوين TCP — يُجرَّب الكل بالتوازي، يكفي نجاح واحد |
 | `http_targets` | روابط HTTP — يُجرَّب الأول ثم الثاني عند الفشل |
 | `dns_targets` | نطاقات DNS — يُجرَّب الأول ثم الثاني عند الفشل |
+| `check_interval_sec` | الثواني بين كل فحص وآخر (1–3600، افتراضي 5) |
 | `fail_threshold` | عدد الفشل المتتالي قبل إعلان الانقطاع |
-| `webhook_url` | رابط Discord أو Slack (اتركه فارغاً لتعطيله) |
-| `speed_test.parallel_connections` | اتصالات متوازية في اختبار التنزيل (1–8، افتراضي 4) |
-| `speed_test.timeout_seconds` | مدة اختبار التنزيل بالثواني (افتراضي 30) |
+| `log_dir` | مجلد السجلات، نسبةً إلى مجلد التطبيق. تُرفض المسارات المطلقة و`..` |
+| `webhook_url` | رابط Discord أو Slack (اتركه فارغاً لتعطيله). يُقبل فقط رابط `https` على نطاقات Discord (`discord.com`, `discordapp.com`) أو Slack (`hooks.slack.com`) |
+| `telegram_bot_token`, `telegram_chat_id` | تنبيهات Telegram. تعرض اللوحة الرمز المحفوظ كـ "محفوظ — مخفي" ولا يعود إليها أبداً |
+| `dashboard_port` | منفذ اللوحة المحلية (1–65535، افتراضي 8765) |
+| `use_icmp` | فحص الراوتر أيضاً بـ ICMP لتشخيص الشبكة المحلية مقابل المزوّد |
+| `language` | `en` أو `ar` |
+| `speed_test.parallel_connections` | اتصالات متوازية في اختبار التنزيل (1–16، افتراضي 4) |
+| `speed_test.timeout_seconds` | مدة اختبار التنزيل بالثواني (5–120، افتراضي 30) |
 | `speed_test.upload_target` | نقطة POST لاختبار الرفع (افتراضي Cloudflare `__up`؛ فارغ = تعطيل الرفع) |
 | `speed_test.schedule_minutes` | تشغيل قياس سرعة تلقائي كل N دقيقة (0 = معطّل) |
 | `speed_test.alert_threshold_mbps` | أرسل Webhook إذا انخفضت السرعة عن هذا الحد (0 = معطّل) |
@@ -304,7 +343,7 @@ Linux         →  ubuntu-22.04 (WebKitGTK 4.0)
 - يستخدم **endpoint Cloudflare** (`speed.cloudflare.com`) افتراضياً — لا يحتاج حساباً
 - **قياسات تلقائية مجدولة** اختيارية (`speed_test.schedule_minutes`) تبني تاريخ throughput دون تدخّل
 - تُحفظ النتائج في `logs/speedtest_DATE.jsonl` (منفصلة عن سجلات الاتصال)
-- التاريخ قابل للعرض والتصدير كـ CSV مباشرةً من لوحة التحكم
+- تُعرض قياسات اليوم في شاشة قياس السرعة، ويمكن تصدير سجل الاتصال كـ CSV من شاشة السجل
 
 > **الخصوصية:** لا تحتوي payloads الاختبار على أي معرّفات للجهاز. تذهب حركة البيانات فقط إلى العنوان الذي تُحدّده في الإعدادات.
 
@@ -314,31 +353,34 @@ Linux         →  ubuntu-22.04 (WebKitGTK 4.0)
 
 ```text
 internet-monitor/
-├── main.go                   نقطة الدخول — نسخة الـ Tray
-├── singleton_*.go            حارس النسخة الواحدة (لكل نظام تشغيل)
-├── cmd/gui/                  نسخة النافذة النيتيف
-│   ├── main.go
-│   ├── gui_notifier.go       تنفيذ Notifier خاص بالـ GUI
-│   ├── tray_windows.go       Systray في الخلفية لنسخة GUI
-│   └── notify_*.go           إشعارات OS (Windows / Unix)
-├── core/                     محرك المراقبة المشترك
-│   ├── engine.go             Engine + Notifier interface + MultiNotifier
-│   └── doc.go
-├── types/                    الأنواع المشتركة (CheckResult, Status, Event)
-├── speedtest/                محرك قياس سرعة التنزيل التكيّفي
-├── config/                   Config struct والتحميل والترحيل
-├── monitor/                  محرك الفحص — TCP / HTTP / DNS
-├── dashboard/                خادم HTTP، SSE، REST APIs، assets مدمجة
-│   ├── server.go
-│   ├── notifier.go           DashNotifier (تنفيذ core.Notifier)
-│   └── assets/               HTML / CSS / JS مدمجة (Chart.js محلي)
-├── logger/                   تسجيل JSONL + تنسيق Discord/Slack webhook
-├── tray/                     أيقونة الـ Tray، القائمة، إشعارات OS
-│   └── notifier.go           TrayNotifier (تنفيذ core.Notifier)
-├── updater/                  GitHub Releases API + minio/selfupdate
-├── startup/                  تسجيل بدء التشغيل مع OS
-├── .github/workflows/        build.yml — CI/CD لجميع المنصات
-└── scripts/                  سكريبتات البناء والتثبيت والتشغيل (Windows)
+├── cmd/
+│   ├── tray/                 نقطة الدخول — نسخة الـ Tray
+│   └── gui/                  نقطة الدخول — نسخة النافذة النيتيف (CGO + WebView2/WebKit)
+├── internal/
+│   ├── app/                  التهيئة المشتركة وحارس النسخة الواحدة
+│   ├── assets/               الأيقونة المدمجة
+│   ├── audio/                التحقق من صوت التنبيه المخصص وتحويله
+│   ├── config/               Config والقيم الافتراضية والتخزين وقائمة نطاقات الـ webhook المسموحة
+│   ├── core/                 محرك المراقبة + Notifier interface
+│   ├── jsonl/                قراءة/كتابة ملفات JSONL اليومية
+│   ├── logger/               التسجيل + تنسيق Discord/Slack webhook
+│   ├── monitor/              محرك الفحص — TCP / HTTP / DNS / ICMP
+│   ├── notifytext/           نصوص الإشعارات المترجمة
+│   ├── report/               بيانات التقرير الشهري
+│   ├── server/               واجهة HTTP المحلية، بث SSE، رمز الجلسة، الواجهة الثابتة
+│   ├── sound/                تشغيل صوت التنبيه
+│   ├── speedtest/            محرك قياس سرعة التنزيل والرفع
+│   ├── startup/              تسجيل بدء التشغيل مع OS
+│   ├── tray/                 أيقونة الـ Tray، القائمة، إشعارات OS
+│   ├── types/                الأنواع المشتركة
+│   └── updater/              محدّث GitHub Releases
+├── web/                      لوحة React 19 + Vite + TypeScript
+│   ├── src/                  التطبيق والشاشات (Overview, History, Speed, Report, Settings) والترجمة
+│   ├── dist/                 ناتج البناء (يُولَّد)
+│   └── embed.go              يضمّن dist/ داخل الملفات التنفيذية
+├── scripts/                  سكريبتات البناء والتثبيت والتشغيل (Windows)
+├── docs/                     لقطات الشاشة
+└── .github/workflows/        build.yml — CI/CD لجميع المنصات
 ```
 
 ---
@@ -396,7 +438,7 @@ logs/
 ```bash
 git clone https://github.com/YOUR_USERNAME/internet-monitor.git
 cd internet-monitor
-go mod tidy
+cd web && bun install --frozen-lockfile && cd ..
 ```
 
 ### 2. إنشاء فرع
@@ -420,15 +462,38 @@ git checkout -b feature/اسم-الميزة
 
 - اشرح الدافع بوضوح
 - أرفق صورة لأي تغيير مرئي
-- تأكد من نجاح `go build ./...`
+- تأكد من نجاح `go build ./...` و`go test ./...` (ابنِ `web/` أولاً)
+- عند تغيير ملفات في `web/` تأكد من نجاح `bun run typecheck` و`bun run lint` و`bun run test`
 
 ### مجالات تحتاج مساعدة
 
 - دعم بناء Windows ARM64
-- تحسين استجابة لوحة التحكم للموبايل
 - تكامل macOS native menu bar
 - مخططات زمن الاستجابة لكل عنوان على حدة
 - دعم لغات إضافية
+
+### إضافة لغة جديدة
+
+كل لغة ليها فولدر جوه `web/locales/`، وفيه ملف JSON لكل صفحة (`settings.json`
+و`faq.json` و`changelog.json`، و`server.json` لتنبيهات سطح المكتب ورسايل الـ Webhook
+وTelegram، وهكذا). المفاتيح متداخلة: `{"faq": {"free": {"a": "…"}}}` معناها المفتاح
+`faq.free.a`. لوحة التحكم والتقرير الشهري والتطبيق نفسه بيقروا من نفس الملفات، وأي
+مفتاح متكرر بيترفض.
+
+1. انسخ `web/locales/en/` إلى `web/locales/<code>/`، مثلاً `fr/`.
+2. عدّل `meta.json`:
+   - `name`: اسم اللغة بلغتها، مثل `Français`.
+   - `dir`: ‏`ltr` أو `rtl`.
+   - `intl`: صيغة التواريخ والأرقام، مثل `fr-FR`.
+3. ترجم كل القيم في باقي الملفات، وسيب كل `{placeholder}` وكل لينك داخلي زي
+   `(settings#alerts)` زي ما هو في الإنجليزي.
+4. شغّل `bun run test` جوه `web/`. الاختبار بيفشل لو فيه ملف أو مفتاح ناقص، أو مفتاح
+   مش موجود في الإنجليزي، أو placeholder مختلف.
+
+لو ضفت ملف صفحة جديد، ضيف سطر واحد بس: استورد النسخة الإنجليزي بتاعته في
+`web/src/lib/i18n.ts` (`MESSAGE_FILES`) عشان مفاتيحه تتفحص بالـ types.
+
+لا يحتاج الأمر أي تعديل في الكود: اللغة الجديدة تظهر تلقائياً في قائمة اللغات والإعدادات.
 
 ---
 
@@ -441,7 +506,7 @@ git checkout -b feature/اسم-الميزة
 | ⏰ جدولة قياسات السرعة تلقائياً | ✅ تم |
 | 📄 تصدير تقرير PDF (للشكاوى لمزوّد الخدمة) | ✅ تم |
 | 🔄 زر "فحص التحديثات" اليدوي | ✅ تم |
-| 📱 لوحة تحكم متجاوبة للموبايل | 🔜 مخطط |
+| ⚛️ لوحة React (سمات داكنة/فاتحة وتخطيط بحجم الهاتف) | ✅ تم |
 | 🪟 بناء Windows ARM64 | 🔜 مخطط |
 | 📈 تحليلات لكل مزوّد خدمة وتقارير أسبوعية | 💡 مقترح |
 | 🔌 Plugin API لأنواع فحص مخصصة | 💡 مقترح |
@@ -450,6 +515,8 @@ git checkout -b feature/اسم-الميزة
 
 ## 📄 الرخصة
 
-MIT — مجاني للاستخدام الشخصي والتجاري.
+[Elastic License 2.0](LICENSE) — مجاني للاستخدام الشخصي والتجاري، والكود متاح للكل.
+مينفعش تقدّمه لحد تاني كخدمة مستضافة أو مُدارة، ولازم تسيب الرخصة وحقوق النشر زي ما هي.
+النسخ اللي قبل 2.0.0 نزلت برخصة MIT.
 
 صُنع بـ ❤️ بواسطة [FutureSolutionDev](https://github.com/FutureSolutionDev)

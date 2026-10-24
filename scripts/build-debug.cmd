@@ -2,7 +2,8 @@
 cd /d "%~dp0.."
 
 echo [Internet Monitor] Building DEBUG (console visible)...
-go build -o internet-monitor-debug.exe .
+call scripts\build-web.cmd || (pause & exit /b 1)
+go build -o internet-monitor-debug.exe ./cmd/tray
 if %errorlevel% neq 0 (
     echo [ERROR] Build failed!
     pause

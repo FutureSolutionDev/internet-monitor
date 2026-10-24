@@ -1,15 +1,18 @@
-.PHONY: build build-gui build-debug run stop install uninstall logs clean
+.PHONY: web build build-gui build-debug run stop install uninstall logs clean
 
 BINARY       = internet-monitor.exe
 GUI_BINARY   = internet-monitor-gui.exe
 DEBUG_BINARY = internet-monitor-debug.exe
 
-build:
-	go build -ldflags="-H=windowsgui -s -w" -o $(BINARY) .
+web:
+	cd web && bun install --frozen-lockfile && bun run build
+
+build: web
+	go build -ldflags="-H=windowsgui -s -w" -o $(BINARY) ./cmd/tray
 	@echo Built: $(BINARY)
 
-build-debug:
-	go build -o $(DEBUG_BINARY) .
+build-debug: web
+	go build -o $(DEBUG_BINARY) ./cmd/tray
 	@echo Built: $(DEBUG_BINARY)
 
 run: build
@@ -30,7 +33,7 @@ uninstall:
 logs:
 	@scripts\logs.cmd
 
-build-gui:
+build-gui: web
 	set CGO_ENABLED=1 && go build -ldflags="-H=windowsgui -s -w" -o $(GUI_BINARY) ./cmd/gui/
 	@echo Built: $(GUI_BINARY)
 

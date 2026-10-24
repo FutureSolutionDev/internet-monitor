@@ -1,0 +1,120 @@
+{
+  "faq_eyebrow": "Help",
+  "faq_title": "Questions, answered",
+  "faq_intro": "Short answers about how Internet Monitor works, what it keeps, and how to fix common problems.",
+  "faq_q": "Q{n}",
+  "faq_more": "Didn't find your answer? Contact us",
+  "faq": {
+    "section": {
+      "start": "Getting started",
+      "monitoring": "Monitoring and outages",
+      "alerts": "Alerts and sound",
+      "reports": "Reports and speed tests",
+      "privacy": "Privacy and updates"
+    },
+    "what": {
+      "q": "What does Internet Monitor do?",
+      "a": "It checks your connection every few seconds in three ways: it connects to DNS servers, loads a small web page, and looks up website names. Every outage is saved with its exact start time, how long it lasted, and which part failed. You can then turn that into a report for your internet provider."
+    },
+    "open": {
+      "q": "How do I open the dashboard?",
+      "a": "Click the tray icon and choose “Open dashboard”, or use the app window if you installed the window version. Typing the address into the browser yourself shows a locked page, because the dashboard needs a key that changes every time the app starts."
+    },
+    "platforms": {
+      "q": "Does it work on macOS and Linux?",
+      "a": "Yes. There are builds for Windows, macOS and Linux. The “Start with Windows” option only exists on Windows."
+    },
+    "free": {
+      "q": "Is it free?",
+      "a": "Yes. It's free for personal and commercial use, and the source code is public under the Elastic License 2.0. There's no account and nothing to sign up for."
+    },
+    "disconnected": {
+      "q": "When does it say I'm disconnected?",
+      "a": "When checks fail 3 times in a row. With the default 5-second interval, that's about 15 seconds. This keeps a single lost check from counting as an outage. You can change both numbers in [Settings → Monitoring](settings#monitoring)."
+    },
+    "unstable": {
+      "q": "What does “Unstable” mean?",
+      "a": "You're online, but the connection is poor: more than 20% of packets are lost, or responses take longer than 500 ms. Both limits can be changed in [Settings → Monitoring](settings#monitoring)."
+    },
+    "layers": {
+      "q": "What's the difference between a DNS problem and a full outage?",
+      "a": "A full outage means nothing gets through. A DNS problem means the line works but website names can't be looked up, so pages don't open. A website problem means names resolve but pages don't load. The History screen and the report show which one happened, which is useful when your provider says “the line was fine”."
+    },
+    "router": {
+      "q": "Is the problem my router or my provider?",
+      "a": "The app also checks your router (the local gateway). If the router answers but the internet doesn't, the diagnosis points to your provider. If the router doesn't answer either, the problem is in your home network: Wi-Fi, cables, or the router itself."
+    },
+    "targets": {
+      "q": "Can I change what it checks?",
+      "a": "Yes. [Settings → Check targets](settings#targets) has three lists: DNS servers (8.8.8.8 and 1.1.1.1 by default), web pages, and names to look up. Each list holds up to 10 entries, and you can test them before saving."
+    },
+    "data": {
+      "q": "How much internet data does it use?",
+      "a": "Regular checks are tiny: a connection, an empty web page and a name lookup. Speed tests are different. A test moves as much data as your line can in its time limit, so on a fast connection one test can use hundreds of megabytes. If your data is limited, don't schedule automatic speed tests."
+    },
+    "where": {
+      "q": "Where do alerts show up?",
+      "a": "As a system notification with a sound on this computer. You can also send them to a Discord or Slack channel with a webhook, or to Telegram. Set these up in [Settings → Alerts](settings#alerts) and use the test button to make sure they arrive."
+    },
+    "telegram": {
+      "q": "How do I set up Telegram alerts?",
+      "a": "Create a bot with @BotFather in Telegram and copy its token. Send your bot any message, then find your chat ID. Paste both into [Settings → Alerts](settings#alerts) and press the test button."
+    },
+    "sound": {
+      "q": "Why isn't my custom sound playing?",
+      "a": "Open [Settings → Sound](settings#sound). It shows whether your own sound is in use and how long it is. Files must be MP3 or WAV, up to 30 seconds and 10 MB. “Play like a real alert” plays it exactly as an alert would. If you hear nothing, check that the computer isn't muted."
+    },
+    "silent": {
+      "q": "I didn't get a notification on Windows. Why?",
+      "a": "Windows hides notifications while Do not disturb or Focus is on, and it lets you turn them off per app. Check Settings → System → Notifications in Windows. The outage is still saved in History either way."
+    },
+    "quiet": {
+      "q": "How do quiet hours work?",
+      "a": "In [Settings → Notifications](settings#n-quiet), turn on Quiet hours and choose the times and days. You can mute only the sound or hold desktop alerts completely. A window that crosses midnight, like 22:00 to 07:00, counts for the day it starts. Webhook and Telegram messages are still sent, and every alert is still saved."
+    },
+    "noise": {
+      "q": "Can I stop alerts for very short drops?",
+      "a": "Yes. Set [“Wait before alerting”](settings#n-min-outage) in Settings → Notifications. Outages shorter than that are saved in History but don't alert you. [“Remind while down”](settings#n-reminder) repeats the alert every few minutes until the connection comes back."
+    },
+    "history": {
+      "q": "Where can I see past notifications?",
+      "a": "Click the bell at the top, or open [Notifications](notifications) in the menu. Each alert shows where it was sent and, if something was held back, the reason, such as quiet hours or a channel you turned off. The app keeps the latest 500."
+    },
+    "proof": {
+      "q": "How do I send proof to my internet provider?",
+      "a": "In [History](history), press “Monthly report” and choose “Print or save as PDF”. It lists every outage with its time, duration and cause. For raw data, export CSV from History for one day, 7 days or 30 days."
+    },
+    "retention": {
+      "q": "How long is my history kept?",
+      "a": "90 days. Older log files are deleted automatically. The logs live in the “logs” folder next to the app. Choose “Open logs folder” from the tray menu to find them."
+    },
+    "speedserver": {
+      "q": "Which server does the speed test use?",
+      "a": "Cloudflare's speed test servers by default. You can point it at other servers in [Settings → Speed test](settings#speed)."
+    },
+    "schedule": {
+      "q": "Can speed tests run on their own?",
+      "a": "Yes. Set an interval in [Settings → Speed test](settings#speed). You can also set a minimum speed. Results are sent to your Discord, Slack or Telegram alerts, and a result below that speed is marked as too slow."
+    },
+    "send": {
+      "q": "Does it send my data anywhere?",
+      "a": "No. There's no account, no tracking and no analytics. The only connections it makes are the checks themselves, speed tests, update checks on GitHub, and the Discord, Slack or Telegram alerts you set up. The Privacy page lists each one."
+    },
+    "lan": {
+      "q": "Can someone else on my network open the dashboard?",
+      "a": "No. The dashboard only accepts connections from this computer, and even then it needs the key the app creates each time it starts."
+    },
+    "secrets": {
+      "q": "Where are my settings stored?",
+      "a": "In config.json next to the app. Your webhook URL and Telegram token are saved there as plain text, so don't share that file or that folder. The dashboard never sends them back to the browser."
+    },
+    "updates": {
+      "q": "How do updates work?",
+      "a": "The app checks GitHub for a new version every 6 hours, or right away when you press “Check for updates”. Before installing, it checks the download against the release's checksums. Test (pre-release) versions are never offered automatically."
+    },
+    "bug": {
+      "q": "I found a bug. Where do I report it?",
+      "a": "Open an issue on the project's GitHub page. Say what you expected, what happened, and your app version (shown at the bottom of the sidebar). Don't paste your config.json, since it may contain your webhook or token. You can also reach us on WhatsApp, Discord or email from the Contact page."
+    }
+  }
+}

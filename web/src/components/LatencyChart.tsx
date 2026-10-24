@@ -1,0 +1,244 @@
+import { type KeyboardEvent, type PointerEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { formatLatency, formatTime } from "../lib/format";
+import { isRtl, type Lang, type Translate } from "../lib/i18n";
+import { tone } from "../styles/categories";
+import { ChartTooltip } from "./ChartTooltip";
+
+interface Props {
+  values: number[];
+  lastCheck: number;
+  intervalSec: number;
+  lang: Lang;
+  t: Translate;
+  height?: number;
+}
+
+const PAD = { top: 12, bottom: 24, start: 40, end: 8 };
+
+function niceMax(v: number): number {
+  if (v <= 50) return 50;
+  const pow = 10 ** Math.floor(Math.log10(v));
+  for (const m of [1, 2, 2.5, 5, 10]) {
+    if (m * pow >= v) return m * pow;
+  }
+  return 10 * pow;
+}
+
+export function LatencyChart({ values, lastCheck, intervalSec, lang, t, height = 200 }: Props) {
+  const wrap = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(600);
+  const [fromEnd, setFromEnd] = useState<number | null>(null);
+  const tipId = useId();
+  const rtl = isRtl(lang);
+
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w) setWidth(Math.round(w));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const geo = useMemo(() => {
+    const ok = values.filter((v) => v > 0);
+    const max = niceMax(Math.max(...ok, 1) * 1.1);
+    const plotW = Math.max(10, width - PAD.start - PAD.end);
+    const plotH = height - PAD.top - PAD.bottom;
+    const n = values.length;
+    const xAt = (i: number) => {
+      const p = n <= 1 ? plotW : (i / (n - 1)) * plotW;
+      return rtl ? PAD.end + (plotW - p) : PAD.start + p;
+    };
+    const yAt = (v: number) => PAD.top + plotH - (Math.min(v, max) / max) * plotH;
+    const segments: string[] = [];
+    let current = "";
+    values.forEach((v, i) => {
+      if (v > 0) {
+        current += `${current ? "L" : "M"}${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`;
+      } else if (current) {
+        segments.push(current);
+        current = "";
+      }
+    });
+    if (current) segments.push(current);
+    const areas = segments.map((d) => {
+      const pts = d.slice(1).split(/[LM]/);
+      const first = pts[0]?.split(",")[0];
+      const last = pts[pts.length - 1]?.split(",")[0];
+      return `${d}L${last},${PAD.top + plotH}L${first},${PAD.top + plotH}Z`;
+    });
+    const ticks = [0, max / 2, max];
+    return {
+      max,
+      plotW,
+      plotH,
+      xAt,
+      yAt,
+      segments,
+      areas,
+      ticks,
+      avg: ok.length ? ok.reduce((a, b) => a + b, 0) / ok.length : 0,
+      min: ok.length ? Math.min(...ok) : 0,
+      peak: ok.length ? Math.max(...ok) : 0,
+    };
+  }, [values, width, height, rtl]);
+
+  const n = values.length;
+  const timeOf = (i: number) => lastCheck - (n - 1 - i) * intervalSec * 1000;
+  const active = fromEnd === null || n === 0 ? null : Math.max(0, n - 1 - fromEnd);
+  const setActive = (i: number | null) => setFromEnd(i === null ? null : n - 1 - i);
+
+  const pick = (e: PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    let p = rtl ? PAD.end + geo.plotW - x : x - PAD.start;
+    p = Math.max(0, Math.min(geo.plotW, p));
+    setActive(n <= 1 ? 0 : Math.round((p / geo.plotW) * (n - 1)));
+  };
+
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (n === 0) return;
+    const forward = rtl ? "ArrowLeft" : "ArrowRight";
+    const back = rtl ? "ArrowRight" : "ArrowLeft";
+    const cur = active ?? n - 1;
+    let next: number | null = null;
+    if (e.key === forward) next = Math.min(n - 1, cur + 1);
+    else if (e.key === back) next = Math.max(0, cur - 1);
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = n - 1;
+    else if (e.key === "Escape") {
+      setActive(null);
+      return;
+    }
+    if (next === null) return;
+    e.preventDefault();
+    setActive(next);
+  };
+
+  const lat = (v: number) => formatLatency(t, lang, v);
+  const summary = `${t("chart_latency")}: ${lat(geo.min)}–${lat(geo.peak)}, ${t("stat_avg", { value: lat(geo.avg) })}`;
+  const activeValue = active !== null ? values[active] : undefined;
+  const tipX = active !== null ? geo.xAt(active) : 0;
+  const valueAt = (i: number) => {
+    const v = values[i];
+    if (v === undefined) return "";
+    return `${formatTime(lang, timeOf(i))}: ${v > 0 ? lat(v) : t("chart_failed")}`;
+  };
+  const valueText = valueAt(active ?? n - 1);
+
+  const tipY = activeValue !== undefined && activeValue > 0 ? geo.yAt(activeValue) : PAD.top + geo.plotH - 10;
+
+  return (
+    <div className="chart" ref={wrap}>
+      <span id={`${tipId}-summary`} className="sr-only">
+        {summary}
+      </span>
+      <div
+        className="chart-plot"
+        role="slider"
+        aria-label={t("chart_latency")}
+        aria-describedby={`${tipId}-summary`}
+        aria-valuemin={0}
+        aria-valuemax={Math.max(0, n - 1)}
+        aria-valuenow={active ?? Math.max(0, n - 1)}
+        aria-valuetext={valueText}
+        tabIndex={n ? 0 : -1}
+        onPointerDown={pick}
+        onPointerMove={pick}
+        onPointerLeave={(e) => {
+          if (e.pointerType === "mouse") setActive(null);
+        }}
+        onKeyDown={onKey}
+        onFocus={() => setActive(active ?? (n ? n - 1 : null))}
+        onBlur={() => setActive(null)}
+      >
+        <svg height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden>
+          {geo.ticks.map((tick) => (
+            <g key={tick}>
+              <line
+                className="chart-grid"
+                x1={rtl ? PAD.end : PAD.start}
+                x2={rtl ? PAD.end + geo.plotW : PAD.start + geo.plotW}
+                y1={geo.yAt(tick)}
+                y2={geo.yAt(tick)}
+              />
+              <text
+                className="chart-axis num"
+                x={rtl ? width - 4 : PAD.start - 8}
+                y={geo.yAt(tick) + 4}
+                textAnchor="end"
+              >
+                {lat(tick)}
+              </text>
+            </g>
+          ))}
+          {geo.areas.map((d) => (
+            <path key={`a${d}`} className="chart-area" d={d} />
+          ))}
+          {geo.segments.map((d) => (
+            <path key={`l${d}`} className="chart-line" d={d} />
+          ))}
+          {values.map((v, i) =>
+            v <= 0 ? (
+              <rect
+                // biome-ignore lint/suspicious/noArrayIndexKey: one marker per check slot
+                key={i}
+                className="chart-fail"
+                x={geo.xAt(i) - 2}
+                y={PAD.top + geo.plotH - 10}
+                width={4}
+                height={10}
+                rx={2}
+              />
+            ) : null,
+          )}
+          {active !== null ? (
+            <>
+              <line className="chart-cursor" x1={tipX} x2={tipX} y1={PAD.top} y2={PAD.top + geo.plotH} />
+              {activeValue && activeValue > 0 ? (
+                <circle className="chart-dot" cx={tipX} cy={geo.yAt(activeValue)} r={5} />
+              ) : null}
+            </>
+          ) : null}
+          <text
+            className="chart-axis"
+            x={rtl ? PAD.end + geo.plotW : PAD.start}
+            y={height - 4}
+            textAnchor={rtl ? "end" : "start"}
+          >
+            {n ? formatTime(lang, timeOf(0), false) : ""}
+          </text>
+          <text
+            className="chart-axis"
+            x={rtl ? PAD.end : PAD.start + geo.plotW}
+            y={height - 4}
+            textAnchor={rtl ? "start" : "end"}
+          >
+            {n ? formatTime(lang, timeOf(n - 1), false) : ""}
+          </text>
+        </svg>
+      </div>
+      {active !== null && activeValue !== undefined ? (
+        <ChartTooltip
+          id={tipId}
+          x={tipX}
+          y={tipY}
+          bounds={width}
+          title={formatTime(lang, timeOf(active))}
+          rows={[
+            activeValue > 0
+              ? {
+                  label: t("chart_latency"),
+                  value: lat(activeValue),
+                  tone: tone.latency,
+                }
+              : { label: t("chart_latency"), value: t("chart_failed"), tone: tone.disconnected },
+          ]}
+        />
+      ) : null}
+    </div>
+  );
+}

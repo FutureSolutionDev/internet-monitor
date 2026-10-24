@@ -1,0 +1,99 @@
+import { CreditCard, Landmark, type LucideIcon, Smartphone } from "lucide-react";
+import type { MessageKey } from "../lib/i18n";
+
+export interface DonateConfig {
+  paypal: string;
+  vodafoneCash: string;
+  vodafoneCashLink: string;
+  instapay: string;
+  instapayLink: string;
+}
+
+export const DONATE: DonateConfig = {
+  paypal: "https://www.paypal.com/ncp/payment/9T8REJA5D7Z4U",
+  vodafoneCash: "01069017890",
+  vodafoneCashLink: "https://vf.eg/vfcash?id=mt&qrId=DJMHw5",
+  instapay: "01069017890",
+  instapayLink: "https://ipn.eg/S/sabryadawood/instapay/6APpJc",
+};
+
+export type DonateAccent = "blue" | "coral" | "violet";
+
+export interface DonateMethod {
+  id: "paypal" | "vodafone-cash" | "instapay";
+  icon: LucideIcon;
+  accent: DonateAccent;
+  name: MessageKey;
+  how: MessageKey;
+  handle: string;
+  copy: string;
+  href?: string;
+}
+
+const PAYPAL_HOSTS = new Set(["paypal.me", "www.paypal.me", "paypal.com", "www.paypal.com"]);
+const INSTAPAY_HOSTS = new Set(["ipn.eg"]);
+const VODAFONE_CASH_HOSTS = new Set(["vf.eg"]);
+
+function httpsOn(raw: string, hosts: Set<string>): boolean {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" && !u.username && !u.port && hosts.has(u.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+export const isPaypalLink = (raw: string) => httpsOn(raw, PAYPAL_HOSTS);
+export const isInstapayLink = (raw: string) => httpsOn(raw, INSTAPAY_HOSTS);
+export const isVodafoneCashLink = (raw: string) => httpsOn(raw, VODAFONE_CASH_HOSTS);
+export const isVodafoneCash = (raw: string) => /^010\d{8}$/.test(raw);
+export const isInstapayAddress = (raw: string) =>
+  /^[a-z0-9._-]+@instapay$/i.test(raw) || /^01[0125]\d{8}$/.test(raw);
+
+const groupPhone = (digits: string) => digits.replace(/^(\d{3})(\d{4})(\d{4})$/, "$1 $2 $3");
+
+export function donateMethods(cfg: DonateConfig = DONATE): DonateMethod[] {
+  const out: DonateMethod[] = [];
+  const paypal = cfg.paypal.trim();
+  if (isPaypalLink(paypal)) {
+    out.push({
+      id: "paypal",
+      icon: CreditCard,
+      accent: "blue",
+      name: "support.paypal.name",
+      how: "support.paypal.how",
+      handle: new URL(paypal).hostname.replace(/^www\./, ""),
+      copy: paypal,
+      href: paypal,
+    });
+  }
+  const phone = cfg.vodafoneCash.replace(/[\s-]/g, "");
+  const vfLink = cfg.vodafoneCashLink.trim();
+  if (isVodafoneCash(phone)) {
+    out.push({
+      id: "vodafone-cash",
+      icon: Smartphone,
+      accent: "coral",
+      name: "support.vodafone.name",
+      how: "support.vodafone.how",
+      handle: groupPhone(phone),
+      copy: isVodafoneCashLink(vfLink) ? vfLink : phone,
+      href: isVodafoneCashLink(vfLink) ? vfLink : undefined,
+    });
+  }
+  const address = cfg.instapay.replace(/[\s-]/g, "");
+  const link = cfg.instapayLink.trim();
+  if (isInstapayAddress(address)) {
+    out.push({
+      id: "instapay",
+      icon: Landmark,
+      accent: "violet",
+      name: "support.instapay.name",
+      how: "support.instapay.how",
+      handle: /^\d+$/.test(address) ? groupPhone(address) : address,
+      copy: isInstapayLink(link) ? link : address,
+      href: isInstapayLink(link) ? link : undefined,
+    });
+  }
+  return out;
+}

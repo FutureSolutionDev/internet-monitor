@@ -8,3 +8,9 @@ config.json
 tmp
 .playwright-mcp
 *.txt
+Plan
+.session
+.session-key
+test - Copy/notification.mp3
+
+*.syso

@@ -8,6 +8,100 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 GitHub release notes for each tag are auto-generated from commits; this file is
 the curated, human-readable summary.
 
+## [Unreleased]
+
+## [2.0.0] - 2026-10-24
+
+The v2 rebuild.
+
+### Added
+- **React dashboard** (React 19 + Vite + TypeScript in `web/`, embedded into the
+  binaries via `web/embed.go`) with a live overview: status, plain-language
+  diagnosis, latency chart, jitter, packet loss, availability for today / 7 / 30
+  days, and per-target status.
+- **History screen** with a per-day log, filters, and CSV export for a day, the
+  last 7 days, or the last 30 days.
+- **Monthly report page** at `/report?month=YYYY-MM` with "Print or save as PDF"
+  (replaces `report.html`).
+- Speed test screen with gauge, today's runs, scheduled tests and alert threshold.
+- Custom alert sound upload (MP3/WAV, up to 30 s / 10 MB); Settings shows whether
+  the custom sound is active and its length, with "Try the sound" and "Play like
+  a real alert".
+- **New default alert sound.**
+- Dark and light themes, Arabic/English with full RTL, layout for phone-size windows.
+  Switching themes reveals the new one in a circle from the button you clicked
+  (instant when the system asks for reduced motion).
+- In-app pages: **What's new** (every release since v0.0.1, filterable by type),
+  **FAQ**, **About**, **Contact** (WhatsApp, Discord, email, GitHub), **Privacy**
+  and **Terms of use**, linked from the sidebar.
+- Unsaved-changes guard in Settings.
+- **Support us** page (`/support`) listing PayPal, Vodafone Cash and InstaPay donation
+  details from `web/src/content/donate.ts`; methods left empty are hidden, and the page
+  and its links stay hidden until at least one is filled in.
+- **What's new after an update**: the first time the dashboard opens on a new
+  version it shows that release's changes once, with a link to the full list.
+- FAQ answers link to the exact setting they mention, and the setting is
+  scrolled into view and highlighted.
+- **Notification controls** (`notifications` in `config.json`): sound on/off and
+  volume, quiet hours (mute the sound or the whole desktop alert, per weekday,
+  windows across midnight), an on/off switch per event (down, unstable, restored,
+  speed test) and per channel (desktop, webhook, Telegram), a minimum outage
+  length before alerting, and repeat reminders while offline. Defaults keep the
+  previous behaviour.
+- **Notification history**: every alert, with where it was sent or why it was
+  muted, in `logs/notifications_YYYY-MM-DD.jsonl`; `GET /api/notifications` and
+  `POST /api/notifications/read`, plus a live `notification` event.
+- Richer Windows toasts: a coloured status icon, the time, an "Open dashboard"
+  button, and a new alert replaces the previous one instead of piling up.
+- Webhook and Telegram messages follow the app language.
+- CI `web` job (typecheck, lint, test, build); Go jobs reuse its `web-dist` artifact.
+
+### Changed
+- **License: the Elastic License 2.0 replaces MIT.** The app stays free for
+  personal and commercial use and the source stays public; offering it to others
+  as a hosted or managed service is not allowed. Versions before 2.0.0 were
+  released under MIT.
+- The Arabic interface, pages, alerts and Webhook/Telegram messages are now
+  written in Egyptian colloquial Arabic instead of Modern Standard Arabic.
+- The fixed 4-second desktop alert cooldown is gone; a quick drop-and-return now
+  shows both alerts. Use the minimum outage length to hide short blips.
+- Repository layout: entry points in `cmd/tray` and `cmd/gui`, packages under
+  `internal/`; the old vanilla-JS UI in `internal/server/assets` is removed.
+- Building from source now requires [bun](https://bun.sh) (CI pins 1.3.14) in
+  addition to Go. `make build`, `build-debug`, `build-gui` and `scripts\build*.cmd`
+  build the web UI first.
+- Settings saving is conflict-safe.
+- The top-bar language switcher is an icon button; its menu lists the languages.
+- Latency and jitter are shown in the most readable unit (`46 ms`, `1.06 s`, `2 min 5 s`)
+  in the dashboard, chart axis, desktop alerts, tray tooltip and Webhook/Telegram messages.
+- Config handling moved to a hardened config store; the Go toolchain is
+  upgraded to the version declared in `go.mod`.
+- Dev mode: `go run ./cmd/tray` plus `bun run dev` in `web/` for the UI. The
+  `.air.toml` config is no longer documented.
+- CI refuses to publish a release unless every binary is present.
+- Translations moved from one file per language to a folder per language with one
+  nested JSON file per page (`web/locales/<lang>/*.json`); changelog strings are
+  grouped by version (`changelog.v2.0.0.items.1`).
+- Error messages name the actual problem (rate limited, webhook not set up or
+  rejected, update already running) instead of a generic failure, and a failed
+  webhook test can be retried right away.
+- Availability is rounded down, so any downtime never displays as 100%.
+
+### Fixed
+- The WhatsApp link on the Contact page now opens from the desktop window.
+- **Uploaded custom alert sounds silently fell back to the default.** The
+  uploaded file is now validated and converted, and is the sound that plays.
+- The auto-updater never selects the GUI asset for a tray install.
+
+### Security
+- The local dashboard binds `127.0.0.1` and requires a private session key that
+  is kept for up to 24 hours, so an open dashboard reconnects on its own after a
+  restart; open it from the tray menu or app window.
+- Webhook URL and Telegram token are never sent back to the browser (shown as
+  "Saved — hidden").
+- Webhook URLs must be `https` and on a Discord or Slack host.
+- The updater is pinned to GitHub hosts.
+
 ## [0.10.0] - 2026-06-01
 
 ### Added
@@ -67,6 +161,7 @@ Last release before the 0.9.x → 0.10.0 feature wave. Earlier tags
 (0.0.1 – 0.8.1) predate this changelog; see the GitHub Releases page for their
 auto-generated notes.
 
+[2.0.0]: https://github.com/FutureSolutionDev/internet-monitor/releases/tag/v2.0.0
 [0.10.0]: https://github.com/FutureSolutionDev/internet-monitor/releases/tag/v0.10.0
 [0.9.4]: https://github.com/FutureSolutionDev/internet-monitor/releases/tag/v0.9.4
 [0.8.1]: https://github.com/FutureSolutionDev/internet-monitor/releases/tag/v0.8.1

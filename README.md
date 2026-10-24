@@ -1,17 +1,17 @@
 # 🌐 Internet Monitor
 
-![Logo](dashboard/assets/favicon.png)
+![Logo](internal/assets/favicon.png)
 
 [![Build & Release](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml/badge.svg)](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev)
+[![License: Elastic 2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go)](https://go.dev)
 ![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 
 > [🇸🇦 اقرأ بالعربية](README.ar.md)
 
 # Document your outages. Win the dispute with your ISP.
 
-**Internet Monitor** is a free, open-source tool that captures **proof** of every internet drop — so you can stop arguing from memory and start attaching evidence to your support ticket.
+**Internet Monitor** is a free, source-available tool that captures **proof** of every internet drop — so you can stop arguing from memory and start attaching evidence to your support ticket.
 
 It logs each outage with **per-layer detail (TCP / HTTP / DNS)** — so you can prove things like *"DNS failed while the link was up"* — with exact **timestamps and durations**, and exports a clean **monthly report (PDF)** or **CSV** you can hand to your provider. 100% local: no account, no cloud, no telemetry.
 
@@ -23,13 +23,11 @@ It logs each outage with **per-layer detail (TCP / HTTP / DNS)** — so you can 
 
 ![Dashboard Arabic RTL](docs/screenshot-dashboard-ar.png)
 
-![Speed Test Running](docs/screenshot-speed-running.png)
-
 ![Speed Test Result](docs/screenshot-speed-result.png)
 
-![Logs](docs/screenshot-logs.png)
+![History](docs/screenshot-logs.png)
 
-![Settings Targets](docs/screenshot-settings-targets.png)
+![Settings](docs/screenshot-settings.png)
 
 ## 💡 Why Internet Monitor?
 
@@ -44,7 +42,7 @@ Most "my internet is down" complaints fail because you have **no proof** — no 
 
 1. **Run it** in the background (system tray or standalone window) — it checks every few seconds, 24/7.
 2. **Let it capture the drops** — each outage is logged with its cause (TCP/HTTP/DNS), exact start time and duration.
-3. **Generate the monthly report** — open the dashboard → **Logs → Monthly report (PDF)**, pick the month, then **Print / Save as PDF**.
+3. **Generate the monthly report** — open the dashboard → **History**, open the monthly report (`/report?month=YYYY-MM`), pick the month, then click **Print or save as PDF**.
 4. **Attach it to your ticket/complaint.** The report is **neutral by default** (reads as your own document); an opt-in "shareable" toggle can add a small footer if you want.
 
 > Tip: enable **scheduled speed tests** and **ICMP/LAN-vs-ISP diagnosis** to back your case with latency, jitter, and throughput history.
@@ -64,16 +62,20 @@ Most "my internet is down" complaints fail because you have **no proof** — no 
 | Feature | Details |
 | ------- | ------- |
 | 🔍 **Multi-layer checking** | TCP Ping + HTTP + DNS simultaneously — all targets configurable as arrays |
-| 📊 **Live dashboard** | Real-time latency chart + stats + event log + recent checks table |
-| ⚡ **Speed Test** | Download **and upload** measurement (Cloudflare endpoint) with a speedtest.net-style circular gauge, configurable parallel connections/timeout, and optional **scheduled automatic tests** |
-| 🔔 **Instant notifications** | Windows Toast + Discord / Slack / **Telegram** + custom alert sound, localized to your chosen language |
+| 📊 **Live overview** | Connection status, a plain-language diagnosis (e.g. "router fine, outage at ISP"), latency chart, jitter, packet loss, availability for today / 7 days / 30 days, and per-target status |
+| 🕘 **History** | Per-day event log with filters and CSV export (selected day, last 7 days, last 30 days) |
+| ⚡ **Speed Test** | Download **and upload** measurement (Cloudflare endpoint) with a circular gauge, ping / download / upload results, today's runs, configurable parallel connections/timeout, **scheduled automatic tests** and a low-speed alert threshold |
+| 🔔 **Instant notifications** | Windows Toast + Discord / Slack / **Telegram**, localized to your chosen language |
+| 🎵 **Custom alert sound** | Upload an MP3 or WAV (up to 30 seconds / 10 MB). Settings shows whether the custom sound is active and its length; **Try the sound** and **Play like a real alert** let you test it. A new default sound ships built in |
 | 📋 **Structured logs** | Daily JSONL files — connectivity events in `connectivity_DATE.jsonl`, speed tests in `speedtest_DATE.jsonl` |
-| 📤 **CSV export** | Export connectivity logs and speed test history directly from the dashboard |
+| 📄 **Monthly report** | `/report?month=YYYY-MM` page with **Print or save as PDF** |
 | 🔄 **Auto-update** | Checks GitHub Releases (background + a manual **"Check for updates"** button), one-click update with automatic restart |
 | 🌐 **Bilingual UI** | Arabic & English with full RTL support, toggle anytime |
+| 🎨 **Themes & small screens** | Dark and light themes; the layout adapts to phone-size windows |
 | 🖥️ **Two modes** | System Tray (background) + Standalone native window |
 | 🔒 **Single instance** | Prevents running more than one copy at the same time |
-| ⚙️ **Settings tabs** | Organized settings: Monitoring / Targets / Notifications / Speed Test |
+| ⚙️ **Safe settings** | Unsaved-changes guard and conflict-safe saving (a stale save never overwrites newer settings) |
+| 🛡️ **Local-only dashboard** | Listens on `127.0.0.1` only, protected by a per-launch session token. Webhook URL and Telegram token are never sent back to the browser |
 
 ---
 
@@ -110,36 +112,35 @@ chmod +x internet-monitor-*
 ./internet-monitor-macos-arm64
 ```
 
-Open the dashboard at **<http://localhost:8765>**
+Open the dashboard from the **tray menu** (or the app window in the GUI version).
+
+> The dashboard only accepts requests that carry a per-launch session token. Opening <http://127.0.0.1:8765> directly in a browser shows an "open from the app" message — that is expected.
 
 ---
 
-## 🧑‍💻 Dev Mode (Live Reload)
+## 🧑‍💻 Dev Mode
 
-### Option A — `go run` (simplest)
+You need [Go](https://go.dev/dl/) and [bun](https://bun.sh) (see [Build from Source](#️-build-from-source)). Build the web UI once so the Go embed has files to pick up:
 
 ```bash
 git clone https://github.com/FutureSolutionDev/internet-monitor.git
 cd internet-monitor
-go mod tidy
-go run .
+cd web && bun install --frozen-lockfile && bun run build && cd ..
+go run ./cmd/tray
 ```
 
-### Option B — [Air](https://github.com/air-verse/air) (auto-rebuild on file change)
+### Live UI work (Vite dev server)
+
+With the backend running, start the Vite dev server in a second terminal. It proxies `/api`, `/events` and `/notification-sound` to `http://127.0.0.1:8765` (override with `IM_BACKEND`) and adds the session token for you. The token is the `token` value in the `.session` file next to the running executable.
 
 ```bash
-# Install air
-go install github.com/air-verse/air@latest
-
-# Run with live reload
-air
+cd web
+IM_SESSION=<token> bun run dev
 ```
 
-Air watches `.go`, `.html`, `.js`, and `.css` files and rebuilds automatically.
+On Windows PowerShell: `$env:IM_SESSION="<token>"; bun run dev`.
 
-Open the dashboard at **<http://localhost:8765>** — edit any source file and the binary reloads.
-
-> The native window (GUI) version requires GCC — see [Build from Source](#️-build-from-source) below.
+> The native window (GUI) version requires CGO — see [Build from Source](#️-build-from-source) below.
 
 ---
 
@@ -149,33 +150,55 @@ Open the dashboard at **<http://localhost:8765>** — edit any source file and t
 
 | Tool | Version | Note |
 | ---- | ------- | ---- |
-| [Go](https://go.dev/dl/) | 1.21+ | Required |
-| GCC (TDM-GCC recommended) | any | Optional — native window version only |
+| [Go](https://go.dev/dl/) | see `go.mod` (currently 1.27.3) | Required |
+| [bun](https://bun.sh) | 1.3.14 (the version CI uses) | Required — builds the React dashboard |
+| GCC (TDM-GCC recommended) | any | Optional — native window version only (CGO) |
 
-### Tray version — no CGO needed
+The dashboard in `web/` is embedded into the Go binaries (`web/embed.go`), so **build it first**. Without `web/dist`, `go build` fails.
+
+### Web UI
+
+```bash
+cd web
+bun install --frozen-lockfile
+bun run build
+cd ..
+```
+
+Other checks used by CI: `bun run typecheck`, `bun run lint`, `bun run test`.
+
+### Tray version — no CGO needed on Windows
 
 ```bash
 git clone https://github.com/FutureSolutionDev/internet-monitor.git
 cd internet-monitor
-go mod tidy
-CGO_ENABLED=0 go build -ldflags="-H=windowsgui -s -w" -o internet-monitor.exe .
+cd web && bun install --frozen-lockfile && bun run build && cd ..
+go build -ldflags="-H=windowsgui -s -w" -o internet-monitor.exe ./cmd/tray
 ```
 
-### Native window version — requires GCC
+### Native window version — requires CGO
 
-**Windows** — auto-installs TDM-GCC if missing:
+Uses WebView2 on Windows and WebKitGTK/WebKit on Linux/macOS.
+
+**Windows** — builds the web UI, then auto-installs TDM-GCC if missing:
 
 ```bat
 scripts\build-gui.cmd
 ```
 
-**macOS / Linux** — GCC is pre-installed:
+**macOS / Linux** — GCC is pre-installed (Linux also needs `libgtk-3-dev` and `libwebkit2gtk-4.0-dev`):
 
 ```bash
 go build -ldflags="-s -w" -o internet-monitor-gui ./cmd/gui/
 ```
 
+### Makefile
+
+`make build`, `make build-debug` and `make build-gui` depend on `make web`, which runs `bun install --frozen-lockfile && bun run build` inside `web/`.
+
 ### Available scripts
+
+The `build*.cmd` scripts call `scripts\build-web.cmd` first.
 
 ```text
 scripts\build.cmd        Build tray exe
@@ -191,14 +214,20 @@ scripts\logs.cmd         Open logs folder
 
 ### CI/CD — GitHub Actions
 
-Every push to `master` triggers automatic builds for all platforms:
+Every push to `master` (and every pull request) runs the pipeline:
 
 ```text
+Web UI        →  typecheck, lint, test, build (bun 1.3.14); uploads web/dist as an artifact
+Quality       →  gofmt, go vet, go test, golangci-lint (needs Web UI)
 Windows Tray  →  cross-compiled on Linux (CGO disabled)
 Windows GUI   →  windows-latest runner
-macOS         →  macos-latest (arm64 native + intel cross-compile)
-Linux         →  ubuntu-22.04 (WebKitGTK 4.0)
+macOS         →  macos-latest (arm64 native + intel cross-compile; tray + GUI)
+Linux         →  ubuntu-22.04 (WebKitGTK 4.0; tray + GUI)
 ```
+
+The Go build jobs download the `web-dist` artifact instead of rebuilding the UI.
+
+On push to `master`, a version tag and GitHub release are created **only if every build passes**. The release job checks that all 8 binaries exist and publishes a `SHA256SUMS` file with them.
 
 ---
 
@@ -218,7 +247,11 @@ Edit it directly or use the **Settings tab** in the dashboard.
   "latency_threshold_ms": 500,
   "log_dir": "logs",
   "webhook_url": "",
+  "telegram_bot_token": "",
+  "telegram_chat_id": "",
   "dashboard_port": 8765,
+  "use_icmp": false,
+  "language": "en",
   "speed_test": {
     "download_targets": ["https://speed.cloudflare.com/__down"],
     "parallel_connections": 4,
@@ -235,10 +268,16 @@ Edit it directly or use the **Settings tab** in the dashboard.
 | `ping_targets` | TCP addresses — tries all in parallel, OK if any succeeds |
 | `http_targets` | HTTP URLs — tries in order until one returns 200/204 |
 | `dns_targets` | DNS domains — tries in order until one resolves |
+| `check_interval_sec` | Seconds between checks (1–3600, default 5) |
 | `fail_threshold` | Consecutive failures before declaring disconnected |
-| `webhook_url` | Discord or Slack webhook URL (leave empty to disable) |
-| `speed_test.parallel_connections` | Parallel HTTP connections for download test (1–8, default 4) |
-| `speed_test.timeout_seconds` | Download test duration in seconds (default 30) |
+| `log_dir` | Log folder, relative to the app folder. Absolute paths and `..` are rejected |
+| `webhook_url` | Discord or Slack webhook URL (leave empty to disable). Only `https` URLs on Discord (`discord.com`, `discordapp.com`) or Slack (`hooks.slack.com`) hosts are accepted |
+| `telegram_bot_token`, `telegram_chat_id` | Telegram alerts. The dashboard shows a saved token as "Saved — hidden" and never receives it back |
+| `dashboard_port` | Local dashboard port (1–65535, default 8765) |
+| `use_icmp` | Also ping the router (ICMP) for LAN-vs-ISP diagnosis |
+| `language` | `en` or `ar` |
+| `speed_test.parallel_connections` | Parallel HTTP connections for download test (1–16, default 4) |
+| `speed_test.timeout_seconds` | Download test duration in seconds (5–120, default 30) |
 | `speed_test.upload_target` | POST endpoint for the upload test (default Cloudflare `__up`; empty disables upload) |
 | `speed_test.schedule_minutes` | Run an automatic speed test every N minutes (0 = disabled) |
 | `speed_test.alert_threshold_mbps` | Send webhook if speed drops below this value (0 = disabled) |
@@ -304,7 +343,7 @@ The built-in speed test uses an **adaptive HTTP download + upload** approach, sh
 - Uses **Cloudflare's speed endpoint** (`speed.cloudflare.com`) by default — no account required
 - Optional **scheduled automatic tests** (`speed_test.schedule_minutes`) build a throughput history unattended
 - Results are stored in `logs/speedtest_DATE.jsonl` (separate from connectivity logs)
-- History is viewable and exportable as CSV directly from the dashboard
+- Today's runs are listed on the Speed test screen; the connectivity history can be exported as CSV from History
 
 > **Privacy:** speed test payloads contain no device identifiers. Traffic goes only to the endpoint you configure in Settings → Speed Test.
 
@@ -314,31 +353,34 @@ The built-in speed test uses an **adaptive HTTP download + upload** approach, sh
 
 ```text
 internet-monitor/
-├── main.go                   Entry point — Tray version
-├── singleton_*.go            Single-instance guard (per OS)
-├── cmd/gui/                  Native window version
-│   ├── main.go
-│   ├── gui_notifier.go       GUI-specific Notifier implementation
-│   ├── tray_windows.go       Background systray in GUI mode
-│   └── notify_*.go           OS notifications (Windows / Unix)
-├── core/                     Shared monitoring engine
-│   ├── engine.go             Engine struct + Notifier interface + MultiNotifier
-│   └── doc.go
-├── types/                    Shared data types (CheckResult, Status, Event)
-├── speedtest/                Adaptive download speed test engine
-├── config/                   Config struct, loading, migration
-├── monitor/                  Check engine — TCP / HTTP / DNS
-├── dashboard/                HTTP server, SSE stream, REST APIs, embedded assets
-│   ├── server.go
-│   ├── notifier.go           DashNotifier (core.Notifier implementation)
-│   └── assets/               Embedded HTML / CSS / JS (Chart.js local)
-├── logger/                   JSONL logging + Discord/Slack webhook formatting
-├── tray/                     System tray icon, menu, OS notifications
-│   └── notifier.go           TrayNotifier (core.Notifier implementation)
-├── updater/                  GitHub Releases API + minio/selfupdate
-├── startup/                  OS startup registration
-├── .github/workflows/        build.yml — CI/CD for all platforms
-└── scripts/                  Windows build / install / run helpers
+├── cmd/
+│   ├── tray/                 Entry point — system tray version
+│   └── gui/                  Entry point — native window version (CGO + WebView2/WebKit)
+├── internal/
+│   ├── app/                  Shared bootstrap, single-instance guard
+│   ├── assets/               Embedded icon
+│   ├── audio/                Custom alert sound validation + conversion
+│   ├── config/               Config struct, defaults, store, webhook allow-list
+│   ├── core/                 Monitoring engine + Notifier interface
+│   ├── jsonl/                Daily JSONL file reading/writing
+│   ├── logger/               Logging + Discord/Slack webhook formatting
+│   ├── monitor/              Check engine — TCP / HTTP / DNS / ICMP
+│   ├── notifytext/           Localized notification text
+│   ├── report/               Monthly report data
+│   ├── server/               Local HTTP API, SSE stream, session token, static UI
+│   ├── sound/                Alert sound playback
+│   ├── speedtest/            Download/upload speed test engine
+│   ├── startup/              OS startup registration
+│   ├── tray/                 Tray icon, menu, OS notifications
+│   ├── types/                Shared data types
+│   └── updater/              GitHub Releases updater
+├── web/                      React 19 + Vite + TypeScript dashboard
+│   ├── src/                  App, screens (Overview, History, Speed, Report, Settings), i18n
+│   ├── dist/                 Build output (generated)
+│   └── embed.go              Embeds dist/ into the Go binaries
+├── scripts/                  Windows build / install / run helpers
+├── docs/                     Screenshots
+└── .github/workflows/        build.yml — CI/CD for all platforms
 ```
 
 ---
@@ -396,7 +438,7 @@ All contributions are welcome — bugs, features, translations, documentation.
 ```bash
 git clone https://github.com/YOUR_USERNAME/internet-monitor.git
 cd internet-monitor
-go mod tidy
+cd web && bun install --frozen-lockfile && cd ..
 ```
 
 ### 2. Create a branch
@@ -420,15 +462,39 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) — commit t
 
 - Describe the motivation clearly
 - Attach a screenshot for any visual change
-- Confirm `go build ./...` passes
+- Confirm `go build ./...` and `go test ./...` pass (build `web/` first)
+- For changes in `web/`, confirm `bun run typecheck`, `bun run lint` and `bun run test` pass
 
 ### Areas looking for help
 
 - Windows ARM64 build support
-- Mobile-responsive dashboard improvements
 - macOS native menu bar integration
 - Per-target latency history charts
 - Additional language support
+
+### Adding a language
+
+Each language has its own folder in `web/locales/`, with one JSON file per page
+(`settings.json`, `faq.json`, `changelog.json`, `server.json` for desktop alerts and
+Webhook/Telegram messages, and so on). Keys are nested: `{"faq": {"free": {"a": "…"}}}`
+is the key `faq.free.a`. The dashboard, the monthly report and the app itself all
+read from these same files, and a key defined twice is rejected.
+
+1. Copy `web/locales/en/` to `web/locales/<code>/`, for example `fr/`.
+2. Edit `meta.json`:
+   - `name`: the language's own name, such as `Français`.
+   - `dir`: `ltr` or `rtl`.
+   - `intl`: the locale used for dates and numbers, such as `fr-FR`.
+3. Translate every value in the other files. Keep each `{placeholder}` and each
+   in-app link target such as `(settings#alerts)` exactly as it is in English.
+4. Run `bun run test` in `web/`. It fails if a file or key is missing, a key isn't
+   in English, or a placeholder doesn't match.
+
+A new page file needs one extra line: import its English copy in
+`web/src/lib/i18n.ts` (`MESSAGE_FILES`) so its keys are type-checked.
+
+No code changes are needed. The new language appears in the language menu and
+in Settings automatically.
 
 ---
 
@@ -441,7 +507,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) — commit t
 | ⏰ Scheduled speed tests | ✅ Done |
 | 📄 PDF report export (for ISP complaints) | ✅ Done |
 | 🔄 Manual "Check for updates" button | ✅ Done |
-| 📱 Mobile-responsive dashboard | 🔜 Planned |
+| ⚛️ React dashboard (dark/light themes, phone-size layout) | ✅ Done |
 | 🪟 Windows ARM64 build | 🔜 Planned |
 | 📈 Per-ISP analytics & weekly reports | 💡 Proposed |
 | 🔌 Plugin API for custom check types | 💡 Proposed |
@@ -450,6 +516,8 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) — commit t
 
 ## 📄 License
 
-MIT — Free for personal and commercial use.
+[Elastic License 2.0](LICENSE) — free for personal and commercial use, and the source is public.
+You may not offer it to others as a hosted or managed service, and you must keep its license and
+copyright notices. Versions before 2.0.0 were released under the MIT license.
 
 Built with ❤️ by [FutureSolutionDev](https://github.com/FutureSolutionDev)
