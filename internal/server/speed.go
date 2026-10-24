@@ -134,10 +134,10 @@ func (sr *speedRunner) start(triggeredBy string) bool {
 		}
 		if lgr := sr.s.lgr; lgr != nil {
 			lgr.LogSpeedTest(event)
-			if cfg.WebhookURL != "" || (cfg.TelegramBotToken != "" && cfg.TelegramChatID != "") {
-				below := cfg.SpeedTest.AlertThresholdMbps > 0 && result.DownloadMbps < cfg.SpeedTest.AlertThresholdMbps
-				lgr.SendSpeedTestResult(cfg.WebhookURL, event, cfg.SpeedTest.AlertThresholdMbps, below)
-			}
+		}
+		if hook := sr.s.hooks.SpeedResult; hook != nil {
+			below := cfg.SpeedTest.AlertThresholdMbps > 0 && result.DownloadMbps < cfg.SpeedTest.AlertThresholdMbps
+			hook(event, cfg.SpeedTest.AlertThresholdMbps, below)
 		}
 		sr.mu.Lock()
 		sr.last = &event

@@ -1,6 +1,7 @@
 package sound
 
 import (
+	"fmt"
 	"internet-monitor/internal/assets"
 	"os"
 	"path/filepath"
@@ -61,3 +62,35 @@ func RingtonePath() string {
 	})
 	return defaultPath
 }
+
+var (
+	cacheMu   sync.Mutex
+	cacheKey  string
+	cacheData []byte
+)
+
+func scaled(path string, volume int) ([]byte, string, bool) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, "", false
+	}
+	key := fmt.Sprintf("%s|%d|%d|%d", path, info.ModTime().UnixNano(), info.Size(), volume)
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+	if key == cacheKey {
+		return cacheData, key, cacheData != nil
+	}
+	var out []byte
+	if info.Size() <= MaxScaleBytes {
+		if data, err := os.ReadFile(path); err == nil {
+			out, _ = ScaleWAV(data, volume)
+		}
+	}
+	if out == nil {
+		logf("[sound] cannot change the volume of %q; playing it unchanged", path)
+	}
+	cacheKey, cacheData = key, out
+	return out, key, out != nil
+}
+
+func Play() { PlayAt(100) }

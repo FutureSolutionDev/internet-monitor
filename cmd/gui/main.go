@@ -3,6 +3,7 @@
 package main
 
 import (
+	"internet-monitor/internal/alerts"
 	"internet-monitor/internal/app"
 	"internet-monitor/internal/assets"
 	"internet-monitor/internal/tray"
@@ -19,7 +20,10 @@ func main() {
 		return
 	}
 
-	a, err := app.New(app.Options{Version: Version, TestNotification: TestNotification})
+	a, err := app.New(app.Options{
+		Version: Version,
+		Desktop: func(func() string) alerts.Desktop { return tray.Desktop{} },
+	})
 	if err != nil {
 		log.Fatalf("startup failed: %v", err)
 	}

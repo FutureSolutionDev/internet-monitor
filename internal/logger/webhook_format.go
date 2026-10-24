@@ -3,181 +3,15 @@ package logger
 import (
 	"fmt"
 	"internet-monitor/internal/config"
-	"internet-monitor/internal/monitor"
 	"strings"
 	"time"
-	"unicode"
 )
-
-func capitalize(s string) string {
-	if s == "" {
-		return s
-	}
-	r := []rune(s)
-	r[0] = unicode.ToUpper(r[0])
-	return string(r)
-}
 
 func IsDiscord(url string) bool { return config.IsDiscordWebhook(url) }
 
 func IsSlack(url string) bool { return config.IsSlackWebhook(url) }
 
 func IsSupportedWebhook(url string) bool { return config.IsSupportedWebhook(url) }
-
-func BuildEventPayload(event monitor.Event, url string) interface{} {
-	if IsDiscord(url) {
-		return discordEventPayload(event)
-	}
-	return slackEventPayload(event)
-}
-
-func tgMark(ok bool) string {
-	if ok {
-		return "✅"
-	}
-	return "❌"
-}
-
-func TelegramEventText(event monitor.Event) string {
-	emoji := map[string]string{"connected": "✅", "degraded": "⚠️", "disconnected": "❌"}[event.EventType]
-	var b strings.Builder
-	fmt.Fprintf(&b, "%s *Internet %s*\n", emoji, capitalize(event.EventType))
-	fmt.Fprintf(&b, "TCP: %s  HTTP: %s  DNS: %s",
-		tgMark(!event.Reason.TCPPingFailed), tgMark(!event.Reason.HTTPFailed), tgMark(!event.Reason.DNSFailed))
-	if event.Reason.PacketLossPct > 0 {
-		fmt.Fprintf(&b, "\nPacket Loss: %.1f%%", event.Reason.PacketLossPct)
-	}
-	if event.Reason.AvgLatencyMs > 0 {
-		fmt.Fprintf(&b, "\nLatency: %dms", event.Reason.AvgLatencyMs)
-	}
-	if event.DurationSeconds > 0 {
-		fmt.Fprintf(&b, "\nDuration: %.0fs", event.DurationSeconds)
-	}
-	return b.String()
-}
-
-func TelegramSpeedText(event SpeedTestEvent, thresholdMbps float64, belowThreshold bool) string {
-	icon := "🚀"
-	if belowThreshold {
-		icon = "⚠️"
-	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "%s *Speed Test*\n📥 Download: *%.1f Mbps*", icon, event.DownloadMbps)
-	if event.UploadMbps != nil {
-		fmt.Fprintf(&b, "\n📤 Upload: *%.1f Mbps*", *event.UploadMbps)
-	}
-	fmt.Fprintf(&b, "\n📡 Latency: %dms", event.LatencyMs)
-	if belowThreshold && thresholdMbps > 0 {
-		fmt.Fprintf(&b, "\n⚠️ Below threshold: %.1f Mbps", thresholdMbps)
-	}
-	return b.String()
-}
-
-func discordEventPayload(event monitor.Event) map[string]interface{} {
-	colors := map[string]int{
-		"connected":    0x22C55E,
-		"degraded":     0xEAB308,
-		"disconnected": 0xEF4444,
-	}
-	emojis := map[string]string{
-		"connected":    "✅",
-		"degraded":     "⚠️",
-		"disconnected": "❌",
-	}
-
-	color := colors[event.EventType]
-	emoji := emojis[event.EventType]
-
-	checks := []map[string]interface{}{}
-
-	tcpVal := "✅ OK"
-	if event.Reason.TCPPingFailed {
-		tcpVal = "❌ Failed"
-	}
-	checks = append(checks, field("🔌 TCP Ping", tcpVal, true))
-
-	httpVal := "✅ OK"
-	if event.Reason.HTTPFailed {
-		httpVal = "❌ Failed"
-	}
-	checks = append(checks, field("🌐 HTTP", httpVal, true))
-
-	dnsVal := "✅ OK"
-	if event.Reason.DNSFailed {
-		dnsVal = "❌ Failed"
-	}
-	checks = append(checks, field("🔍 DNS", dnsVal, true))
-
-	metrics := []map[string]interface{}{}
-
-	lossStr := fmt.Sprintf("%.1f%%", event.Reason.PacketLossPct)
-	if event.Reason.PacketLossPct == 0 {
-		lossStr = "0%"
-	}
-	metrics = append(metrics, field("📉 Packet Loss", lossStr, true))
-
-	latStr := fmt.Sprintf("%dms", event.Reason.AvgLatencyMs)
-	if event.Reason.AvgLatencyMs == 0 {
-		latStr = "—"
-	}
-	metrics = append(metrics, field("⚡ Latency", latStr, true))
-
-	durStr := "—"
-	if event.DurationSeconds > 0 {
-		d := time.Duration(event.DurationSeconds) * time.Second
-		if d < time.Minute {
-			durStr = fmt.Sprintf("%.0fs", event.DurationSeconds)
-		} else {
-			durStr = fmt.Sprintf("%dm %ds", int(d.Minutes()), int(d.Seconds())%60)
-		}
-	}
-	metrics = append(metrics, field("⏱️ Duration", durStr, true))
-
-	allFields := append(checks, metrics...)
-
-	return map[string]interface{}{
-		"username": "Internet Monitor",
-		"embeds": []map[string]interface{}{{
-			"title":     fmt.Sprintf("%s Internet %s", emoji, capitalize(event.EventType)),
-			"color":     color,
-			"fields":    allFields,
-			"timestamp": event.Timestamp.UTC().Format(time.RFC3339),
-			"footer":    map[string]string{"text": "Internet Monitor • Event Log"},
-		}},
-	}
-}
-
-func slackEventPayload(event monitor.Event) map[string]interface{} {
-	emojis := map[string]string{
-		"connected":    ":white_check_mark:",
-		"degraded":     ":warning:",
-		"disconnected": ":x:",
-	}
-	emoji := emojis[event.EventType]
-
-	lines := []string{
-		fmt.Sprintf("%s *Internet %s*", emoji, capitalize(event.EventType)),
-		"",
-	}
-
-	lines = append(lines, fmt.Sprintf("*TCP Ping:* %s  *HTTP:* %s  *DNS:* %s",
-		boolCheck(!event.Reason.TCPPingFailed),
-		boolCheck(!event.Reason.HTTPFailed),
-		boolCheck(!event.Reason.DNSFailed),
-	))
-
-	if event.Reason.PacketLossPct > 0 {
-		lines = append(lines, fmt.Sprintf("*Packet Loss:* %.1f%%", event.Reason.PacketLossPct))
-	}
-	if event.Reason.AvgLatencyMs > 0 {
-		lines = append(lines, fmt.Sprintf("*Latency:* %dms", event.Reason.AvgLatencyMs))
-	}
-	if event.DurationSeconds > 0 {
-		lines = append(lines, fmt.Sprintf("*Duration:* %.0fs", event.DurationSeconds))
-	}
-
-	return map[string]interface{}{"text": strings.Join(lines, "\n")}
-}
 
 type TestResult struct {
 	Target    string
@@ -216,65 +50,6 @@ func BuildTestPayload(results TestResults, url string) interface{} {
 		return discordTestPayload(results)
 	}
 	return slackTestPayload(results)
-}
-
-func BuildSpeedResultPayload(event SpeedTestEvent, thresholdMbps float64, belowThreshold bool, url string) interface{} {
-	title := "🚀 Speed Test Completed"
-	color := 0x22C55E
-	if belowThreshold {
-		title = "⚠️ Speed Drop Detected"
-		color = 0xEAB308
-	}
-
-	fields := []map[string]interface{}{
-		{"name": "📥 Download", "value": fmt.Sprintf("%.1f Mbps", event.DownloadMbps), "inline": true},
-	}
-	if event.UploadMbps != nil {
-		fields = append(fields, map[string]interface{}{
-			"name": "📤 Upload", "value": fmt.Sprintf("%.1f Mbps", *event.UploadMbps), "inline": true,
-		})
-	}
-	fields = append(fields,
-		map[string]interface{}{"name": "⏱️ Duration", "value": fmt.Sprintf("%.1fs", event.DurationSeconds), "inline": true},
-		map[string]interface{}{"name": "📡 Latency", "value": fmt.Sprintf("%dms", event.LatencyMs), "inline": true},
-	)
-	if belowThreshold && thresholdMbps > 0 {
-		fields = append(fields, map[string]interface{}{
-			"name": "⚠️ Threshold", "value": fmt.Sprintf("%.1f Mbps", thresholdMbps), "inline": true,
-		})
-	}
-
-	if IsDiscord(url) {
-		return map[string]interface{}{
-			"username": "Internet Monitor",
-			"embeds": []map[string]interface{}{{
-				"title":     title,
-				"color":     color,
-				"fields":    fields,
-				"timestamp": event.Timestamp.Format(time.RFC3339),
-			}},
-		}
-	}
-
-	statusIcon := "✅"
-	if belowThreshold {
-		statusIcon = "⚠️"
-	}
-	upStr := ""
-	if event.UploadMbps != nil {
-		upStr = fmt.Sprintf(" | 📤 %.1f Mbps", *event.UploadMbps)
-	}
-	text := fmt.Sprintf("*%s %s*\n📥 Download: *%.1f Mbps*%s | ⏱️ %.1fs | 📡 %dms",
-		statusIcon, title, event.DownloadMbps, upStr, event.DurationSeconds, event.LatencyMs)
-	if belowThreshold && thresholdMbps > 0 {
-		text += fmt.Sprintf("\n⚠️ Below threshold: %.1f Mbps", thresholdMbps)
-	}
-	return map[string]interface{}{
-		"blocks": []map[string]interface{}{{
-			"type": "section",
-			"text": map[string]interface{}{"type": "mrkdwn", "text": text},
-		}},
-	}
 }
 
 func discordTestPayload(results TestResults) map[string]interface{} {
@@ -353,13 +128,6 @@ func slackTestPayload(results TestResults) map[string]interface{} {
 
 func field(name, value string, inline bool) map[string]interface{} {
 	return map[string]interface{}{"name": name, "value": value, "inline": inline}
-}
-
-func boolCheck(ok bool) string {
-	if ok {
-		return ":white_check_mark:"
-	}
-	return ":x:"
 }
 
 func formatSlackResult(label string, ok bool, latMs int64, errStr string) string {

@@ -1,9 +1,9 @@
 package main
 
 import (
+	"internet-monitor/internal/alerts"
 	"internet-monitor/internal/app"
 	"internet-monitor/internal/assets"
-	"internet-monitor/internal/notifytext"
 	"internet-monitor/internal/server"
 	"internet-monitor/internal/tray"
 	"log"
@@ -22,10 +22,7 @@ func main() {
 
 	a, err := app.New(app.Options{
 		Version: Version,
-		TestNotification: func(lang string) {
-			title, body := notifytext.TestMessage(lang)
-			tray.Notify(title, body)
-		},
+		Desktop: func(launchURL func() string) alerts.Desktop { return tray.Desktop{ActionURL: launchURL} },
 	})
 	if err != nil {
 		log.Fatalf("startup failed: %v", err)

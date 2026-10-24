@@ -62,3 +62,12 @@ func TestEscapeAppleScript(t *testing.T) {
 		t.Errorf("EscapeAppleScript = %q", got)
 	}
 }
+
+func TestDuration(t *testing.T) {
+	cases := map[float64]string{0: "0 s", 42.4: "42 s", 120: "2 min", 125: "2 min 5 s", 3600: "1 h", 3900: "1 h 5 min", -5: "0 s"}
+	for in, want := range cases {
+		if got := Duration("en", in); got != want {
+			t.Errorf("Duration(%v) = %q, want %q", in, got, want)
+		}
+	}
+}

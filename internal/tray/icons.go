@@ -43,13 +43,19 @@ func orFallback(cached []byte, r, g, b uint8) []byte {
 }
 
 func blendOnColor(r, g, b uint8) []byte {
-	const size = 32
-	const iconSize = 22
-	const offset = (size - iconSize) / 2
+	data, ok := badgePNG(32, 22, r, g, b)
+	if !ok {
+		return generateFallback(r, g, b)
+	}
+	return pngToICO(data)
+}
+
+func badgePNG(size, iconSize int, r, g, b uint8) ([]byte, bool) {
+	offset := (size - iconSize) / 2
 
 	src, err := png.Decode(bytes.NewReader(customPNG))
 	if err != nil {
-		return generateFallback(r, g, b)
+		return nil, false
 	}
 
 	dst := image.NewNRGBA(image.Rect(0, 0, size, size))
@@ -93,8 +99,10 @@ func blendOnColor(r, g, b uint8) []byte {
 	draw.Draw(dst, iconRect, scaled, image.Point{}, draw.Over)
 
 	var buf bytes.Buffer
-	png.Encode(&buf, dst)
-	return pngToICO(buf.Bytes())
+	if err := png.Encode(&buf, dst); err != nil {
+		return nil, false
+	}
+	return buf.Bytes(), true
 }
 
 func generateFallback(r, g, b uint8) []byte {

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"internet-monitor/internal/alerts"
 	"internet-monitor/internal/config"
 	"internet-monitor/internal/core"
 	"internet-monitor/internal/logger"
@@ -19,8 +20,8 @@ import (
 )
 
 type Options struct {
-	Version          string
-	TestNotification func(lang string)
+	Version string
+	Desktop func(launchURL func() string) alerts.Desktop
 }
 
 type App struct {
@@ -30,6 +31,7 @@ type App struct {
 	Log     *logger.Logger
 	Server  *server.Server
 	Engine  *core.Engine
+	Alerts  *alerts.Alerts
 
 	stop chan struct{}
 	once sync.Once
@@ -73,23 +75,39 @@ func New(opts Options) (*App, error) {
 	sound.SetDir(dir)
 	notifytext.SetLang(cfg.Language)
 
+	history := alerts.OpenHistory(lgr.LogDir, lgr.AppLog)
+	var al *alerts.Alerts
 	srv := server.New(server.Options{
 		Store:               store,
 		Logger:              lgr,
 		Version:             opts.Version,
 		AppDir:              dir,
 		NativeNotifications: true,
+		History:             history,
 		Hooks: server.Hooks{
-			TestNotification: opts.TestNotification,
-			PlaySound:        sound.Play,
+			TestNotification: func(lang string) { al.Test(lang) },
+			PlaySound:        func() { sound.PlayAt(store.Get().Notifications.Sound.Volume) },
 			TestWebhook:      lgr.SendTestWebhook,
 			CheckUpdate:      func() (*updater.Info, error) { return updater.Check(opts.Version) },
 			ApplyUpdate:      updater.Apply,
 			Restart:          updater.Restart,
+			SpeedResult:      func(ev logger.SpeedTestEvent, threshold float64, below bool) { al.OnSpeedResult(ev, threshold, below) },
 		},
+	})
+	var desktop alerts.Desktop
+	if opts.Desktop != nil {
+		desktop = opts.Desktop(srv.LaunchURL)
+	}
+	al = alerts.New(cfg, alerts.Options{
+		Desktop: desktop,
+		Remote:  lgr,
+		History: history,
+		Publish: srv.PublishNotification,
+		Logf:    lgr.AppLog,
 	})
 	engine := core.New(cfg, monitor.NewChecker(cfg), lgr, opts.Version)
 	store.Subscribe(engine.ApplyConfig)
+	store.Subscribe(al.ApplyConfig)
 
 	if err := srv.Start(cfg.DashboardPort); err != nil {
 		lgr.AppLog("port %d unavailable (%v); using a free port instead", cfg.DashboardPort, err)
@@ -106,6 +124,7 @@ func New(opts Options) (*App, error) {
 		Log:     lgr,
 		Server:  srv,
 		Engine:  engine,
+		Alerts:  al,
 		stop:    make(chan struct{}),
 	}, nil
 }
@@ -119,7 +138,7 @@ func (a *App) LogDir() string {
 }
 
 func (a *App) Run(notifiers ...core.Notifier) {
-	multi := core.MultiNotifier{server.NewNotifier(a.Server)}
+	multi := core.MultiNotifier{server.NewNotifier(a.Server), a.Alerts}
 	multi = append(multi, notifiers...)
 	a.Engine.Notifier = multi
 	a.Engine.Start()
@@ -149,6 +168,7 @@ func (a *App) Stop() {
 	a.once.Do(func() {
 		close(a.stop)
 		a.Engine.Stop()
+		a.Alerts.Close()
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		if err := a.Server.Shutdown(ctx); err != nil {

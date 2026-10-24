@@ -109,16 +109,6 @@ func (l *Logger) Log(event monitor.Event) {
 		l.AppLog("ERROR open log file: %v", err)
 	}
 
-	if l.cfg.WebhookURL != "" {
-		if !IsSupportedWebhook(l.cfg.WebhookURL) {
-			l.AppLog("WEBHOOK skipped: URL is not Discord or Slack")
-		} else {
-			go l.sendWebhook(l.cfg.WebhookURL, BuildEventPayload(event, l.cfg.WebhookURL))
-		}
-	}
-	if l.cfg.TelegramBotToken != "" && l.cfg.TelegramChatID != "" {
-		go l.sendTelegram(l.cfg.TelegramBotToken, l.cfg.TelegramChatID, TelegramEventText(event))
-	}
 }
 
 type SpeedTestEvent struct {
@@ -202,7 +192,8 @@ func (l *Logger) CleanupOldLogs(maxAge time.Duration) {
 		}
 		if !strings.HasPrefix(name, "connectivity_") &&
 			!strings.HasPrefix(name, "speedtest_") &&
-			!strings.HasPrefix(name, "metrics_") {
+			!strings.HasPrefix(name, "metrics_") &&
+			!strings.HasPrefix(name, "notifications_") {
 			continue
 		}
 		info, err := e.Info()
@@ -217,15 +208,29 @@ func (l *Logger) CleanupOldLogs(maxAge time.Duration) {
 	}
 }
 
-func (l *Logger) SendSpeedTestResult(webhookURL string, event SpeedTestEvent, thresholdMbps float64, belowThreshold bool) {
-	if webhookURL != "" && IsSupportedWebhook(webhookURL) {
-		go l.sendWebhook(webhookURL, BuildSpeedResultPayload(event, thresholdMbps, belowThreshold, webhookURL))
-	}
+func (l *Logger) remoteTargets() (url, token, chat string) {
 	l.mu.Lock()
-	tgToken, tgChat := l.cfg.TelegramBotToken, l.cfg.TelegramChatID
-	l.mu.Unlock()
-	if tgToken != "" && tgChat != "" {
-		go l.sendTelegram(tgToken, tgChat, TelegramSpeedText(event, thresholdMbps, belowThreshold))
+	defer l.mu.Unlock()
+	return l.cfg.WebhookURL, l.cfg.TelegramBotToken, l.cfg.TelegramChatID
+}
+
+func (l *Logger) SendEvent(lang string, event monitor.Event, kind string, webhook, telegram bool) {
+	url, token, chat := l.remoteTargets()
+	if webhook && url != "" && IsSupportedWebhook(url) {
+		go l.sendWebhook(url, BuildEventPayload(lang, event, kind, url))
+	}
+	if telegram && token != "" && chat != "" {
+		go l.sendTelegram(token, chat, TelegramEventText(lang, event, kind))
+	}
+}
+
+func (l *Logger) SendSpeed(lang string, event SpeedTestEvent, thresholdMbps float64, below, webhook, telegram bool) {
+	url, token, chat := l.remoteTargets()
+	if webhook && url != "" && IsSupportedWebhook(url) {
+		go l.sendWebhook(url, BuildSpeedResultPayload(lang, event, thresholdMbps, below, url))
+	}
+	if telegram && token != "" && chat != "" {
+		go l.sendTelegram(token, chat, TelegramSpeedText(lang, event, thresholdMbps, below))
 	}
 }
 
@@ -251,6 +256,9 @@ func (l *Logger) sendTelegram(token, chatID, text string) {
 		return
 	}
 	resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		l.AppLog("TELEGRAM HTTP %d", resp.StatusCode)
+	}
 }
 
 func (l *Logger) sendWebhook(url string, payload interface{}) {

@@ -63,3 +63,29 @@ func TestApplyConfigNonBlocking(t *testing.T) {
 		e.ApplyConfig(config.Default())
 	}
 }
+
+type plainNotifier struct{ events int }
+
+func (p *plainNotifier) OnTick(types.CheckResult, types.Status) {}
+func (p *plainNotifier) OnEvent(types.Event)                    { p.events++ }
+
+type initialNotifier struct {
+	plainNotifier
+	initial int
+}
+
+func (i *initialNotifier) OnInitialEvent(types.Event) { i.initial++ }
+
+func TestMultiNotifierForwardsInitialEventOnlyToOptIns(t *testing.T) {
+	plain, opt := &plainNotifier{}, &initialNotifier{}
+	m := MultiNotifier{plain, nil, opt}
+	var n Notifier = m
+	init, ok := n.(InitialEventNotifier)
+	if !ok {
+		t.Fatal("MultiNotifier does not forward initial events")
+	}
+	init.OnInitialEvent(types.Event{EventType: "disconnected"})
+	if opt.initial != 1 || plain.events != 0 || opt.events != 0 {
+		t.Fatalf("plain=%d opt=%+v", plain.events, opt)
+	}
+}

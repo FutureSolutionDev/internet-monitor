@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"internet-monitor/internal/alerts"
 	"internet-monitor/internal/config"
 	"internet-monitor/internal/logger"
 	"internet-monitor/internal/updater"
@@ -22,6 +23,7 @@ type Hooks struct {
 	CheckUpdate      func() (*updater.Info, error)
 	ApplyUpdate      func(downloadURL string) error
 	Restart          func()
+	SpeedResult      func(event logger.SpeedTestEvent, thresholdMbps float64, below bool)
 }
 
 type Options struct {
@@ -31,6 +33,7 @@ type Options struct {
 	AppDir              string
 	NativeNotifications bool
 	Hooks               Hooks
+	History             *alerts.History
 }
 
 type Server struct {
@@ -42,6 +45,7 @@ type Server struct {
 	token   string
 	native  bool
 	hooks   Hooks
+	history *alerts.History
 
 	port     int
 	srv      *http.Server
@@ -54,6 +58,7 @@ type Server struct {
 	speed  *speedRunner
 	avail  *availabilityCache
 	tester *rateLimiter
+	toasts *rateLimiter
 }
 
 func New(opts Options) *Server {
@@ -66,11 +71,13 @@ func New(opts Options) *Server {
 		token:    newToken(),
 		native:   opts.NativeNotifications,
 		hooks:    opts.Hooks,
+		history:  opts.History,
 		shutdown: make(chan struct{}),
 		hub:      newHub(),
 		live:     newLiveState(),
 		update:   &updateState{},
 		tester:   newRateLimiter(time.Minute),
+		toasts:   newRateLimiter(2 * time.Second),
 	}
 	s.speed = &speedRunner{s: s}
 	s.avail = &availabilityCache{s: s}
@@ -137,6 +144,9 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /api/speed-test/start", s.serveSpeedTestStart)
 	mux.HandleFunc("POST /api/speed-test/cancel", s.serveSpeedTestCancel)
 	mux.HandleFunc("GET /api/speed-test/history", s.serveSpeedTestHistory)
+
+	mux.HandleFunc("GET /api/notifications", s.serveNotifications)
+	mux.HandleFunc("POST /api/notifications/read", s.serveNotificationsRead)
 
 	mux.HandleFunc("HEAD /notification-sound", s.serveSoundGet)
 	mux.HandleFunc("GET /notification-sound", s.serveSoundGet)

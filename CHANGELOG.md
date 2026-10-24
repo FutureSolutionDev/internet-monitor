@@ -33,9 +33,23 @@ The v2 rebuild.
   **FAQ**, **About**, **Contact** (WhatsApp, Discord, email, GitHub), **Privacy**
   and **Terms of use**, linked from the sidebar.
 - Unsaved-changes guard in Settings.
+- **Notification controls** (`notifications` in `config.json`): sound on/off and
+  volume, quiet hours (mute the sound or the whole desktop alert, per weekday,
+  windows across midnight), an on/off switch per event (down, unstable, restored,
+  speed test) and per channel (desktop, webhook, Telegram), a minimum outage
+  length before alerting, and repeat reminders while offline. Defaults keep the
+  previous behaviour.
+- **Notification history**: every alert, with where it was sent or why it was
+  muted, in `logs/notifications_YYYY-MM-DD.jsonl`; `GET /api/notifications` and
+  `POST /api/notifications/read`, plus a live `notification` event.
+- Richer Windows toasts: a coloured status icon, the time, an "Open dashboard"
+  button, and a new alert replaces the previous one instead of piling up.
+- Webhook and Telegram messages follow the app language.
 - CI `web` job (typecheck, lint, test, build); Go jobs reuse its `web-dist` artifact.
 
 ### Changed
+- The fixed 4-second desktop alert cooldown is gone; a quick drop-and-return now
+  shows both alerts. Use the minimum outage length to hide short blips.
 - Repository layout: entry points in `cmd/tray` and `cmd/gui`, packages under
   `internal/`; the old vanilla-JS UI in `internal/server/assets` is removed.
 - Building from source now requires [bun](https://bun.sh) (CI pins 1.3.14) in

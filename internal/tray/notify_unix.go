@@ -4,8 +4,8 @@ package tray
 
 import (
 	"fmt"
+	"internet-monitor/internal/alerts"
 	"internet-monitor/internal/notifytext"
-	"internet-monitor/internal/sound"
 	"os"
 	"os/exec"
 	"runtime"
@@ -33,14 +33,13 @@ func opener() string {
 	return "xdg-open"
 }
 
-func Notify(title, message string) {
-	sound.Play()
+func showDesktop(t alerts.Toast, _ string) {
 	if runtime.GOOS == "darwin" {
 		start("osascript", "-e", fmt.Sprintf(`display notification "%s" with title "%s"`,
-			notifytext.EscapeAppleScript(message), notifytext.EscapeAppleScript(title)))
+			notifytext.EscapeAppleScript(t.Body), notifytext.EscapeAppleScript(t.Title)))
 		return
 	}
-	start("notify-send", "-a", "Internet Monitor", title, message)
+	start("notify-send", "-a", "Internet Monitor", t.Title, t.Body)
 }
 
 func OpenURL(url string) {

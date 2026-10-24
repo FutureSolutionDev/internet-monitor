@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"internet-monitor/internal/i18n"
 	"internet-monitor/internal/types"
+	"math"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -106,6 +107,27 @@ func Build(lang string, status types.Status, r types.CheckResult) (title, body s
 			return title, i18n.T(lang, "notify.down.failed", i18n.Vars{"layers": strings.Join(parts, " + ")})
 		}
 		return title, i18n.T(lang, "notify.down.lost", nil)
+	}
+}
+
+func Duration(lang string, seconds float64) string {
+	s := int(math.Round(seconds))
+	if s < 0 {
+		s = 0
+	}
+	switch {
+	case s < 60:
+		return i18n.T(lang, "duration.s", i18n.Vars{"s": s})
+	case s < 3600:
+		if s%60 == 0 {
+			return i18n.T(lang, "duration.m", i18n.Vars{"m": s / 60})
+		}
+		return i18n.T(lang, "duration.ms", i18n.Vars{"m": s / 60, "s": s % 60})
+	default:
+		if (s%3600)/60 == 0 {
+			return i18n.T(lang, "duration.h", i18n.Vars{"h": s / 3600})
+		}
+		return i18n.T(lang, "duration.hm", i18n.Vars{"h": s / 3600, "m": (s % 3600) / 60})
 	}
 }
 

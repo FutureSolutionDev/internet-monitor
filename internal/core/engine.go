@@ -18,6 +18,10 @@ type Notifier interface {
 	OnEvent(event types.Event)
 }
 
+type InitialEventNotifier interface {
+	OnInitialEvent(event types.Event)
+}
+
 type MultiNotifier []Notifier
 
 func recoverFan() {
@@ -47,6 +51,19 @@ func (m MultiNotifier) OnEvent(e types.Event) {
 			defer recoverFan()
 			n.OnEvent(e)
 		}(n)
+	}
+}
+
+func (m MultiNotifier) OnInitialEvent(e types.Event) {
+	for _, n := range m {
+		i, ok := n.(InitialEventNotifier)
+		if !ok {
+			continue
+		}
+		func() {
+			defer recoverFan()
+			i.OnInitialEvent(e)
+		}()
 	}
 }
 
@@ -290,8 +307,12 @@ func (e *Engine) runCheck() {
 		if !isFirst || newStatus != types.StatusConnected {
 			e.lgr.Log(event)
 		}
-		if !isFirst && e.Notifier != nil {
-			e.safeNotify(func() { e.Notifier.OnEvent(event) })
+		if e.Notifier != nil {
+			if !isFirst {
+				e.safeNotify(func() { e.Notifier.OnEvent(event) })
+			} else if n, ok := e.Notifier.(InitialEventNotifier); ok && newStatus != types.StatusConnected {
+				e.safeNotify(func() { n.OnInitialEvent(event) })
+			}
 		}
 
 		s := newStatus

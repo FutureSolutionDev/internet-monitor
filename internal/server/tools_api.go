@@ -194,6 +194,10 @@ func (s *Server) sendTestWebhook(results testTargetsResponse) {
 }
 
 func (s *Server) serveTestNotification(w http.ResponseWriter, r *http.Request) {
+	if !s.toasts.allow("test") {
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "wait a moment before testing again")
+		return
+	}
 	lang := i18n.Normalize(r.URL.Query().Get("lang"))
 	s.logf("NOTIFICATION test triggered by user (lang=%s)", lang)
 	if s.hooks.TestNotification != nil {

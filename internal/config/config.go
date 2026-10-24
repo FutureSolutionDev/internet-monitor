@@ -34,6 +34,7 @@ type Config struct {
 	UseICMP             bool            `json:"use_icmp"`
 	Language            string          `json:"language"`
 	SpeedTest           SpeedTestConfig `json:"speed_test"`
+	Notifications       Notifications   `json:"notifications"`
 }
 
 const (
@@ -61,6 +62,7 @@ func Default() Config {
 			TimeoutSeconds:      30,
 			UploadTarget:        "https://speed.cloudflare.com/__up",
 		},
+		Notifications: DefaultNotifications(),
 	}
 }
 
@@ -70,6 +72,7 @@ func (c Config) Clone() Config {
 	out.HTTPTargets = cloneStrings(c.HTTPTargets)
 	out.DNSTargets = cloneStrings(c.DNSTargets)
 	out.SpeedTest.DownloadTargets = cloneStrings(c.SpeedTest.DownloadTargets)
+	out.Notifications = c.Notifications.Clone()
 	return out
 }
 
@@ -166,6 +169,7 @@ func (c *Config) Sanitize() {
 	if c.SpeedTest.ScheduleMinutes < 0 {
 		c.SpeedTest.ScheduleMinutes = 0
 	}
+	c.Notifications.Sanitize()
 }
 
 func cleanTargets(in []string) []string {
