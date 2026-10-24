@@ -2192,13 +2192,13 @@ select.input {
 
 .cl-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 190px;
+  grid-template-columns: 190px minmax(0, 1fr);
   gap: 32px;
   align-items: start;
 }
 
 .cl-map {
-  grid-column: 2;
+  grid-column: 1;
   grid-row: 1;
   position: sticky;
   top: calc(var(--layout-topbar) + 16px);
@@ -2207,8 +2207,8 @@ select.input {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding-inline-start: 16px;
-  border-inline-start: 1px solid var(--border-subtle);
+  padding-inline-end: 16px;
+  border-inline-end: 1px solid var(--border-subtle);
 }
 
 .cl-map-title {
@@ -2258,7 +2258,7 @@ select.input {
   content: "";
   position: absolute;
   inset-block: 7px;
-  inset-inline-start: -17px;
+  inset-inline-end: -17px;
   width: 2px;
   border-radius: 2px;
   background: var(--accent-blue);
@@ -2273,7 +2273,7 @@ select.input {
 }
 
 .cl-timeline {
-  grid-column: 1;
+  grid-column: 2;
   grid-row: 1;
   position: relative;
   min-width: 0;
@@ -2466,6 +2466,10 @@ select.input {
   visibility: hidden;
 }
 
+.cl-panel[hidden] {
+  display: none;
+}
+
 .cl-panel {
   display: grid;
   gap: 18px;
@@ -2555,7 +2559,8 @@ select.input {
   }
 
   .cl-map-label {
-    margin: 0 4px 0 0;
+    margin: 0;
+    margin-inline-end: 4px;
     white-space: nowrap;
   }
 
@@ -2568,6 +2573,7 @@ select.input {
   }
 
   .cl-timeline {
+    grid-column: 1;
     grid-row: 2;
   }
 }
