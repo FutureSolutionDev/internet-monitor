@@ -218,6 +218,7 @@ export function Settings() {
       return;
     }
     setSaving(true);
+    const sent = state.draft;
     try {
       let r: Awaited<ReturnType<typeof api.saveConfig>>;
       try {
@@ -235,7 +236,14 @@ export function Settings() {
           Number(e instanceof ApiError ? e.body.revision : 0),
         );
       }
-      setState({ base: r.config, revision: r.revision, draft: draftFrom(r.config) });
+      const saved = r;
+      setState((s) => {
+        const draft = draftFrom(saved.config);
+        if (s)
+          for (const key of Object.keys(draft) as (keyof Draft)[])
+            if (s.draft[key] !== sent[key]) Object.assign(draft, { [key]: s.draft[key] });
+        return { base: saved.config, revision: saved.revision, draft };
+      });
       setSubmitted(false);
       setServerIssue({});
       setRemote(null);

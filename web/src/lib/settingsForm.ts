@@ -108,9 +108,20 @@ function notificationDraft(n: NotificationSettings) {
   };
 }
 
+const ARABIC_DIGITS = /[٠-٩۰-۹]/g;
+
+export function toNumber(raw: string): number {
+  return Number(
+    raw
+      .trim()
+      .replace(ARABIC_DIGITS, (d) => String(d.charCodeAt(0) & 0xf))
+      .replace(/٫/g, "."),
+  );
+}
+
 export function notificationsFrom(d: Draft, base: NotificationSettings): NotificationSettings {
   const num = (raw: string, fallback: number) => {
-    const n = Number(raw);
+    const n = toNumber(raw);
     return raw.trim() !== "" && Number.isInteger(n) ? n : fallback;
   };
   return {
@@ -186,7 +197,7 @@ export function isSafeLogDir(v: string): boolean {
 
 function numberIssue(raw: string, min: number, max?: number, integer = true): FieldIssue | undefined {
   if (raw.trim() === "") return { key: "err_required" };
-  const n = Number(raw);
+  const n = toNumber(raw);
   if (!Number.isFinite(n) || (integer && !Number.isInteger(n)) || n < min || (max !== undefined && n > max)) {
     return max === undefined ? { key: "err_min", vars: { min } } : { key: "err_range", vars: { min, max } };
   }
@@ -267,7 +278,7 @@ const sameList = (a: string[], b: string[] | null | undefined) => {
 export function buildChanges(d: Draft, base: ConfigView): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   const num = (raw: string, current: number, key: string) => {
-    const n = Number(raw);
+    const n = toNumber(raw);
     if (raw.trim() !== "" && Number.isFinite(n) && n !== current) out[key] = n;
   };
   num(d.check_interval_sec, base.check_interval_sec, "check_interval_sec");
@@ -290,7 +301,7 @@ export function buildChanges(d: Draft, base: ConfigView): Record<string, unknown
   const st = base.speed_test;
   const speed: Record<string, unknown> = {};
   const snum = (raw: string, current: number, key: string) => {
-    const n = Number(raw);
+    const n = toNumber(raw);
     if (raw.trim() !== "" && Number.isFinite(n) && n !== current) speed[key] = n;
   };
   snum(d.speed_timeout, st.timeout_seconds, "timeout_seconds");

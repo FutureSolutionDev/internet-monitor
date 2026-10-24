@@ -1413,6 +1413,10 @@ select.input {
   max-width: min(420px, calc(100vw - 32px));
 }
 
+body:has(.savebar) .toasts {
+  bottom: 92px;
+}
+
 .toast {
   display: flex;
   align-items: flex-start;
@@ -2876,6 +2880,7 @@ select.input {
     grid-column: 1;
     position: static;
     max-height: none;
+    overflow-x: auto;
     flex-direction: row;
     align-items: center;
     gap: 16px;
@@ -3146,6 +3151,10 @@ select.input {
     bottom: 12px;
     border-radius: var(--radius-lg);
     flex-wrap: wrap;
+  }
+
+  body:has(.savebar) .toasts {
+    bottom: 124px;
   }
 
   .kpis {

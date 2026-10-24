@@ -72,7 +72,7 @@ export function Contact() {
                   icon={Copy}
                   aria-label={t("contact_copy", { name })}
                   title={t("contact_copy", { name })}
-                  onClick={() => void copy(c.handle)}
+                  onClick={() => void copy(c.href.startsWith("mailto:") ? c.href.slice(7) : c.href)}
                 />
               </div>
             </li>

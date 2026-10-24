@@ -275,7 +275,12 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
             ))}
           </nav>
           {version ? (
-            <a className="num version-link" href={hrefOf("changelog")} onClick={(e) => go(e, "changelog")}>
+            <a
+              className="num version-link"
+              href={hrefOf("changelog")}
+              aria-label={t("version_current", { v: version })}
+              onClick={(e) => go(e, "changelog")}
+            >
               <span className="version-long">{t("version_current", { v: version })}</span>
               <span className="version-short" aria-hidden>
                 {version}
@@ -291,7 +296,7 @@ export function Shell({ route, children }: { route: Route; children: ReactNode }
         tabIndex={-1}
         onClick={() => closeDrawer(true)}
       />
-      <div className="main">
+      <div className="main" inert={phone && drawer}>
         <header className="topbar">
           <Button
             ref={menuButton}

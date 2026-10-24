@@ -26,7 +26,8 @@ export function useAsync<T>(load: (signal: AbortSignal) => Promise<T>, deps: unk
         if (!ctrl.signal.aborted) setState({ data, error: null, loading: false, scope });
       },
       (error: unknown) => {
-        if (!ctrl.signal.aborted) setState((s) => ({ ...s, error, loading: false }));
+        if (!ctrl.signal.aborted)
+          setState((s) => ({ data: s.scope === scope ? s.data : null, error, loading: false, scope }));
       },
     );
     return () => ctrl.abort();
@@ -34,7 +35,7 @@ export function useAsync<T>(load: (signal: AbortSignal) => Promise<T>, deps: unk
   const current = state.scope === scope;
   return {
     data: current ? state.data : null,
-    error: state.error,
+    error: current ? state.error : null,
     loading: state.loading || !current,
     reload: () => setNonce((n) => n + 1),
   };
