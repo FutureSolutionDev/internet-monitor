@@ -93,7 +93,7 @@ export function NotificationsSection({ draft, set, err, base }: SectionProps & {
     <Card id="notifications" className="settings-section" labelledBy="notifications-title">
       <CardHead id="notifications-title" title={t("sec_notifications")} sub={t("n_sub")} />
       <div className="form-grid">
-        <div className="switch-row full">
+        <div className="switch-row full" id="n-sound">
           <div className="field">
             <span className="field-label">{t("n_sound")}</span>
             <span className="field-hint" id={soundHint}>
@@ -146,7 +146,7 @@ export function NotificationsSection({ draft, set, err, base }: SectionProps & {
 
         <hr className="divider full" />
 
-        <div className="switch-row full">
+        <div className="switch-row full" id="n-quiet">
           <div className="field">
             <span className="field-label">{t("n_quiet")}</span>
             <span className="field-hint" id={quietHint}>
@@ -277,6 +277,7 @@ export function NotificationsSection({ draft, set, err, base }: SectionProps & {
         <hr className="divider full" />
 
         <TextField
+          anchor="n-min-outage"
           label={t("n_min_outage")}
           hint={t("n_min_outage_hint")}
           error={err("min_outage")}
@@ -287,6 +288,7 @@ export function NotificationsSection({ draft, set, err, base }: SectionProps & {
           narrow
         />
         <TextField
+          anchor="n-reminder"
           label={t("n_reminder")}
           hint={t("n_reminder_hint")}
           error={err("reminder")}

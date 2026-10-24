@@ -1,5 +1,6 @@
 import { MessagesSquare } from "lucide-react";
 import { Fragment } from "react";
+import { RichText } from "../components/RichText";
 import { RouteLink } from "../components/RouteLink";
 import { FAQ } from "../content/faq";
 import { formatNumber } from "../lib/format";
@@ -41,7 +42,9 @@ export function Faq() {
                         <span className="faq-idx num">{t("faq_q", { n: formatNumber(lang, index) })}</span>
                         <h3 id={`faq-q-${item.id}`}>{t(item.q)}</h3>
                       </div>
-                      <p className="faq-a">{t(item.a)}</p>
+                      <p className="faq-a">
+                        <RichText text={t(item.a)} />
+                      </p>
                     </article>
                   </div>
                 );

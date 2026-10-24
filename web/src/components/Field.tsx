@@ -7,16 +7,17 @@ interface FieldProps {
   hint?: ReactNode;
   error?: string;
   className?: string;
+  anchor?: string;
   children: (ids: { inputId: string; describedBy: string | undefined; invalid: boolean }) => ReactNode;
 }
 
-export function Field({ label, hint, error, className, children }: FieldProps) {
+export function Field({ label, hint, error, className, anchor, children }: FieldProps) {
   const inputId = useId();
   const hintId = useId();
   const errorId = useId();
   const describedBy = [hint ? hintId : "", error ? errorId : ""].filter(Boolean).join(" ") || undefined;
   return (
-    <div className={["field", className].filter(Boolean).join(" ")}>
+    <div id={anchor} className={["field", className].filter(Boolean).join(" ")}>
       <label className="field-label" htmlFor={inputId}>
         {label}
       </label>
@@ -51,6 +52,7 @@ interface TextFieldProps {
   disabled?: boolean;
   type?: "text" | "password" | "url";
   autoComplete?: string;
+  anchor?: string;
 }
 
 export function TextField({
@@ -68,9 +70,10 @@ export function TextField({
   disabled,
   type = "text",
   autoComplete = "off",
+  anchor,
 }: TextFieldProps) {
   return (
-    <Field label={label} hint={hint} error={error} className={className}>
+    <Field label={label} hint={hint} error={error} className={className} anchor={anchor}>
       {({ inputId, describedBy, invalid }) => (
         <div className={["input-wrap", narrow && "input-narrow"].filter(Boolean).join(" ")}>
           <input

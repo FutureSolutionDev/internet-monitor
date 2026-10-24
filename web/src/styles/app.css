@@ -3632,3 +3632,36 @@ select.input {
   font-size: var(--text-sm);
   line-height: 1.6;
 }
+
+.text-link {
+  color: var(--accent-blue);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent-blue) 45%, transparent);
+  text-underline-offset: 3px;
+}
+
+.text-link:hover {
+  text-decoration-color: currentColor;
+}
+
+.spotlight {
+  border-radius: var(--radius-md);
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 6px;
+  animation: spotlight 1.3s var(--ease-out) 2;
+}
+
+@keyframes spotlight {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-blue) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 18px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight {
+    animation: none;
+  }
+}

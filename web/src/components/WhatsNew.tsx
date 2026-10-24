@@ -29,6 +29,7 @@ export function WhatsNew() {
   const running = useLive((s) => s.snapshot?.version);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const ref = useRef<HTMLDialogElement>(null);
+  const done = useRef<HTMLButtonElement>(null);
   const titleId = useId();
 
   const release = useMemo(() => {
@@ -45,6 +46,7 @@ export function WhatsNew() {
     if (open && !d.open) {
       if (typeof d.showModal === "function") d.showModal();
       else d.setAttribute("open", "");
+      done.current?.focus();
     }
     if (!open && d.open) {
       if (typeof d.close === "function") d.close();
@@ -110,7 +112,7 @@ export function WhatsNew() {
         <Button variant="ghost" onClick={() => close(() => navigate("changelog"))}>
           {t("wn_all")}
         </Button>
-        <Button variant="solid" onClick={() => close()} autoFocus>
+        <Button ref={done} variant="solid" onClick={() => close()}>
           {t("wn_close")}
         </Button>
       </div>

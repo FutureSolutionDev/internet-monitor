@@ -68,6 +68,10 @@ export function routeOf(pathname: string): Route {
   return "overview";
 }
 
+export function isRoute(v: string): v is Route {
+  return Object.hasOwn(paths, v);
+}
+
 export function hrefOf(route: Route, search = ""): string {
   return paths[route] + search;
 }
