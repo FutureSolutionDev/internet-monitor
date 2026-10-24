@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/xml"
 	"net/url"
-	"path/filepath"
 	"strings"
 )
 
@@ -30,7 +29,7 @@ func escapeAttr(s string) string {
 }
 
 func fileURI(path string) string {
-	u := url.URL{Scheme: "file", Path: "/" + strings.TrimPrefix(filepath.ToSlash(path), "/")}
+	u := url.URL{Scheme: "file", Path: "/" + strings.TrimPrefix(strings.ReplaceAll(path, `\`, "/"), "/")}
 	return u.String()
 }
 

@@ -209,7 +209,7 @@ func (c Config) ValidateChanges(prev Config, all bool) error {
 }
 
 func validateLogDir(dir string) error {
-	if filepath.IsAbs(dir) || filepath.VolumeName(dir) != "" || strings.HasPrefix(dir, "/") || strings.HasPrefix(dir, `\`) {
+	if filepath.IsAbs(dir) || filepath.VolumeName(dir) != "" || hasDriveLetter(dir) || strings.HasPrefix(dir, "/") || strings.HasPrefix(dir, `\`) {
 		return fieldError("log_dir", "must be a folder inside the app directory")
 	}
 	for _, part := range strings.FieldsFunc(dir, func(r rune) bool { return r == '/' || r == '\\' }) {
@@ -218,6 +218,10 @@ func validateLogDir(dir string) error {
 		}
 	}
 	return nil
+}
+
+func hasDriveLetter(dir string) bool {
+	return len(dir) >= 2 && dir[1] == ':' && (dir[0]|0x20 >= 'a' && dir[0]|0x20 <= 'z')
 }
 
 type FieldError struct {
