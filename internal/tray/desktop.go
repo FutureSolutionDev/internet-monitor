@@ -17,14 +17,3 @@ func (d Desktop) Show(t alerts.Toast) {
 	}
 	showDesktop(t, action)
 }
-
-func toastTag(kind alerts.Kind) (tag, group string) {
-	switch kind {
-	case alerts.KindSpeed:
-		return "speed", "speed"
-	case alerts.KindTest:
-		return "test", "test"
-	default:
-		return "status", "connection"
-	}
-}
