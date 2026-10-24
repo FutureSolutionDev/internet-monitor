@@ -2,6 +2,7 @@ package updater
 
 import (
 	"bytes"
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -282,6 +284,8 @@ func compareVersions(a, b string) int {
 		return 0
 	}
 
+	a, preA, _ := strings.Cut(strings.SplitN(a, "+", 2)[0], "-")
+	b, preB, _ := strings.Cut(strings.SplitN(b, "+", 2)[0], "-")
 	partsA := strings.SplitN(a, ".", 3)
 	partsB := strings.SplitN(b, ".", 3)
 
@@ -300,5 +304,37 @@ func compareVersions(a, b string) int {
 			return -1
 		}
 	}
-	return 0
+	return comparePrerelease(preA, preB)
+}
+
+func comparePrerelease(a, b string) int {
+	switch {
+	case a == b:
+		return 0
+	case a == "":
+		return 1
+	case b == "":
+		return -1
+	}
+	idsA := strings.Split(a, ".")
+	idsB := strings.Split(b, ".")
+	for i := 0; i < len(idsA) && i < len(idsB); i++ {
+		na, errA := strconv.Atoi(idsA[i])
+		nb, errB := strconv.Atoi(idsB[i])
+		switch {
+		case errA == nil && errB == nil:
+			if na != nb {
+				return cmp.Compare(na, nb)
+			}
+		case errA == nil:
+			return -1
+		case errB == nil:
+			return 1
+		default:
+			if c := strings.Compare(idsA[i], idsB[i]); c != 0 {
+				return c
+			}
+		}
+	}
+	return cmp.Compare(len(idsA), len(idsB))
 }
