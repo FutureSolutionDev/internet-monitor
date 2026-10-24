@@ -3007,40 +3007,62 @@ select.input {
   }
 }
 
+@page {
+  size: A4;
+  margin: 0;
+}
+
 @media print {
-  :root {
-    color-scheme: light;
-    --color-canvas: #fff;
-    --color-surface: #fff;
-    --color-surface-top: #fff;
-    --color-surface-raised: #f3f5f9;
-    --color-track: #e3e7ee;
-    --gradient-card: #fff;
-    --gradient-row: #f6f8fb;
-    --text-primary: #12151b;
-    --text-secondary: #3f4652;
-    --text-tertiary: #5d6470;
-    --accent-green: #2b7d36;
-    --accent-amber: #a85f00;
-    --accent-coral: #c13f3b;
-    --accent-blue: #1f68b8;
-    --shadow-card: none;
+  html,
+  body {
+    background: var(--color-canvas) !important;
   }
 
-  .no-print {
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .no-print,
+  .toasts {
     display: none !important;
   }
 
-  .card {
-    border: 1px solid #e3e7ee;
+  .report {
+    max-width: none;
+    padding: 10mm 10mm 12mm;
+    gap: 12px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  .kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .card,
+  .kpis,
+  .table tr {
     break-inside: avoid;
   }
 
-  .report {
-    padding: 0;
+  .card:has(.table) {
+    break-inside: auto;
   }
 
-  .meter-fill {
-    box-shadow: none;
+  .card-head {
+    break-after: avoid;
+  }
+
+  .table thead {
+    display: table-header-group;
+  }
+
+  .table-wrap {
+    overflow: visible;
   }
 }
