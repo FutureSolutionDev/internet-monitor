@@ -9,10 +9,10 @@ export interface DonateConfig {
 }
 
 export const DONATE: DonateConfig = {
-  paypal: "",
-  vodafoneCash: "",
-  instapay: "",
-  instapayLink: "",
+  paypal: "https://www.paypal.com/ncp/payment/9T8REJA5D7Z4U",
+  vodafoneCash: "01069017890",
+  instapay: "01069017890",
+  instapayLink: "https://ipn.eg/S/sabryadawood/instapay/6APpJc",
 };
 
 export type DonateAccent = "blue" | "coral" | "violet";
@@ -42,7 +42,8 @@ function httpsOn(raw: string, hosts: Set<string>): boolean {
 export const isPaypalLink = (raw: string) => httpsOn(raw, PAYPAL_HOSTS);
 export const isInstapayLink = (raw: string) => httpsOn(raw, INSTAPAY_HOSTS);
 export const isVodafoneCash = (raw: string) => /^010\d{8}$/.test(raw);
-export const isInstapayAddress = (raw: string) => /^[a-z0-9._-]+@instapay$/i.test(raw);
+export const isInstapayAddress = (raw: string) =>
+  /^[a-z0-9._-]+@instapay$/i.test(raw) || /^01[0125]\d{8}$/.test(raw);
 
 export function donateMethods(cfg: DonateConfig = DONATE): DonateMethod[] {
   const out: DonateMethod[] = [];
@@ -69,7 +70,7 @@ export function donateMethods(cfg: DonateConfig = DONATE): DonateMethod[] {
       handle: phone,
     });
   }
-  const address = cfg.instapay.trim();
+  const address = cfg.instapay.replace(/[\s-]/g, "");
   const link = cfg.instapayLink.trim();
   if (isInstapayAddress(address)) {
     out.push({

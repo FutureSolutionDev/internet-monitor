@@ -33,6 +33,11 @@ describe("donation methods", () => {
     expect(donateMethods({ ...EMPTY, ...partial })).toEqual([]);
   });
 
+  test("InstaPay accepts an Egyptian mobile number as well as an address", () => {
+    expect(donateMethods({ ...EMPTY, instapay: "0112 345 6789" })[0]?.handle).toBe("01123456789");
+    expect(donateMethods({ ...EMPTY, instapay: "01312345678" })).toEqual([]);
+  });
+
   test("an InstaPay link on another host is dropped but the address stays", () => {
     const [m] = donateMethods({ ...EMPTY, instapay: "x@instapay", instapayLink: "https://evil.example/pay" });
     expect(m?.href).toBeUndefined();
