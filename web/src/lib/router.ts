@@ -12,7 +12,8 @@ export type Route =
   | "privacy"
   | "terms"
   | "about"
-  | "contact";
+  | "contact"
+  | "support";
 
 const paths: Record<Route, string> = {
   overview: "/",
@@ -27,6 +28,7 @@ const paths: Record<Route, string> = {
   terms: "/terms",
   about: "/about",
   contact: "/contact",
+  support: "/support",
 };
 
 type Blocker = (proceed: () => void) => boolean;

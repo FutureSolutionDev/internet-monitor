@@ -1,4 +1,4 @@
-import { ExternalLink, MessagesSquare } from "lucide-react";
+import { ExternalLink, HeartHandshake, MessagesSquare } from "lucide-react";
 import { RouteLink } from "../components/RouteLink";
 import {
   ABOUT_STORY,
@@ -8,6 +8,7 @@ import {
   PUBLISHER,
   PUBLISHER_URL,
 } from "../content/about";
+import { donateMethods } from "../content/donate";
 import { REPO_URL } from "../content/text";
 import { type MessageKey, useI18n } from "../lib/i18n";
 import { useLive } from "../lib/live";
@@ -117,6 +118,12 @@ export function About() {
           <MessagesSquare size={17} aria-hidden />
           {t("about_contact_cta")}
         </RouteLink>
+        {donateMethods().length > 0 ? (
+          <RouteLink route="support" className="btn btn-ghost">
+            <HeartHandshake size={17} aria-hidden />
+            {t("nav_support")}
+          </RouteLink>
+        ) : null}
         <a className="btn btn-ghost" href={REPO_URL} target="_blank" rel="noreferrer noopener">
           GitHub
           <ExternalLink size={15} aria-hidden />

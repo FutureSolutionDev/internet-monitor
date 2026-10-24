@@ -35,6 +35,9 @@ The v2 rebuild.
   **FAQ**, **About**, **Contact** (WhatsApp, Discord, email, GitHub), **Privacy**
   and **Terms of use**, linked from the sidebar.
 - Unsaved-changes guard in Settings.
+- **Support us** page (`/support`) listing PayPal, Vodafone Cash and InstaPay donation
+  details from `web/src/content/donate.ts`; methods left empty are hidden, and the page
+  and its links stay hidden until at least one is filled in.
 - **What's new after an update**: the first time the dashboard opens on a new
   version it shows that release's changes once, with a link to the full list.
 - FAQ answers link to the exact setting they mention, and the setting is
@@ -83,6 +86,7 @@ The v2 rebuild.
 - Availability is rounded down, so any downtime never displays as 100%.
 
 ### Fixed
+- The WhatsApp link on the Contact page now opens from the desktop window.
 - **Uploaded custom alert sounds silently fell back to the default.** The
   uploaded file is now validated and converted, and is the sound that plays.
 - The auto-updater never selects the GUI asset for a tray install.

@@ -4,6 +4,7 @@ import {
   CircleAlert,
   CircleHelp,
   Gauge as GaugeIcon,
+  HeartHandshake,
   History,
   Info,
   LayoutDashboard,
@@ -27,6 +28,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { donateMethods } from "../content/donate";
 import { api } from "../lib/api";
 import { errorKey } from "../lib/errors";
 import { formatAgo } from "../lib/format";
@@ -64,6 +66,8 @@ const ABOUT: { route: Route; key: MessageKey; icon: LucideIcon }[] = [
   { route: "terms", key: "nav_terms", icon: Scale },
 ];
 
+if (donateMethods().length > 0) ABOUT.push({ route: "support", key: "nav_support", icon: HeartHandshake });
+
 const TITLES: Record<Route, MessageKey> = {
   overview: "nav_overview",
   history: "nav_history",
@@ -77,6 +81,7 @@ const TITLES: Record<Route, MessageKey> = {
   terms: "nav_terms",
   about: "nav_about",
   contact: "nav_contact",
+  support: "nav_support",
 };
 
 function ConnectionPill() {

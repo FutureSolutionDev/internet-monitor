@@ -24,10 +24,16 @@ func ValidateWebURL(raw string) (string, error) {
 }
 
 var externalHosts = map[string]bool{
-	"github.com":  true,
-	"wa.me":       true,
-	"discord.gg":  true,
-	"discord.com": true,
+	"github.com":        true,
+	"wa.me":             true,
+	"chat.whatsapp.com": true,
+	"discord.gg":        true,
+	"discord.com":       true,
+	"paypal.me":         true,
+	"www.paypal.me":     true,
+	"paypal.com":        true,
+	"www.paypal.com":    true,
+	"ipn.eg":            true,
 }
 
 func ValidateExternalURL(raw string) (string, error) {

@@ -16,6 +16,7 @@ import { Notifications } from "../screens/Notifications";
 import { Overview } from "../screens/Overview";
 import { Report } from "../screens/Report";
 import { Speed } from "../screens/Speed";
+import { Support } from "../screens/Support";
 import { Settings } from "../screens/settings/Settings";
 
 function Gate({ kind }: { kind: "unauthorized" | "busy" | "offline" }) {
@@ -75,6 +76,7 @@ export function App() {
         {route === "terms" ? <Legal kind="terms" /> : null}
         {route === "about" ? <About /> : null}
         {route === "contact" ? <Contact /> : null}
+        {route === "support" ? <Support /> : null}
       </Shell>
     );
   }
