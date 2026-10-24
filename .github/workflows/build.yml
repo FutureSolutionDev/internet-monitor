@@ -126,11 +126,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Read pinned release version
+        id: pin
+        run: |
+          v=$(tr -d ' \r\n' < .release-version 2>/dev/null || true)
+          if [ -n "$v" ] && ! git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then
+            echo "custom=$v" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Compute next version tag (no tag pushed)
         id: tag
         uses: mathieudutour/github-tag-action@v7
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: ${{ steps.pin.outputs.custom }}
           default_bump: patch
           release_branches: master,main
           dry_run: true
@@ -357,7 +366,8 @@ jobs:
           name: "Internet Monitor ${{ needs.version.outputs.new_tag }}"
           generate_release_notes: true
           fail_on_unmatched_files: true
-          prerelease: true
+          prerelease: ${{ contains(needs.version.outputs.new_tag, '-') }}
+          make_latest: ${{ !contains(needs.version.outputs.new_tag, '-') }}
           files: |
             dist/internet-monitor-windows.exe
             dist/internet-monitor-gui-windows.exe

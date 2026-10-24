@@ -52,6 +52,7 @@ const GAP = 6;
 const MARGIN = 8;
 const DESIRED_HEIGHT = 320;
 const MIN_WIDTH = 200;
+const MIN_ROOM = 160;
 
 function normalize(text: string): string {
   return text.toLocaleLowerCase().normalize("NFKD").replace(/[ً-ٰٟ]/g, "");
@@ -97,16 +98,30 @@ export function SmartSelect<T extends string>({
     const el = trigger.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const width = Math.min(Math.max(r.width, MIN_WIDTH), vw - MARGIN * 2);
-    const below = vh - r.bottom - MARGIN;
-    const above = r.top - MARGIN;
-    const up = below < Math.min(DESIRED_HEIGHT, 220) && above > below;
-    const maxHeight = Math.max(140, Math.min(DESIRED_HEIGHT, up ? above : below));
-    const next: PanelPos = { width, maxHeight };
-    if (up) next.bottom = vh - r.top + GAP;
-    else next.top = r.bottom + GAP;
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const vh = document.documentElement.clientHeight || window.innerHeight;
+    if (r.bottom < 0 || r.top > vh) {
+      setOpen(false);
+      setQuery("");
+      return;
+    }
+    const width = Math.max(0, Math.min(Math.max(r.width, MIN_WIDTH), vw - MARGIN * 2));
+    const below = vh - r.bottom - GAP - MARGIN;
+    const above = r.top - GAP - MARGIN;
+    const next: PanelPos = { width, maxHeight: 0 };
+    if (below >= Math.min(DESIRED_HEIGHT, MIN_ROOM) || below >= above) {
+      next.top = Math.max(MARGIN, r.bottom + GAP);
+      next.maxHeight = below;
+    } else {
+      next.bottom = Math.max(MARGIN, vh - r.top + GAP);
+      next.maxHeight = above;
+    }
+    if (next.maxHeight < MIN_ROOM) {
+      next.top = MARGIN;
+      next.bottom = undefined;
+      next.maxHeight = vh - MARGIN * 2;
+    }
+    next.maxHeight = Math.max(0, Math.min(DESIRED_HEIGHT, next.maxHeight));
     if (rtl) next.right = Math.max(MARGIN, Math.min(vw - r.right, vw - MARGIN - width));
     else next.left = Math.max(MARGIN, Math.min(r.left, vw - MARGIN - width));
     setPos(next);

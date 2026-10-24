@@ -7,10 +7,16 @@ const en = (key: MessageKey) => translate("en", key);
 const ar = (key: MessageKey) => translate("ar", key);
 
 describe("changelog timeline", () => {
-  test("groups releases by month with the unreleased entry first", () => {
+  test("groups releases by month, newest first", () => {
     const t = buildTimeline(RELEASES, "all", "", en);
-    expect(t.months[0]?.key).toBe(NEXT_MONTH);
-    expect(t.months.map((m) => m.key)).toEqual([NEXT_MONTH, "2026-06", "2026-05"]);
+    expect(t.months.map((m) => m.key)).toEqual(["2026-10", "2026-06", "2026-05"]);
+    const unreleased = buildTimeline(
+      [{ ...(RELEASES[0] as (typeof RELEASES)[number]), id: "next", version: null, date: null }, ...RELEASES],
+      "all",
+      "",
+      en,
+    );
+    expect(unreleased.months[0]?.key).toBe(NEXT_MONTH);
     expect(t.releases).toBe(RELEASES.length);
     expect(t.changes).toBe(RELEASES.reduce((n, r) => n + r.items.length, 0));
   });

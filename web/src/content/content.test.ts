@@ -47,7 +47,8 @@ describe("changelog", () => {
   test("finds the release that holds the running version", () => {
     expect(releaseOfVersion("v0.9.2")).toBe("v0.9.4");
     expect(releaseOfVersion("0.10.0")).toBe("v0.10.0");
-    expect(releaseOfVersion("v0.11.0")).toBe("v2");
+    expect(releaseOfVersion("v2.0.0")).toBe("v2.0.0");
+    expect(releaseOfVersion("v0.11.0")).toBeNull();
     expect(releaseOfVersion("dev")).toBeNull();
     expect(releaseOfVersion(undefined)).toBeNull();
   });

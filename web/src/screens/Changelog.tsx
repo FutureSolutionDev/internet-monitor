@@ -34,6 +34,8 @@ function shortVersion(release: Release, t: Translate): string {
   return release.version === null ? t("cl_next") : `v${release.version}`;
 }
 
+const latestId = RELEASES.find((r) => r.version !== null)?.id;
+
 function anchorOf(id: string): string {
   return `release-${id.replace(/\./g, "-")}`;
 }
@@ -273,6 +275,9 @@ export function Changelog() {
                                 <time dateTime={release.date}>
                                   {formatDate(lang, release.date, DATE_OPTS)}
                                 </time>
+                              ) : null}
+                              {release.id === latestId ? (
+                                <span className="tag cl-latest">{t("cl_latest")}</span>
                               ) : null}
                               {mine ? <span className="tag cl-current">{t("cl_installed")}</span> : null}
                             </span>

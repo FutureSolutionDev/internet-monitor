@@ -2744,6 +2744,11 @@ select.input {
   font-size: var(--text-xs);
 }
 
+.cl-latest {
+  background: color-mix(in srgb, var(--accent-green) 16%, transparent);
+  color: var(--accent-green);
+}
+
 .cl-current {
   background: color-mix(in srgb, var(--accent-blue) 16%, transparent);
   color: var(--accent-blue);

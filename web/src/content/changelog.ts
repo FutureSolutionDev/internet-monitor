@@ -20,9 +20,9 @@ export const KINDS: ChangeKind[] = ["new", "improved", "fixed", "security"];
 
 export const RELEASES: Release[] = [
   {
-    id: "v2",
-    version: null,
-    date: null,
+    id: "v2.0.0",
+    version: "2.0.0",
+    date: "2026-10-24",
     title: "changelog.v2.title",
     items: [
       { kind: "new", text: "changelog.v2.1" },

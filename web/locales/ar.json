@@ -405,6 +405,7 @@
     "kind_fixed": "إصلاح",
     "kind_security": "أمان",
     "cl_next": "الإصدار القادم",
+    "cl_latest": "أحدث إصدار",
     "cl_installed": "إصدارك الحالي",
     "cl_versions": "v{from} – v{to}",
     "faq_eyebrow": "مساعدة",

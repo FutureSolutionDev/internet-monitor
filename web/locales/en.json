@@ -405,6 +405,7 @@
     "kind_fixed": "Fixed",
     "kind_security": "Security",
     "cl_next": "Next release",
+    "cl_latest": "Latest",
     "cl_installed": "Your version",
     "cl_versions": "v{from} – v{to}",
     "faq_eyebrow": "Help",
