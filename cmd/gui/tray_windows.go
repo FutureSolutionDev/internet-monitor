@@ -3,11 +3,14 @@
 package main
 
 import (
+	"internet-monitor/internal/i18n"
 	"internet-monitor/internal/monitor"
+	"internet-monitor/internal/notifytext"
 	"internet-monitor/internal/tray"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
@@ -104,12 +107,20 @@ func initTray(w webview.WebView, hwnd uintptr) func() {
 	go func() {
 		runtime.LockOSThread()
 		systray.Run(func() {
+			lang := notifytext.Lang()
 			systray.SetIcon(tray.GrayIcon())
-			systray.SetTooltip("Internet Monitor — جاري الفحص...")
+			systray.SetTooltip(i18n.T(lang, "app_name", nil) + " — " + i18n.T(lang, "tray.status.checking", nil))
 
-			mOpen := systray.AddMenuItem("فتح النافذة / Open", "إظهار النافذة الرئيسية")
+			mOpen := systray.AddMenuItem(i18n.T(lang, "tray.open_window", nil), i18n.T(lang, "tray.open_window_hint", nil))
 			systray.AddSeparator()
-			mExit := systray.AddMenuItem("إغلاق / Exit", "إنهاية البرنامج")
+			mExit := systray.AddMenuItem(i18n.T(lang, "tray.exit", nil), i18n.T(lang, "tray.exit_hint", nil))
+			notifytext.OnLangChange(func(lang string) {
+				mOpen.SetTitle(i18n.T(lang, "tray.open_window", nil))
+				mOpen.SetTooltip(i18n.T(lang, "tray.open_window_hint", nil))
+				mExit.SetTitle(i18n.T(lang, "tray.exit", nil))
+				mExit.SetTooltip(i18n.T(lang, "tray.exit_hint", nil))
+				updateTrayStatus(monitor.Status(lastStatus.Load()))
+			})
 
 			go func() {
 				for {
@@ -143,16 +154,22 @@ func initTray(w webview.WebView, hwnd uintptr) func() {
 	}
 }
 
+var lastStatus atomic.Int32
+
+func init() { lastStatus.Store(-1) }
+
 func updateTrayStatus(status monitor.Status) {
+	lastStatus.Store(int32(status))
 	switch status {
 	case monitor.StatusConnected:
 		systray.SetIcon(tray.GreenIcon())
-		systray.SetTooltip("Internet Monitor — متصل ✅")
 	case monitor.StatusDegraded:
 		systray.SetIcon(tray.YellowIcon())
-		systray.SetTooltip("Internet Monitor — ضعيف ⚠️")
 	case monitor.StatusDisconnected:
 		systray.SetIcon(tray.RedIcon())
-		systray.SetTooltip("Internet Monitor — منقطع ❌")
+	default:
+		return
 	}
+	lang := notifytext.Lang()
+	systray.SetTooltip(i18n.T(lang, "app_name", nil) + " — " + notifytext.StatusLabel(lang, status))
 }

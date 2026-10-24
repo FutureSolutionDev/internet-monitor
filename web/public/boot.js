@@ -7,6 +7,7 @@
     var lang = localStorage.getItem("im.lang");
     var dir = localStorage.getItem("im.dir");
     if (lang && /^[a-z]{2,3}(-[A-Za-z0-9]+)*$/.test(lang)) d.setAttribute("lang", lang);
+    if (dir !== "rtl" && dir !== "ltr" && lang) dir = /^(ar|fa|he|ur|ps|sd|ug|yi|dv|ckb)(-|$)/.test(lang) ? "rtl" : "ltr";
     if (dir === "rtl" || dir === "ltr") d.setAttribute("dir", dir);
   } catch (e) {}
 })();

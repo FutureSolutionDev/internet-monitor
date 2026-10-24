@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"internet-monitor/internal/config"
+	"internet-monitor/internal/i18n"
 	"internet-monitor/internal/monitor"
 	"internet-monitor/internal/types"
 	"log"
@@ -285,20 +286,25 @@ func (l *Logger) SendTestWebhook(url string) string {
 		return "Only Discord and Slack webhooks are supported"
 	}
 
+	l.mu.Lock()
+	lang := l.cfg.Language
+	l.mu.Unlock()
+	title, text := i18n.T(lang, "webhook.test.title", nil), i18n.T(lang, "webhook.test.body", nil)
+
 	var payload interface{}
 	if IsDiscord(url) {
 		payload = map[string]interface{}{
 			"username": "Internet Monitor",
 			"embeds": []map[string]interface{}{{
-				"title":       "🔔 Webhook Test",
-				"description": "الاتصال بين Internet Monitor والـ Webhook يعمل بشكل صحيح ✅",
+				"title":       title,
+				"description": text,
 				"color":       0x22C55E,
 				"footer":      map[string]string{"text": "Internet Monitor"},
 			}},
 		}
 	} else {
 		payload = map[string]interface{}{
-			"text": ":bell: *Webhook Test* — Internet Monitor webhook is working correctly :white_check_mark:",
+			"text": "*" + title + "* — " + text,
 		}
 	}
 
