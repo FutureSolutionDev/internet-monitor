@@ -29,8 +29,18 @@ jobs:
     defaults:
       run:
         working-directory: web
+    outputs:
+      dev_version: ${{ steps.dev_version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+
+      - name: Version for untagged builds
+        id: dev_version
+        env:
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          v=$(tr -d ' \r\n' < ../.release-version 2>/dev/null || true)
+          echo "version=v${v:-0.0.0}-dev.${SHA::7}" >> "$GITHUB_OUTPUT"
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -186,12 +196,18 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Generate app icon (embed favicon as .syso)
+        run: |
+          go install github.com/tc-hib/go-winres@v0.3.3
+          cd cmd/tray
+          go-winres simply --arch amd64 --icon ../../internal/assets/favicon.png
+
       - name: Build
         env:
           CGO_ENABLED: 0
           GOOS: windows
           GOARCH: amd64
-          VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
+          VERSION: ${{ needs.version.outputs.new_tag || needs.web.outputs.dev_version }}
         run: go build -ldflags="-H=windowsgui -s -w -X main.Version=$VERSION" -o internet-monitor-windows.exe ./cmd/tray
 
       - uses: actions/upload-artifact@v7
@@ -227,7 +243,7 @@ jobs:
       - name: Build
         env:
           CGO_ENABLED: 1
-          VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
+          VERSION: ${{ needs.version.outputs.new_tag || needs.web.outputs.dev_version }}
         run: go build -ldflags="-H=windowsgui -s -w -X main.Version=$env:VERSION" -o internet-monitor-gui-windows.exe ./cmd/gui/
 
       - uses: actions/upload-artifact@v7
@@ -258,7 +274,7 @@ jobs:
         env:
           CGO_ENABLED: 1
           GOARCH: arm64
-          VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
+          VERSION: ${{ needs.version.outputs.new_tag || needs.web.outputs.dev_version }}
         run: |
           go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-macos-arm64 ./cmd/tray
           go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-gui-macos-arm64 ./cmd/gui/
@@ -269,7 +285,7 @@ jobs:
           GOARCH: amd64
           CGO_CFLAGS: "-arch x86_64"
           CGO_LDFLAGS: "-arch x86_64"
-          VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
+          VERSION: ${{ needs.version.outputs.new_tag || needs.web.outputs.dev_version }}
         run: |
           go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-macos-intel ./cmd/tray
           go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-gui-macos-intel ./cmd/gui/
@@ -312,13 +328,13 @@ jobs:
       - name: Build Tray
         env:
           CGO_ENABLED: 1
-          VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
+          VERSION: ${{ needs.version.outputs.new_tag || needs.web.outputs.dev_version }}
         run: go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-linux ./cmd/tray
 
       - name: Build GUI
         env:
           CGO_ENABLED: 1
-          VERSION: ${{ needs.version.outputs.new_tag || 'dev' }}
+          VERSION: ${{ needs.version.outputs.new_tag || needs.web.outputs.dev_version }}
         run: go build -ldflags="-s -w -X main.Version=$VERSION" -o internet-monitor-gui-linux ./cmd/gui/
 
       - uses: actions/upload-artifact@v7
