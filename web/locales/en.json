@@ -6,6 +6,9 @@
   },
   "messages": {
     "app_name": "Internet Monitor",
+    "select_placeholder": "Choose…",
+    "select_search": "Search",
+    "select_empty": "No matches",
     "nav_overview": "Overview",
     "nav_history": "History",
     "nav_speed": "Speed test",

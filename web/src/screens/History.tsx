@@ -7,6 +7,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { type CSSProperties, useMemo, useState } from "react";
+import { SmartSelect } from "../components/SmartSelect";
 import { toast } from "../components/Toast";
 import { Banner, Button, Card, CardHead, Empty, Segmented, Skeleton } from "../components/ui";
 import { api } from "../lib/api";
@@ -130,16 +131,26 @@ export function History() {
 
       <Card>
         <div className="row" style={{ gap: 12 }}>
-          <label className="field" style={{ minWidth: 220 }}>
-            <span className="field-label">{t("history_date")}</span>
-            <select className="input" value={date} onChange={(e) => setPicked(e.target.value)}>
-              {available.map((d) => (
-                <option key={d} value={d}>
-                  {formatDate(lang, d, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="field" style={{ minWidth: 260 }}>
+            <span className="field-label" aria-hidden>
+              {t("history_date")}
+            </span>
+            <SmartSelect
+              label={t("history_date")}
+              value={date}
+              onChange={setPicked}
+              options={available.map((d) => ({
+                value: d,
+                label: formatDate(lang, d, {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                }),
+                keywords: d,
+              }))}
+            />
+          </div>
           <div className="field">
             <span className="field-label">{t("history_filter")}</span>
             <Segmented<Filter>

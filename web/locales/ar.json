@@ -6,6 +6,9 @@
   },
   "messages": {
     "app_name": "مراقب الإنترنت",
+    "select_placeholder": "اختر…",
+    "select_search": "بحث",
+    "select_empty": "لا توجد نتائج",
     "nav_overview": "نظرة عامة",
     "nav_history": "السجل",
     "nav_speed": "قياس السرعة",
