@@ -10,3 +10,4 @@ tmp
 *.txt
 Plan
 .session
+.session-key

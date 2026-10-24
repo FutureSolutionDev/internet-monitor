@@ -125,7 +125,7 @@ func (s *Server) serveSSE(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case <-heartbeat.C:
-			if !write(": ping\n\n") {
+			if !write("data: {\"type\":\"ping\"}\n\n") {
 				return
 			}
 		case <-c.evicted:

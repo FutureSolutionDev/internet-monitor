@@ -68,7 +68,7 @@ func New(opts Options) *Server {
 		version:  opts.Version,
 		appDir:   opts.AppDir,
 		bootID:   newBootID(),
-		token:    newToken(),
+		token:    loadOrCreateToken(opts.AppDir, time.Now()),
 		native:   opts.NativeNotifications,
 		hooks:    opts.Hooks,
 		history:  opts.History,

@@ -10,12 +10,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
 	sessionQuery  = "session"
 	sessionHeader = "X-IM-Session"
 	sessionFile   = ".session"
+	sessionKey    = ".session-key"
+	sessionKeyTTL = 24 * time.Hour
 )
 
 type SessionInfo struct {
@@ -28,6 +31,31 @@ func newToken() string {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+func wellFormedToken(v string) bool {
+	if len(v) != 64 {
+		return false
+	}
+	_, err := hex.DecodeString(v)
+	return err == nil
+}
+
+func loadOrCreateToken(appDir string, now time.Time) string {
+	if appDir == "" {
+		return newToken()
+	}
+	path := filepath.Join(appDir, sessionKey)
+	if info, err := os.Stat(path); err == nil && now.Sub(info.ModTime()) < sessionKeyTTL {
+		if data, err := os.ReadFile(path); err == nil {
+			if tok := strings.TrimSpace(string(data)); wellFormedToken(tok) {
+				return tok
+			}
+		}
+	}
+	tok := newToken()
+	_ = os.WriteFile(path, []byte(tok), 0o600)
+	return tok
 }
 
 func (s *Server) cookieName() string { return fmt.Sprintf("im_session_%d", s.port) }

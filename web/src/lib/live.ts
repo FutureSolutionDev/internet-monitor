@@ -33,6 +33,8 @@ export interface LiveDeps {
 }
 
 const CLOSED = 2;
+const SILENCE_LIMIT = 40_000;
+const WATCH_EVERY = 5_000;
 
 export function createLiveStore(deps: LiveDeps) {
   let state: LiveState = {
@@ -48,6 +50,8 @@ export function createLiveStore(deps: LiveDeps) {
   let retryTimer: unknown = null;
   let attempts = 0;
   let opened = false;
+  let lastFrame = 0;
+  let watchTimer: unknown = null;
   let firstBoot: { id: string; version: string } | null = null;
   let stopped = true;
   let speedPendingSince = 0;
@@ -85,6 +89,7 @@ export function createLiveStore(deps: LiveDeps) {
     }
     if (!msg || typeof msg !== "object") return;
     const typed = msg as { type?: string; unread?: number; notification?: NotificationRecord };
+    if (typed.type === "ping") return;
     if (typed.type === "notification" || typed.type === "notifications_read") {
       set({
         notice: {
@@ -139,11 +144,35 @@ export function createLiveStore(deps: LiveDeps) {
     scheduleReconnect();
   };
 
+  const stopWatch = () => {
+    if (watchTimer !== null) deps.clearTimer(watchTimer);
+    watchTimer = null;
+  };
+
+  const watch = () => {
+    stopWatch();
+    watchTimer = deps.setTimer(() => {
+      watchTimer = null;
+      if (stopped || !source) return;
+      if (deps.now() - lastFrame > SILENCE_LIMIT) {
+        source.close();
+        source = null;
+        set({ connection: "reconnecting" });
+        void handleClosed();
+        return;
+      }
+      watch();
+    }, WATCH_EVERY);
+  };
+
   const connect = () => {
     source?.close();
     const es = deps.open("/events");
     source = es;
+    lastFrame = deps.now();
+    watch();
     es.onopen = () => {
+      lastFrame = deps.now();
       attempts = 0;
       if (!opened) {
         opened = true;
@@ -153,6 +182,7 @@ export function createLiveStore(deps: LiveDeps) {
       set({ connection: "live", notice: { ...state.notice, revision: state.notice.revision + 1 } });
     };
     es.onmessage = (ev) => {
+      lastFrame = deps.now();
       if (state.connection !== "live") set({ connection: "live" });
       handleMessage(ev);
     };
@@ -161,6 +191,7 @@ export function createLiveStore(deps: LiveDeps) {
       if (es.readyState === CLOSED) {
         es.close();
         source = null;
+        stopWatch();
         set({ connection: state.connection === "connecting" ? "connecting" : "reconnecting" });
         void handleClosed();
       } else if (state.connection === "live") {
@@ -182,6 +213,7 @@ export function createLiveStore(deps: LiveDeps) {
     },
     stop() {
       stopped = true;
+      stopWatch();
       if (retryTimer !== null) deps.clearTimer(retryTimer);
       retryTimer = null;
       source?.close();
@@ -190,6 +222,7 @@ export function createLiveStore(deps: LiveDeps) {
     markUnauthorized() {
       if (state.connection === "unauthorized") return;
       stopped = true;
+      stopWatch();
       if (retryTimer !== null) deps.clearTimer(retryTimer);
       retryTimer = null;
       source?.close();

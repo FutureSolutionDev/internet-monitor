@@ -1,6 +1,8 @@
 import { describe, expect, test, vi } from "vitest";
 import { createLiveStore, type EventSourceLike } from "./live";
 
+const WATCH_EVERY = 5_000;
+
 class FakeSource implements EventSourceLike {
   readyState = 0;
   onopen: ((ev: Event) => void) | null = null;
@@ -27,6 +29,9 @@ class FakeSource implements EventSourceLike {
 function setup(probeStatus = 200) {
   const sources: FakeSource[] = [];
   const timers: (() => void)[] = [];
+  const watchers = new Map<number, () => void>();
+  let seq = 0;
+  let clock = 1000;
   const reload = vi.fn();
   const store = createLiveStore({
     open: () => {
@@ -36,15 +41,29 @@ function setup(probeStatus = 200) {
     },
     probe: async () => probeStatus,
     reload,
-    setTimer: (fn) => {
+    setTimer: (fn, ms) => {
+      if (ms === WATCH_EVERY) {
+        seq++;
+        watchers.set(seq, fn);
+        return seq;
+      }
       timers.push(fn);
-      return timers.length;
+      return -timers.length;
     },
-    clearTimer: () => {},
-    now: () => 1000,
+    clearTimer: (id) => {
+      watchers.delete(id as number);
+    },
+    now: () => clock,
   });
   store.start();
-  return { store, sources, timers, reload };
+  const advance = (ms: number) => {
+    clock += ms;
+    for (const [id, fn] of [...watchers]) {
+      watchers.delete(id);
+      fn();
+    }
+  };
+  return { store, sources, timers, reload, advance };
 }
 
 const snap = (over: Record<string, unknown> = {}) => ({
@@ -90,6 +109,40 @@ describe("live store", () => {
     expect(timers).toHaveLength(1);
     timers[0]?.();
     expect(sources).toHaveLength(2);
+  });
+
+  test("a silent stream is dropped and retried", async () => {
+    const { store, sources, timers, advance } = setup();
+    sources[0]?.open();
+    advance(30_000);
+    expect(store.getState().connection).toBe("live");
+    advance(15_000);
+    expect(sources[0]?.closed).toBe(true);
+    await vi.waitFor(() => expect(timers).toHaveLength(1));
+    timers[0]?.();
+    expect(sources).toHaveLength(2);
+  });
+
+  test("ping frames keep the stream alive without touching the snapshot", () => {
+    const { store, sources, advance } = setup();
+    sources[0]?.open();
+    sources[0]?.send(snap());
+    for (let i = 0; i < 4; i++) {
+      advance(20_000);
+      sources[0]?.send({ type: "ping" });
+    }
+    advance(5_000);
+    expect(sources[0]?.closed).toBe(false);
+    expect(store.getState().snapshot?.type).toBe("init");
+  });
+
+  test("reopening after a drop asks for fresh notifications", () => {
+    const { store, sources } = setup();
+    sources[0]?.open();
+    expect(store.getState().notice.revision).toBe(0);
+    sources[0]?.fail(false);
+    sources[0]?.open();
+    expect(store.getState().notice.revision).toBe(1);
   });
 
   test("a transient drop shows reconnecting", () => {

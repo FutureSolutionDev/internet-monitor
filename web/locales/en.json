@@ -448,7 +448,7 @@
     "changelog.v2.10": "The layout works in phone-size windows.",
     "changelog.v2.11": "Uploaded custom alert sounds silently fell back to the default. Uploads are now checked and converted, and the sound you upload is the one that plays.",
     "changelog.v2.12": "The auto-updater no longer picks the window (GUI) build for a tray install.",
-    "changelog.v2.13": "The dashboard is reachable only from this computer and needs a key that changes every launch. Open it from the tray menu or the app window.",
+    "changelog.v2.13": "The dashboard is reachable only from this computer and needs a private key that changes daily, so an open dashboard reconnects on its own after the app restarts. Open it from the tray menu or the app window.",
     "changelog.v2.14": "Your webhook URL and Telegram token are never sent back to the browser. Settings shows them as “Saved — hidden”.",
     "changelog.v2.15": "Webhook URLs must use https and point to Discord or Slack.",
     "changelog.v2.16": "Updates download only from GitHub, and the Go networking and crypto libraries were updated.",
