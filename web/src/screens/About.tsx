@@ -1,6 +1,6 @@
 import { ExternalLink, MessagesSquare } from "lucide-react";
 import { RouteLink } from "../components/RouteLink";
-import { ABOUT_STORY, DEVELOPER, PRINCIPLES, PUBLISHER, PUBLISHER_URL } from "../content/about";
+import { ABOUT_STORY, DEVELOPER, DEVELOPER_URL, PRINCIPLES, PUBLISHER, PUBLISHER_URL } from "../content/about";
 import { REPO_URL } from "../content/text";
 import { type MessageKey, useI18n } from "../lib/i18n";
 import { useLive } from "../lib/live";
@@ -65,7 +65,12 @@ export function About() {
           </div>
           <div>
             <dt>{t("about_developer")}</dt>
-            <dd>{DEVELOPER}</dd>
+             <dd>
+              <a href={DEVELOPER_URL} target="_blank" rel="noreferrer noopener">
+                {DEVELOPER}
+                <span className="sr-only"> {t("opens_new_tab")}</span>
+              </a>
+            </dd>
           </div>
           {version ? (
             <div>
@@ -85,7 +90,7 @@ export function About() {
             <dt>{t("about_source")}</dt>
             <dd>
               <a href={REPO_URL} target="_blank" rel="noreferrer noopener" className="ltr" dir="ltr">
-                github.com/FutureSolutionDev/internet-monitor
+               {t("app_name")}
                 <span className="sr-only"> {t("opens_new_tab")}</span>
               </a>
             </dd>

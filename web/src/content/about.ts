@@ -11,6 +11,7 @@ export interface Principle {
 export const PUBLISHER = "FutureSolutionDev";
 export const DEVELOPER = "Sabry Dawood";
 export const PUBLISHER_URL = "https://github.com/FutureSolutionDev";
+export const DEVELOPER_URL = "https://github.com/sabrydawood";
 
 export const ABOUT_STORY: MessageKey[] = ["about.story.1", "about.story.2"];
 
