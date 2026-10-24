@@ -474,19 +474,24 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) — commit t
 
 ### Adding a language
 
-All text lives in one JSON file per language in `web/locales/`. The dashboard,
-the monthly report, the FAQ and the desktop notifications all read from these
-same files.
+Each language has its own folder in `web/locales/`, with one JSON file per page
+(`settings.json`, `faq.json`, `changelog.json`, `server.json` for desktop alerts and
+Webhook/Telegram messages, and so on). Keys are nested: `{"faq": {"free": {"a": "…"}}}`
+is the key `faq.free.a`. The dashboard, the monthly report and the app itself all
+read from these same files, and a key defined twice is rejected.
 
-1. Copy `web/locales/en.json` to `web/locales/<code>.json`, for example `fr.json`.
-2. Set `meta`:
+1. Copy `web/locales/en/` to `web/locales/<code>/`, for example `fr/`.
+2. Edit `meta.json`:
    - `name`: the language's own name, such as `Français`.
    - `dir`: `ltr` or `rtl`.
    - `intl`: the locale used for dates and numbers, such as `fr-FR`.
-3. Translate every value in `messages`. Keep each `{placeholder}` exactly as it
-   is in English.
-4. Run `bun run test` in `web/`. It fails if a key is missing, a key isn't in
-   English, or a placeholder doesn't match.
+3. Translate every value in the other files. Keep each `{placeholder}` and each
+   in-app link target such as `(settings#alerts)` exactly as it is in English.
+4. Run `bun run test` in `web/`. It fails if a file or key is missing, a key isn't
+   in English, or a placeholder doesn't match.
+
+A new page file needs one extra line: import its English copy in
+`web/src/lib/i18n.ts` (`MESSAGE_FILES`) so its keys are type-checked.
 
 No code changes are needed. The new language appears in the language menu and
 in Settings automatically.

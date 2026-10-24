@@ -1,0 +1,93 @@
+{
+  "notify": {
+    "test": {
+      "title": "Test Notification",
+      "body": "🔔 Notifications and sound are working"
+    },
+    "restored": {
+      "title": "✅ Internet Restored",
+      "latency": "Latency: {ms}ms",
+      "ok": "All checks passing",
+      "after": "Back after {duration}"
+    },
+    "degraded": {
+      "title": "⚠️ Internet Degraded",
+      "body": "Loss: {loss}% — latency: {ms}ms"
+    },
+    "down": {
+      "title": "🔴 Internet Disconnected",
+      "failed": "Failed: {layers}",
+      "lost": "Connection lost"
+    },
+    "reminder": {
+      "title": "⏰ Still offline",
+      "body": "Disconnected for {duration}"
+    },
+    "speed": {
+      "title": "🚀 Speed test finished",
+      "slow_title": "⚠️ Speed below {threshold} Mbps",
+      "body": "↓ {down} Mbps · ↑ {up} Mbps · {ms} ms",
+      "body_down": "↓ {down} Mbps · {ms} ms"
+    },
+    "action": {
+      "open": "Open dashboard"
+    }
+  },
+  "duration": {
+    "s": "{s} s",
+    "m": "{m} min",
+    "ms": "{m} min {s} s",
+    "h": "{h} h",
+    "hm": "{h} h {m} min"
+  },
+  "remote": {
+    "title": {
+      "down": "Internet disconnected",
+      "degraded": "Internet unstable",
+      "restored": "Internet restored",
+      "reminder": "Internet still disconnected"
+    },
+    "tcp": "TCP ping",
+    "http": "HTTP",
+    "dns": "DNS",
+    "loss": "Packet loss",
+    "latency": "Latency",
+    "duration": "Duration",
+    "ok": "OK",
+    "failed": "Failed",
+    "footer": "Event log",
+    "download": "Download",
+    "upload": "Upload",
+    "threshold": "Threshold",
+    "speed": {
+      "done": "Speed test completed",
+      "drop": "Speed drop detected"
+    }
+  },
+  "tray": {
+    "starting": "Starting…",
+    "status": {
+      "connected": "Connected",
+      "degraded": "Unstable",
+      "disconnected": "Disconnected",
+      "checking": "Checking…"
+    },
+    "detail": "loss {loss}% · {ms} ms",
+    "last_change": "Last change: {time}",
+    "last_change_none": "Last change: —",
+    "open_dashboard": "Open dashboard",
+    "open_dashboard_hint": "Open the dashboard in your browser",
+    "open_window": "Open window",
+    "open_window_hint": "Show the main window",
+    "open_logs": "Open logs folder",
+    "open_logs_hint": "Open the folder with your log files",
+    "exit": "Exit",
+    "exit_hint": "Stop monitoring and exit"
+  },
+  "webhook": {
+    "test": {
+      "title": "🔔 Webhook test",
+      "body": "Internet Monitor can reach this webhook ✅"
+    }
+  }
+}

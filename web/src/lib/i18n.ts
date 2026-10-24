@@ -1,8 +1,39 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
-import en from "../../locales/en.json";
+import about from "../../locales/en/about.json";
+import changelog from "../../locales/en/changelog.json";
+import common from "../../locales/en/common.json";
+import faq from "../../locales/en/faq.json";
+import history from "../../locales/en/history.json";
+import legal from "../../locales/en/legal.json";
+import notifications from "../../locales/en/notifications.json";
+import overview from "../../locales/en/overview.json";
+import report from "../../locales/en/report.json";
+import server from "../../locales/en/server.json";
+import settings from "../../locales/en/settings.json";
+import speed from "../../locales/en/speed.json";
 import { useLive } from "./live";
 
-export type MessageKey = keyof typeof en.messages;
+export const MESSAGE_FILES = {
+  about,
+  changelog,
+  common,
+  faq,
+  history,
+  legal,
+  notifications,
+  overview,
+  report,
+  server,
+  settings,
+  speed,
+};
+
+type Leaves<T, P extends string = ""> = {
+  [K in keyof T & string]: T[K] extends string ? `${P}${K}` : Leaves<T[K], `${P}${K}.`>;
+}[keyof T & string];
+
+type Files = typeof MESSAGE_FILES;
+export type MessageKey = { [F in keyof Files]: Leaves<Files[F]> }[keyof Files];
 export type Lang = string;
 export type Vars = Record<string, string | number>;
 export type Translate = (key: MessageKey, vars?: Vars) => string;
@@ -18,30 +49,57 @@ export interface Locale extends LocaleMeta {
   messages: Partial<Record<MessageKey, string>>;
 }
 
-interface LocaleFile {
-  meta: LocaleMeta;
-  messages: Record<string, string>;
+export interface MessageTree {
+  [key: string]: string | MessageTree;
 }
 
 export const DEFAULT_LANG = "en";
 
-function loadLocales(files: Record<string, LocaleFile>): Locale[] {
-  const list = Object.entries(files).map(([path, file]) => ({
-    code: path.replace(/^.*\/([^/]+)\.json$/, "$1"),
-    ...file.meta,
-    messages: file.messages as Locale["messages"],
-  }));
+export function flattenMessages(
+  tree: MessageTree,
+  where: string,
+  out: Record<string, string> = {},
+  prefix = "",
+): Record<string, string> {
+  for (const [name, value] of Object.entries(tree)) {
+    const key = prefix + name;
+    if (typeof value !== "string") {
+      flattenMessages(value, where, out, `${key}.`);
+      continue;
+    }
+    if (key in out) throw new Error(`${where}: "${key}" is defined more than once`);
+    out[key] = value;
+  }
+  return out;
+}
+
+export function loadLocales(files: Record<string, unknown>): Locale[] {
+  const byLang = new Map<Lang, { meta?: LocaleMeta; messages: Record<string, string> }>();
+  for (const [path, data] of Object.entries(files)) {
+    const match = /\/([^/]+)\/([^/]+)\.json$/.exec(path);
+    if (!match) continue;
+    const [, code = "", file = ""] = match;
+    const entry = byLang.get(code) ?? { messages: {} };
+    byLang.set(code, entry);
+    if (file === "meta") entry.meta = data as LocaleMeta;
+    else flattenMessages(data as MessageTree, code, entry.messages);
+  }
+  const list: Locale[] = [];
+  for (const [code, { meta, messages }] of byLang) {
+    if (!meta) throw new Error(`${code}: meta.json is missing`);
+    list.push({ code, ...meta, messages: messages as Locale["messages"] });
+  }
   return list.sort((a, b) =>
     a.code === DEFAULT_LANG ? -1 : b.code === DEFAULT_LANG ? 1 : a.code.localeCompare(b.code),
   );
 }
 
-export const LOCALES: Locale[] = loadLocales(
-  import.meta.glob<LocaleFile>("../../locales/*.json", { eager: true, import: "default" }),
-);
+export const LOCALE_FILES = import.meta.glob("../../locales/*/*.json", { eager: true, import: "default" });
+
+export const LOCALES: Locale[] = loadLocales(LOCALE_FILES);
 
 const byCode = new Map(LOCALES.map((l) => [l.code, l]));
-const fallback = en.messages as Record<MessageKey, string>;
+const fallback = (byCode.get(DEFAULT_LANG)?.messages ?? {}) as Record<MessageKey, string>;
 
 export function hasLang(code: string | null | undefined): code is Lang {
   return !!code && byCode.has(code);

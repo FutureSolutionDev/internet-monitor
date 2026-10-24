@@ -1,0 +1,63 @@
+{
+  "about_related": "Related pages",
+  "about_eyebrow": "About",
+  "about_title": "Know when your internet fails, and prove it",
+  "about_principles": "What we care about",
+  "about_details": "Details",
+  "about_publisher": "Published by",
+  "about_developer": "Developed by",
+  "about_version": "Version",
+  "about_license": "License",
+  "about_source": "Source code",
+  "about_contact_cta": "Get in touch",
+  "contact_eyebrow": "Contact",
+  "contact_title": "We're here to help",
+  "contact_intro": "Questions, problems or ideas: pick whichever is easiest for you.",
+  "contact_safety": "Never send your config.json or log files unless we ask. They can contain your webhook, Telegram token and connection history.",
+  "contact_open": "Open {name}",
+  "contact_copy": "Copy {name}",
+  "contact_copied": "Copied to clipboard",
+  "contact_copy_failed": "Couldn't copy. Select the text and copy it yourself.",
+  "about": {
+    "story": {
+      "1": "Internet Monitor started with a familiar problem: the internet keeps dropping, and your provider says the line is fine. Without a record, it's your word against theirs.",
+      "2": "So the app watches your connection quietly in the background, records every outage with its exact time, length and cause, and turns that into a report you can send. It also tells you whether the problem is in your home network or at your provider, so you know who to call."
+    },
+    "principle": {
+      "local": {
+        "title": "Your data stays with you",
+        "body": "Everything is stored on your computer. No account, no cloud, no tracking."
+      },
+      "open": {
+        "title": "Free, with the code in the open",
+        "body": "Free for personal and commercial use under the Elastic License 2.0. Anyone can read the code."
+      },
+      "proof": {
+        "title": "Evidence, not guesses",
+        "body": "Exact times, durations and the layer that failed, ready for a PDF or CSV."
+      },
+      "bilingual": {
+        "title": "Arabic and English",
+        "body": "Every screen, alert and report works in both languages, right to left included."
+      }
+    }
+  },
+  "contact": {
+    "whatsapp": {
+      "name": "WhatsApp",
+      "best": "Quick questions and help getting set up."
+    },
+    "discord": {
+      "name": "Discord",
+      "best": "Chat with other users, share ideas and follow new releases."
+    },
+    "email": {
+      "name": "Email",
+      "best": "Business, privacy questions and anything you'd rather not post publicly."
+    },
+    "github": {
+      "name": "GitHub",
+      "best": "Bug reports and feature requests, in public, so others can follow them."
+    }
+  }
+}

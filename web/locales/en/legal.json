@@ -1,0 +1,76 @@
+{
+  "legal_updated": "Last updated {date}",
+  "legal_toc": "On this page",
+  "privacy_title": "Privacy",
+  "terms_title": "Terms of use",
+  "privacy": {
+    "intro": "Internet Monitor runs on your computer and keeps your data there. This page lists everything it stores and every place it connects to.",
+    "short": {
+      "title": "The short version",
+      "p1": "There's no account, no analytics, no ads and no tracking. The people who make Internet Monitor can't see your history, your settings or your alerts."
+    },
+    "stored": {
+      "title": "What's stored on your computer",
+      "p1": "Everything is kept in the app's folder, except two small preferences kept by your browser.",
+      "li1": "config.json: your settings. This includes your webhook URL, Telegram token and chat ID, saved as plain text. Don't share this file.",
+      "li2": "The logs folder: every check, outage and speed test result, plus app.log, a diagnostic log of what the app did. Files older than 90 days are deleted automatically.",
+      "li3": "notification.wav: your custom alert sound, if you uploaded one.",
+      "li4": ".session: the dashboard key for the current launch. It's replaced every time the app starts.",
+      "li5": "Your browser remembers your theme and language, so the dashboard opens the way you left it."
+    },
+    "network": {
+      "title": "What leaves your computer",
+      "p1": "The app only connects to the places below. Each of them sees your IP address, as with any internet connection, and its own privacy policy applies.",
+      "li1": "Connection checks go to the targets in Settings → Check targets. By default: Google and Cloudflare DNS servers (8.8.8.8 and 1.1.1.1), connectivitycheck.gstatic.com, and name lookups for www.google.com and www.cloudflare.com. It also checks your own router.",
+      "li2": "Speed tests go to speed.cloudflare.com by default, and only when you start one or schedule them. The test data contains nothing that identifies your device.",
+      "li3": "Update checks go to GitHub (api.github.com) every 6 hours, or when you press “Check for updates”. Installing an update downloads it from GitHub.",
+      "li4": "Alerts go to Discord, Slack or Telegram only if you set them up. They contain the status, times, durations and causes of outages, or a speed test result. The app doesn't add your computer's name or IP address."
+    },
+    "dashboard": {
+      "title": "The dashboard",
+      "p1": "The dashboard is served by the app on this computer (127.0.0.1). Other devices on your network can't open it. It uses one cookie, which holds the key for the current launch. It loads no outside scripts, fonts or images."
+    },
+    "control": {
+      "title": "You're in control",
+      "p1": "You can delete the logs folder at any time to erase your history. Deleting config.json resets your settings. To remove the app completely, turn off “Start with Windows” in Settings → App, quit the app, and delete its folder."
+    },
+    "changes": {
+      "title": "Changes to this page",
+      "p1": "If a new version changes what the app stores or where it connects, this page is updated and the change is listed in What's new. The date at the top shows the last update."
+    },
+    "contact": {
+      "title": "Questions",
+      "p1": "Reach us through any channel on the Contact page. Don't send your config.json or logs unless we ask, since they may contain your webhook, token or history."
+    }
+  },
+  "terms": {
+    "intro": "Internet Monitor is free to use, and its source code is public under the Elastic License 2.0. This page explains what that means in plain language. If anything here differs from the license, the license applies.",
+    "use": {
+      "title": "What you may do",
+      "p1": "You may use Internet Monitor for free, at home or at work. You may also copy it, change it and share it. When you share it, include the license with it, and if you changed it, say so clearly.",
+      "p2": "You may not offer Internet Monitor to others as a hosted or managed service, and you may not remove or hide its license, copyright or other notices.",
+      "p3": "Versions before 2.0.0 were released under the MIT license."
+    },
+    "warranty": {
+      "title": "No warranty",
+      "p1": "The app is provided as is. The license says:",
+      "quote": "As far as the law allows, the software comes as is, without any warranty or condition, and the licensor will not be liable to you for any damages arising out of these terms or the use or nature of the software, under any kind of legal claim."
+    },
+    "measurements": {
+      "title": "About the measurements",
+      "p1": "Results are measured from your computer. Wi-Fi signal, other devices on your network, a firewall, or the computer going to sleep can all affect them. Reports are a record of what your computer saw, not a certified measurement, and your provider may or may not accept them."
+    },
+    "fair": {
+      "title": "Use it fairly",
+      "p1": "Only point checks and speed tests at servers you're allowed to use. Don't set very short intervals against servers you don't run. When you use Cloudflare, GitHub, Discord, Slack or Telegram through the app, their own terms apply."
+    },
+    "changes": {
+      "title": "Changes",
+      "p1": "These terms may change in a new version. The date at the top shows the last update, and changes are listed in What's new."
+    },
+    "contact": {
+      "title": "Questions",
+      "p1": "Reach us through any channel on the Contact page."
+    }
+  }
+}

@@ -73,6 +73,9 @@ The v2 rebuild.
 - Dev mode: `go run ./cmd/tray` plus `bun run dev` in `web/` for the UI. The
   `.air.toml` config is no longer documented.
 - CI refuses to publish a release unless every binary is present.
+- Translations moved from one file per language to a folder per language with one
+  nested JSON file per page (`web/locales/<lang>/*.json`); changelog strings are
+  grouped by version (`changelog.v2.0.0.items.1`).
 - Error messages name the actual problem (rate limited, webhook not set up or
   rejected, update already running) instead of a generic failure, and a failed
   webhook test can be retried right away.

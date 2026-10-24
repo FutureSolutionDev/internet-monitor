@@ -7,7 +7,6 @@ import (
 	"path"
 	"regexp"
 	"sort"
-	"strings"
 
 	"internet-monitor/web"
 )
@@ -21,8 +20,8 @@ type Meta struct {
 }
 
 type locale struct {
-	Meta     Meta              `json:"meta"`
-	Messages map[string]string `json:"messages"`
+	Meta     Meta
+	Messages map[string]string
 }
 
 type Vars map[string]any
@@ -33,26 +32,67 @@ var (
 )
 
 func load(fsys fs.FS) (map[string]locale, error) {
-	files, err := fs.Glob(fsys, "locales/*.json")
+	files, err := fs.Glob(fsys, "locales/*/*.json")
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string]locale, len(files))
+	out := map[string]locale{}
+	hasMeta := map[string]bool{}
 	for _, name := range files {
+		code := path.Base(path.Dir(name))
 		data, err := fs.ReadFile(fsys, name)
 		if err != nil {
 			return nil, err
 		}
-		var l locale
-		if err := json.Unmarshal(data, &l); err != nil {
-			return nil, fmt.Errorf("%s: %w", name, err)
+		l, ok := out[code]
+		if !ok {
+			l = locale{Messages: map[string]string{}}
 		}
-		out[strings.TrimSuffix(path.Base(name), ".json")] = l
+		if path.Base(name) == "meta.json" {
+			if err := json.Unmarshal(data, &l.Meta); err != nil {
+				return nil, fmt.Errorf("%s: %w", name, err)
+			}
+			hasMeta[code] = true
+		} else {
+			var tree map[string]any
+			if err := json.Unmarshal(data, &tree); err != nil {
+				return nil, fmt.Errorf("%s: %w", name, err)
+			}
+			if err := flatten(tree, "", l.Messages); err != nil {
+				return nil, fmt.Errorf("%s: %w", name, err)
+			}
+		}
+		out[code] = l
+	}
+	for code := range out {
+		if !hasMeta[code] {
+			return nil, fmt.Errorf("locales: %s/meta.json is missing", code)
+		}
 	}
 	if _, ok := out[Default]; !ok {
-		return nil, fmt.Errorf("locales: %s.json is missing", Default)
+		return nil, fmt.Errorf("locales: %s is missing", Default)
 	}
 	return out, nil
+}
+
+func flatten(tree map[string]any, prefix string, out map[string]string) error {
+	for name, value := range tree {
+		key := prefix + name
+		switch v := value.(type) {
+		case string:
+			if _, dup := out[key]; dup {
+				return fmt.Errorf("%q is defined more than once", key)
+			}
+			out[key] = v
+		case map[string]any:
+			if err := flatten(v, key+".", out); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("%q must be a string or an object", key)
+		}
+	}
+	return nil
 }
 
 func mustLoad(fsys fs.FS) map[string]locale {

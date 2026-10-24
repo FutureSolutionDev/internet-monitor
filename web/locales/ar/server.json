@@ -1,0 +1,93 @@
+{
+  "notify": {
+    "test": {
+      "title": "تجربة الإشعار",
+      "body": "🔔 الإشعار والصوت شغّالين تمام"
+    },
+    "restored": {
+      "title": "✅ النت رجع",
+      "latency": "زمن الاستجابة: {ms}ms",
+      "ok": "كل الفحوصات تمام",
+      "after": "رجع بعد {duration}"
+    },
+    "degraded": {
+      "title": "⚠️ النت مش مستقر",
+      "body": "فقد: {loss}% — زمن: {ms}ms"
+    },
+    "down": {
+      "title": "🔴 النت قطع",
+      "failed": "فشل: {layers}",
+      "lost": "الاتصال اتقطع"
+    },
+    "reminder": {
+      "title": "⏰ لسه مفيش نت",
+      "body": "مقطوع من {duration}"
+    },
+    "speed": {
+      "title": "🚀 خلص قياس السرعة",
+      "slow_title": "⚠️ السرعة أقل من {threshold} Mbps",
+      "body": "↓ {down} Mbps · ↑ {up} Mbps · {ms} ms",
+      "body_down": "↓ {down} Mbps · {ms} ms"
+    },
+    "action": {
+      "open": "افتح اللوحة"
+    }
+  },
+  "duration": {
+    "s": "{s} ث",
+    "m": "{m} د",
+    "ms": "{m} د {s} ث",
+    "h": "{h} س",
+    "hm": "{h} س {m} د"
+  },
+  "remote": {
+    "title": {
+      "down": "النت قطع",
+      "degraded": "النت مش مستقر",
+      "restored": "النت رجع",
+      "reminder": "النت لسه مقطوع"
+    },
+    "tcp": "TCP ping",
+    "http": "HTTP",
+    "dns": "DNS",
+    "loss": "فقد الحزم",
+    "latency": "زمن الاستجابة",
+    "duration": "المدة",
+    "ok": "سليم",
+    "failed": "فشل",
+    "footer": "سجل الأحداث",
+    "download": "التنزيل",
+    "upload": "الرفع",
+    "threshold": "الحد",
+    "speed": {
+      "done": "قياس السرعة خلص",
+      "drop": "السرعة قلّت"
+    }
+  },
+  "tray": {
+    "starting": "جاري التشغيل…",
+    "status": {
+      "connected": "متصل",
+      "degraded": "مش مستقر",
+      "disconnected": "مقطوع",
+      "checking": "جاري الفحص…"
+    },
+    "detail": "فقد {loss}% · {ms} مللي ثانية",
+    "last_change": "آخر تغيير: {time}",
+    "last_change_none": "آخر تغيير: —",
+    "open_dashboard": "افتح لوحة التحكم",
+    "open_dashboard_hint": "افتح لوحة التحكم في المتصفح",
+    "open_window": "افتح النافذة",
+    "open_window_hint": "اعرض النافذة الرئيسية",
+    "open_logs": "افتح فولدر السجلات",
+    "open_logs_hint": "افتح الفولدر اللي فيه ملفات السجل",
+    "exit": "خروج",
+    "exit_hint": "أوقف المراقبة واقفل التطبيق"
+  },
+  "webhook": {
+    "test": {
+      "title": "🔔 اختبار الـ Webhook",
+      "body": "مراقب الإنترنت قادر يوصل للـ webhook ده ✅"
+    }
+  }
+}

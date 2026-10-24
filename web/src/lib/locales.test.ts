@@ -1,5 +1,14 @@
 import { describe, expect, test } from "vitest";
-import { DEFAULT_LANG, LOCALES, translate } from "./i18n";
+import {
+  DEFAULT_LANG,
+  flattenMessages,
+  LOCALE_FILES,
+  LOCALES,
+  loadLocales,
+  MESSAGE_FILES,
+  type MessageTree,
+  translate,
+} from "./i18n";
 
 const base = LOCALES.find((l) => l.code === DEFAULT_LANG);
 const baseKeys = Object.keys(base?.messages ?? {}) as (keyof NonNullable<typeof base>["messages"])[];
@@ -36,6 +45,35 @@ describe("locale files", () => {
         placeholders(l.messages[k]).join() !== placeholders(base?.messages[k]).join(),
     );
     expect(wrong).toEqual([]);
+  });
+
+  test("every language has the same page files with the same keys", () => {
+    const byLang = new Map<string, Map<string, string[]>>();
+    for (const [path, data] of Object.entries(LOCALE_FILES)) {
+      const [, code = "", file = ""] = /\/([^/]+)\/([^/]+)\.json$/.exec(path) ?? [];
+      if (file === "meta") continue;
+      const files = byLang.get(code) ?? new Map<string, string[]>();
+      byLang.set(code, files);
+      files.set(file, Object.keys(flattenMessages(data as MessageTree, path)).sort());
+    }
+    const reference = byLang.get(DEFAULT_LANG);
+    expect([...(reference?.keys() ?? [])].sort()).toEqual(Object.keys(MESSAGE_FILES).sort());
+    for (const [code, files] of byLang) {
+      expect([...files.keys()].sort(), code).toEqual([...(reference?.keys() ?? [])].sort());
+      for (const [file, keys] of files) expect(keys, `${code}/${file}.json`).toEqual(reference?.get(file));
+    }
+  });
+
+  test("a key defined in two files is rejected", () => {
+    const meta = { name: "X", dir: "ltr", intl: "en" };
+    expect(() =>
+      loadLocales({
+        "/locales/xx/meta.json": meta,
+        "/locales/xx/a.json": { faq: { q: "1" } },
+        "/locales/xx/b.json": { "faq.q": "2" },
+      }),
+    ).toThrow(/faq\.q/);
+    expect(() => loadLocales({ "/locales/xx/a.json": { k: "v" } })).toThrow(/meta\.json/);
   });
 
   test("unknown placeholders are left untouched", () => {

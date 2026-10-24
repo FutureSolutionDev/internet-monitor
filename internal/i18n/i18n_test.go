@@ -43,11 +43,22 @@ func TestNormalize(t *testing.T) {
 }
 
 func TestLoadRejectsBrokenFiles(t *testing.T) {
-	if _, err := load(fstest.MapFS{"locales/en.json": {Data: []byte("{")}}); err == nil {
-		t.Error("broken JSON accepted")
+	meta := &fstest.MapFile{Data: []byte(`{"name":"English","dir":"ltr","intl":"en"}`)}
+	cases := map[string]fstest.MapFS{
+		"broken JSON":     {"locales/en/meta.json": meta, "locales/en/a.json": {Data: []byte("{")}},
+		"missing English": {"locales/ar/meta.json": meta, "locales/ar/a.json": {Data: []byte(`{"k":"v"}`)}},
+		"missing meta":    {"locales/en/a.json": {Data: []byte(`{"k":"v"}`)}},
+		"duplicate key":   {"locales/en/meta.json": meta, "locales/en/a.json": {Data: []byte(`{"faq":{"q":"1"}}`)}, "locales/en/b.json": {Data: []byte(`{"faq.q":"2"}`)}},
+		"non-string leaf": {"locales/en/meta.json": meta, "locales/en/a.json": {Data: []byte(`{"k":1}`)}},
 	}
-	if _, err := load(fstest.MapFS{"locales/ar.json": {Data: []byte(`{"meta":{},"messages":{}}`)}}); err == nil {
-		t.Error("missing English accepted")
+	for name, fsys := range cases {
+		if _, err := load(fsys); err == nil {
+			t.Errorf("%s accepted", name)
+		}
+	}
+	l, err := load(fstest.MapFS{"locales/en/meta.json": meta, "locales/en/a.json": {Data: []byte(`{"notify":{"down":{"title":"Down"}}}`)}})
+	if err != nil || l["en"].Messages["notify.down.title"] != "Down" {
+		t.Errorf("nested keys not flattened: %v %v", err, l["en"].Messages)
 	}
 }
 

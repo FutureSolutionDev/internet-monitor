@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
-import ar from "../../locales/ar.json";
-import en from "../../locales/en.json";
 import { FAQ } from "../content/faq";
+import { LOCALES } from "../lib/i18n";
 import { parseRichText, plainText } from "./RichText";
 
 const ANCHORS = new Set([
@@ -33,7 +32,7 @@ describe("rich text", () => {
   });
 
   test("every FAQ link points to a real page and a known spot", () => {
-    for (const messages of [en.messages, ar.messages] as Record<string, string>[]) {
+    for (const messages of LOCALES.map((l) => l.messages as Record<string, string>)) {
       for (const section of FAQ) {
         for (const item of section.items) {
           const raw = messages[item.a] ?? "";
