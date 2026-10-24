@@ -35,6 +35,10 @@ The v2 rebuild.
   **FAQ**, **About**, **Contact** (WhatsApp, Discord, email, GitHub), **Privacy**
   and **Terms of use**, linked from the sidebar.
 - Unsaved-changes guard in Settings.
+- **What's new after an update**: the first time the dashboard opens on a new
+  version it shows that release's changes once, with a link to the full list.
+- FAQ answers link to the exact setting they mention, and the setting is
+  scrolled into view and highlighted.
 - **Notification controls** (`notifications` in `config.json`): sound on/off and
   volume, quiet hours (mute the sound or the whole desktop alert, per weekday,
   windows across midnight), an on/off switch per event (down, unstable, restored,
@@ -63,6 +67,10 @@ The v2 rebuild.
 - Dev mode: `go run ./cmd/tray` plus `bun run dev` in `web/` for the UI. The
   `.air.toml` config is no longer documented.
 - CI refuses to publish a release unless every binary is present.
+- Error messages name the actual problem (rate limited, webhook not set up or
+  rejected, update already running) instead of a generic failure, and a failed
+  webhook test can be retried right away.
+- Availability is rounded down, so any downtime never displays as 100%.
 
 ### Fixed
 - **Uploaded custom alert sounds silently fell back to the default.** The
@@ -70,8 +78,9 @@ The v2 rebuild.
 - The auto-updater never selects the GUI asset for a tray install.
 
 ### Security
-- The local dashboard binds `127.0.0.1` and requires a per-launch session token;
-  open it from the tray menu or app window.
+- The local dashboard binds `127.0.0.1` and requires a private session key that
+  is kept for up to 24 hours, so an open dashboard reconnects on its own after a
+  restart; open it from the tray menu or app window.
 - Webhook URL and Telegram token are never sent back to the browser (shown as
   "Saved — hidden").
 - Webhook URLs must be `https` and on a Discord or Slack host.

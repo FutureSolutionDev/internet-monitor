@@ -710,6 +710,9 @@
     "tray.exit": "Exit",
     "tray.exit_hint": "Stop monitoring and exit",
     "webhook.test.title": "🔔 Webhook test",
-    "webhook.test.body": "Internet Monitor can reach this webhook ✅"
+    "webhook.test.body": "Internet Monitor can reach this webhook ✅",
+    "changelog.v2.25": "After an update, a short window shows what changed in the new version.",
+    "changelog.v2.26": "FAQ answers link straight to the setting they mention and highlight it for you.",
+    "changelog.v2.27": "Error messages say what actually went wrong, and availability never rounds up to 100% when there was downtime."
   }
 }
