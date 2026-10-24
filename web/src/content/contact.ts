@@ -15,7 +15,6 @@ export interface ContactChannel {
 }
 
 export const CONTACT_EMAIL = "sabrydawood@outlook.com";
-export const WHATSAPP_NUMBER = "+20 106 901 7890";
 
 export const CHANNELS: ContactChannel[] = [
   {
@@ -23,8 +22,8 @@ export const CHANNELS: ContactChannel[] = [
     icon: MessageCircle,
     accent: "green",
     name: "contact.whatsapp.name",
-    handle: WHATSAPP_NUMBER,
-    href: "https://wa.me/201069017890",
+    handle: "Dawood's Gate",
+    href: "https://chat.whatsapp.com/Jt5KHILgpCMLp0dtx7hGd0",
     best: "contact.whatsapp.best",
   },
   {
@@ -32,7 +31,7 @@ export const CHANNELS: ContactChannel[] = [
     icon: MessagesSquare,
     accent: "violet",
     name: "contact.discord.name",
-    handle: "discord.gg/7Vhx6fw4qj",
+    handle: "Dawood's Gate",
     href: "https://discord.gg/7Vhx6fw4qj",
     best: "contact.discord.best",
   },
@@ -41,7 +40,7 @@ export const CHANNELS: ContactChannel[] = [
     icon: Mail,
     accent: "blue",
     name: "contact.email.name",
-    handle: CONTACT_EMAIL,
+    handle: "Sabry Dawood",
     href: `mailto:${CONTACT_EMAIL}`,
     best: "contact.email.best",
   },
@@ -50,7 +49,7 @@ export const CHANNELS: ContactChannel[] = [
     icon: GitBranch,
     accent: "coral",
     name: "contact.github.name",
-    handle: "FutureSolutionDev/internet-monitor",
+    handle: "Internet Monitor",
     href: `${REPO_URL}/issues`,
     best: "contact.github.best",
   },
