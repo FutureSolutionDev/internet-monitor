@@ -196,11 +196,16 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Generate app icon (embed favicon as .syso)
+      - name: Generate Windows resources (icon, manifest, version info)
+        env:
+          VERSION: ${{ needs.version.outputs.new_tag || needs.web.outputs.dev_version }}
         run: |
           go install github.com/tc-hib/go-winres@v0.3.3
           cd cmd/tray
-          go-winres simply --arch amd64 --icon ../../internal/assets/favicon.png
+          go-winres simply --arch amd64 --icon ../../internal/assets/favicon.png \
+            --product-version "$VERSION" --file-version "$VERSION" \
+            --product-name "Internet Monitor" --file-description "Internet Monitor" \
+            --original-filename internet-monitor-windows.exe
 
       - name: Build
         env:
@@ -234,11 +239,16 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Generate app icon (embed favicon as .syso)
+      - name: Generate Windows resources (icon, manifest, version info)
+        env:
+          VERSION: ${{ needs.version.outputs.new_tag || needs.web.outputs.dev_version }}
         run: |
           go install github.com/tc-hib/go-winres@v0.3.3
           cd cmd/gui
-          go-winres simply --arch amd64 --icon ../../internal/assets/favicon.png
+          go-winres simply --arch amd64 --icon ../../internal/assets/favicon.png `
+            --product-version "$env:VERSION" --file-version "$env:VERSION" `
+            --product-name "Internet Monitor" --file-description "Internet Monitor Dashboard" `
+            --original-filename internet-monitor-gui-windows.exe
 
       - name: Build
         env:
