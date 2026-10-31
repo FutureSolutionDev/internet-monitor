@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	apiURL        = "https://api.github.com/repos/FutureSolutionDev/internet-monitor/releases/latest"
+	apiURL        = "https://api.github.com/repos/Khaymah/internet-monitor/releases/latest"
 	checkInterval = 6 * time.Hour
 )
 

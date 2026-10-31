@@ -161,7 +161,7 @@ Last release before the 0.9.x → 0.10.0 feature wave. Earlier tags
 (0.0.1 – 0.8.1) predate this changelog; see the GitHub Releases page for their
 auto-generated notes.
 
-[2.0.0]: https://github.com/FutureSolutionDev/internet-monitor/releases/tag/v2.0.0
-[0.10.0]: https://github.com/FutureSolutionDev/internet-monitor/releases/tag/v0.10.0
-[0.9.4]: https://github.com/FutureSolutionDev/internet-monitor/releases/tag/v0.9.4
-[0.8.1]: https://github.com/FutureSolutionDev/internet-monitor/releases/tag/v0.8.1
+[2.0.0]: https://github.com/Khaymah/internet-monitor/releases/tag/v2.0.0
+[0.10.0]: https://github.com/Khaymah/internet-monitor/releases/tag/v0.10.0
+[0.9.4]: https://github.com/Khaymah/internet-monitor/releases/tag/v0.9.4
+[0.8.1]: https://github.com/Khaymah/internet-monitor/releases/tag/v0.8.1

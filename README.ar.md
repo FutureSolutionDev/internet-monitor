@@ -2,7 +2,7 @@
 
 ![Logo](internal/assets/favicon.png)
 
-[![Build & Release](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml/badge.svg)](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml)
+[![Build & Release](https://github.com/Khaymah/internet-monitor/actions/workflows/build.yml/badge.svg)](https://github.com/Khaymah/internet-monitor/actions/workflows/build.yml)
 [![License: Elastic 2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go)](https://go.dev)
 ![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
@@ -83,7 +83,7 @@
 
 > **تحذير Windows SmartScreen؟** انقر **"مزيد من المعلومات" ← "تشغيل على أي حال"**. الملف التنفيذي غير موقَّع — الكود المصدري قابل للفحص الكامل أعلاه.
 
-حمّل أحدث ملف تنفيذي جاهز من [**الإصدارات**](https://github.com/FutureSolutionDev/internet-monitor/releases/latest):
+حمّل أحدث ملف تنفيذي جاهز من [**الإصدارات**](https://github.com/Khaymah/internet-monitor/releases/latest):
 
 | الملف | نظام التشغيل | الوضع |
 | ----- | ------------ | ------ |
@@ -123,7 +123,7 @@ chmod +x internet-monitor-*
 تحتاج [Go](https://go.dev/dl/) و[bun](https://bun.sh) (انظر [البناء من المصدر](#️-البناء-من-المصدر)). ابنِ واجهة الويب مرة واحدة ليجد Go ملفات للتضمين:
 
 ```bash
-git clone https://github.com/FutureSolutionDev/internet-monitor.git
+git clone https://github.com/Khaymah/internet-monitor.git
 cd internet-monitor
 cd web && bun install --frozen-lockfile && bun run build && cd ..
 go run ./cmd/tray
@@ -170,7 +170,7 @@ cd ..
 ### نسخة الـ Tray — لا تحتاج CGO على Windows
 
 ```bash
-git clone https://github.com/FutureSolutionDev/internet-monitor.git
+git clone https://github.com/Khaymah/internet-monitor.git
 cd internet-monitor
 cd web && bun install --frozen-lockfile && bun run build && cd ..
 go build -ldflags="-H=windowsgui -s -w" -o internet-monitor.exe ./cmd/tray
@@ -519,4 +519,4 @@ git checkout -b feature/اسم-الميزة
 مينفعش تقدّمه لحد تاني كخدمة مستضافة أو مُدارة، ولازم تسيب الرخصة وحقوق النشر زي ما هي.
 النسخ اللي قبل 2.0.0 نزلت برخصة MIT.
 
-صُنع بـ ❤️ بواسطة [FutureSolutionDev](https://github.com/FutureSolutionDev)
+صُنع بـ ❤️ بواسطة [Khaymah](https://github.com/Khaymah)

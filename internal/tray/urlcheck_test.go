@@ -35,7 +35,7 @@ func TestValidateExternalURL(t *testing.T) {
 		in string
 		ok bool
 	}{
-		{"https://github.com/FutureSolutionDev/internet-monitor/issues", true},
+		{"https://github.com/Khaymah/internet-monitor/issues", true},
 		{"https://wa.me/201069017890", true},
 		{"https://discord.gg/7Vhx6fw4qj", true},
 		{"https://chat.whatsapp.com/Jt5KHILgpCMLp0dtx7hGd0", true},

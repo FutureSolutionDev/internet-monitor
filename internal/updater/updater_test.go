@@ -52,7 +52,7 @@ func TestCompareVersions(t *testing.T) {
 
 func TestTrustedURL(t *testing.T) {
 	for _, u := range []string{
-		"https://github.com/FutureSolutionDev/internet-monitor/releases/download/v1/x.exe",
+		"https://github.com/Khaymah/internet-monitor/releases/download/v1/x.exe",
 		"https://objects.githubusercontent.com/abc",
 	} {
 		if err := trustedURL(u); err != nil {

@@ -2,7 +2,7 @@
 
 ![Logo](internal/assets/favicon.png)
 
-[![Build & Release](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml/badge.svg)](https://github.com/FutureSolutionDev/internet-monitor/actions/workflows/build.yml)
+[![Build & Release](https://github.com/Khaymah/internet-monitor/actions/workflows/build.yml/badge.svg)](https://github.com/Khaymah/internet-monitor/actions/workflows/build.yml)
 [![License: Elastic 2.0](https://img.shields.io/badge/License-Elastic%202.0-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go)](https://go.dev)
 ![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
@@ -83,7 +83,7 @@ Most "my internet is down" complaints fail because you have **no proof** — no 
 
 > **Windows SmartScreen warning?** Click **"More info" → "Run anyway"**. The binary is unsigned — the source code is fully auditable above.
 
-Download the latest pre-built binary from [**Releases**](https://github.com/FutureSolutionDev/internet-monitor/releases/latest):
+Download the latest pre-built binary from [**Releases**](https://github.com/Khaymah/internet-monitor/releases/latest):
 
 | File | OS | Mode |
 | ---- | -- | ---- |
@@ -123,7 +123,7 @@ Open the dashboard from the **tray menu** (or the app window in the GUI version)
 You need [Go](https://go.dev/dl/) and [bun](https://bun.sh) (see [Build from Source](#️-build-from-source)). Build the web UI once so the Go embed has files to pick up:
 
 ```bash
-git clone https://github.com/FutureSolutionDev/internet-monitor.git
+git clone https://github.com/Khaymah/internet-monitor.git
 cd internet-monitor
 cd web && bun install --frozen-lockfile && bun run build && cd ..
 go run ./cmd/tray
@@ -170,7 +170,7 @@ Other checks used by CI: `bun run typecheck`, `bun run lint`, `bun run test`.
 ### Tray version — no CGO needed on Windows
 
 ```bash
-git clone https://github.com/FutureSolutionDev/internet-monitor.git
+git clone https://github.com/Khaymah/internet-monitor.git
 cd internet-monitor
 cd web && bun install --frozen-lockfile && bun run build && cd ..
 go build -ldflags="-H=windowsgui -s -w" -o internet-monitor.exe ./cmd/tray
@@ -520,4 +520,4 @@ in Settings automatically.
 You may not offer it to others as a hosted or managed service, and you must keep its license and
 copyright notices. Versions before 2.0.0 were released under the MIT license.
 
-Built with ❤️ by [FutureSolutionDev](https://github.com/FutureSolutionDev)
+Built with ❤️ by [Khaymah](https://github.com/Khaymah)
